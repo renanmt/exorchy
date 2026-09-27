@@ -590,7 +590,12 @@ fn tick(live: &Shared) -> bool {
         {
             let mut l = live.borrow_mut();
             l.row_id = id;
-            l.ctx = NoteContext { game: row.clone(), is_windows: IS_WINDOWS, ..Default::default() };
+            l.ctx = NoteContext {
+                game: row.clone(),
+                is_windows: IS_WINDOWS,
+                video_unsupported: crate::ui::media::video_supported() == Some(false),
+                ..Default::default()
+            };
             l.collection = row.as_ref().and_then(|g| g.torrent_source.clone()).unwrap_or_else(|| "eXoWin9x".into());
             l.support_next = None;
         }

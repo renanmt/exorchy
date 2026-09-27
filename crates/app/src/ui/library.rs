@@ -329,6 +329,7 @@ impl LibraryPage {
         // Search (GTK debounces search-changed ~150 ms; a second beat keeps typing cheap).
         self.search.connect_search_changed(glib::clone!(#[weak(rename_to = page)] self, move |e| {
             let q = e.text().to_string();
+            crate::ui::reading::set_query(&q);
             page.filters.borrow_mut().query = q;
             page.debounced_fetch();
         }));

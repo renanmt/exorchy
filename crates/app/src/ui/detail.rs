@@ -37,6 +37,7 @@ pub struct DetailPanel {
     info: gtk::Grid,
     gallery: gtk::FlowBox,
     gallery_head: gtk::Label,
+    articles_slot: gtk::Box,
     manual_path: RefCell<Option<String>>,
     scroller: gtk::ScrolledWindow,
     /// Below the cover; `ui::media` fills it.
@@ -88,6 +89,9 @@ impl DetailPanel {
         body.append(&notes);
         let info = gtk::Grid::builder().row_spacing(4).column_spacing(16).css_classes(["detail-info"]).build();
         body.append(&info);
+        // "Covered in": magazine articles about the game (ui::reading).
+        let articles_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
+        body.append(&articles_slot);
         let gallery_head = gtk::Label::builder().label("Screenshots").xalign(0.0).css_classes(["title-3"]).visible(false).build();
         body.append(&gallery_head);
         let gallery = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).column_spacing(6).row_spacing(6).min_children_per_line(3).max_children_per_line(6).homogeneous(true).build();
@@ -123,6 +127,7 @@ impl DetailPanel {
             info,
             gallery,
             gallery_head,
+            articles_slot,
             manual_path: RefCell::new(None),
             scroller,
             media_slot,
@@ -197,6 +202,12 @@ impl DetailPanel {
             self.load_cover(&game);
             self.load_variants(&game);
             self.load_metadata(&game);
+            while let Some(c) = self.articles_slot.first_child() {
+                self.articles_slot.remove(&c);
+            }
+            if let Some(id) = game.id {
+                self.articles_slot.append(&crate::ui::reading::game_articles_widget(id, &self.window));
+            }
             // An installed game whose extras are still downloading after a
             // restart gets its tracker back, so the phase stays visible.
             if game.installed {
@@ -463,7 +474,8 @@ impl DetailPanel {
             }
             if let Some(m) = self.manual_path.borrow().clone() {
                 let b = btn("Manual", &[]);
-                b.connect_clicked(move |_| actions::open_document(m.clone()));
+                let (w, title) = (self.window.clone(), row.title.clone());
+                b.connect_clicked(move |_| crate::ui::pdf::open_document_viewer(&w, &m, &title, None, 1));
                 self.actions.append(&b);
             }
         } else if downloading {
