@@ -6,14 +6,14 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use exorchy_core::commands::{assets, games};
+use exorchy_core::commands::{assets, games, win9x};
 use exorchy_core::models::Game;
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 
 use crate::app;
 use crate::ui::util::{esc, format_bytes, platform_tag};
-use crate::ui::{actions, bus, covers, downloads};
+use crate::ui::{actions, bus, covers, downloads, launch_notes};
 
 pub const PANEL_WIDTH: i32 = 560;
 
@@ -41,6 +41,12 @@ pub struct DetailPanel {
     scroller: gtk::ScrolledWindow,
     /// Below the cover; `ui::media` fills it.
     pub media_slot: gtk::Box,
+    /// Right above the action bar; `ui::launch_notes` fills it.
+    pub note_slot: gtk::Box,
+    /// A blocking launch note: Play is insensitive with this as tooltip.
+    play_blocked: RefCell<Option<String>>,
+    /// The block is temporary (a support or pack download): Play spins.
+    play_pending: Cell<bool>,
     shown_listeners: RefCell<Vec<Rc<dyn Fn(Option<&Game>)>>>,
 }
 
@@ -65,6 +71,10 @@ impl DetailPanel {
         body.append(&subtitle);
         let chips = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).visible(false).build();
         body.append(&chips);
+        // The launch note (engine missing, support download, ...) sits right
+        // above the bar whose Play it explains.
+        let note_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).visible(false).build();
+        body.append(&note_slot);
         let actions = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["detail-actions"]).build();
         body.append(&actions);
         let status = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["muted", "small"]).visible(false).build();
@@ -113,10 +123,40 @@ impl DetailPanel {
             manual_path: RefCell::new(None),
             scroller,
             media_slot,
+            note_slot,
+            play_blocked: RefCell::new(None),
+            play_pending: Cell::new(false),
             shown_listeners: RefCell::new(Vec::new()),
         });
         close.connect_clicked(glib::clone!(#[weak] panel, move |_| panel.close()));
+        launch_notes::attach(&panel);
         panel
+    }
+
+    /// The row the action bar acts on: the selected language variant, else
+    /// the card's game.
+    pub fn selected_game(&self) -> Option<Game> {
+        self.selected_row()
+    }
+
+    /// A launch that cannot work: Play goes insensitive, `blocked` is its
+    /// tooltip. `None` lifts the block.
+    pub fn set_play_blocked(self: &Rc<Self>, blocked: Option<String>) {
+        if *self.play_blocked.borrow() == blocked {
+            return;
+        }
+        self.play_blocked.replace(blocked);
+        self.render_actions();
+    }
+
+    /// The block is being worked on (a download in flight): Play shows a
+    /// spinner instead of failing.
+    pub fn set_play_pending(self: &Rc<Self>, pending: bool) {
+        if self.play_pending.get() == pending {
+            return;
+        }
+        self.play_pending.set(pending);
+        self.render_actions();
     }
 
     pub fn is_open(&self) -> bool {
@@ -147,6 +187,9 @@ impl DetailPanel {
 
     pub fn show(self: &Rc<Self>, game: Game) {
         let same = self.game.borrow().as_ref().and_then(|g| g.id) == game.id && game.id.is_some();
+        // Reopening the same game after a close is an open too: the listeners
+        // (media, launch notes) tore down on the close and must come back.
+        let reopened = !self.widget.reveals_child();
         self.game.replace(Some(game.clone()));
         if !same {
             self.selected.set(game.id);
@@ -158,7 +201,7 @@ impl DetailPanel {
         }
         self.render();
         self.widget.set_reveal_child(true);
-        if !same {
+        if !same || reopened {
             self.notify_shown(Some(&game));
         }
     }
@@ -388,19 +431,28 @@ impl DetailPanel {
                 b.connect_clicked(move |_| actions::stop(id));
                 self.actions.append(&b);
             } else {
-                let b = btn(if self.launching.get() { "Starting…" } else { "▶ Play" }, &["primary"]);
-                b.set_sensitive(!self.launching.get());
+                let blocked = self.play_blocked.borrow().clone();
+                let pending = self.play_pending.get();
+                let launching = self.launching.get();
+                let label = if launching {
+                    "Starting…"
+                } else if pending {
+                    "Preparing…"
+                } else {
+                    "▶ Play"
+                };
+                let b = btn(label, &["primary"]);
+                if launching || pending {
+                    // The spinner is the button's own content while it waits.
+                    let inner = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+                    inner.append(&gtk::Spinner::builder().spinning(true).build());
+                    inner.append(&gtk::Label::new(Some(label)));
+                    b.set_child(Some(&inner));
+                }
+                b.set_sensitive(!launching && !pending && blocked.is_none());
+                b.set_tooltip_text(blocked.as_deref());
                 let (title, panel) = (row.title.clone(), Rc::downgrade(self));
-                b.connect_clicked(move |_| {
-                    let panel = panel.clone();
-                    let busy: Rc<dyn Fn(bool)> = Rc::new(move |on| {
-                        if let Some(p) = panel.upgrade() {
-                            p.launching.set(on);
-                            p.render_actions();
-                        }
-                    });
-                    actions::play(id, title.clone(), busy);
-                });
+                b.connect_clicked(move |_| play_with_net_prompt(&panel, id, title.clone()));
                 self.actions.append(&b);
             }
             if let Some(m) = self.manual_path.borrow().clone() {
@@ -505,6 +557,79 @@ impl DetailPanel {
         self.status.set_label(text.as_deref().unwrap_or(""));
         self.status.set_visible(text.is_some());
     }
+}
+
+/// Online-capable Win9x games ask once, on the first Play, whether to turn
+/// multiplayer on - the backend answers `prompt: false` for every game and
+/// every state where the question would be noise. Everything else launches
+/// straight away.
+fn play_with_net_prompt(panel: &std::rc::Weak<DetailPanel>, id: i64, title: String) {
+    let Some(p) = panel.upgrade() else { return };
+    if p.launching.get() {
+        return;
+    }
+    let busy: Rc<dyn Fn(bool)> = {
+        let panel = panel.clone();
+        Rc::new(move |on| {
+            if let Some(p) = panel.upgrade() {
+                p.launching.set(on);
+                p.render_actions();
+            }
+        })
+    };
+    let window = p.window.clone();
+    let core = app::core();
+    app::spawn(async move { win9x::win9x_multiplayer_info(core.state(), id).await }, move |res| match res {
+        Ok(info) if info.prompt => net_prompt(&window, id, title, busy),
+        _ => actions::play(id, title, busy),
+    });
+}
+
+/// Asked on Play, not in Settings: this is the moment the online mode would
+/// otherwise silently be missing. Either answer can be remembered, and
+/// either answer launches - a dismissed system dialog means "not now", not
+/// "don't play".
+fn net_prompt(parent: &gtk::Window, id: i64, title: String, busy: Rc<dyn Fn(bool)>) {
+    let dialog = adw::AlertDialog::builder()
+        .heading("Play online?")
+        .body(
+            "This game can play online against others who own the collection, over a community-run IPX gateway. \
+             That needs one-time permission from your system to bridge the emulated network card; you can also play on your own without it.",
+        )
+        .build();
+    dialog.add_responses(&[("offline", "Play offline"), ("setup", "Set up now…")]);
+    dialog.set_response_appearance("setup", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("setup"));
+    dialog.set_close_response("offline");
+    let remember = gtk::CheckButton::with_label("Don't ask again");
+    dialog.set_extra_child(Some(&remember));
+    dialog.connect_response(None, move |_, response| {
+        if remember.is_active() {
+            let core = app::core();
+            app::spawn(async move { win9x::dismiss_win9x_network_prompt(core.state()).await }, |res| {
+                if let Err(e) = res {
+                    log::warn!("dismiss_win9x_network_prompt: {e}");
+                }
+            });
+        }
+        let (title, busy) = (title.clone(), busy.clone());
+        if response == "setup" {
+            busy(true);
+            let core = app::core();
+            app::spawn(async move { win9x::enable_win9x_network(core.clone()).await }, move |res| {
+                busy(false);
+                if let Err(e) = res {
+                    if !e.to_lowercase().contains("cancelled") {
+                        bus::toast_with("Could not enable multiplayer", Some(&e), None);
+                    }
+                }
+                actions::play(id, title, busy);
+            });
+        } else {
+            actions::play(id, title, busy);
+        }
+    });
+    dialog.present(Some(parent));
 }
 
 fn btn(label: &str, extra: &[&str]) -> gtk::Button {

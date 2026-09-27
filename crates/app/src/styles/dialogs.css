@@ -1,1 +1,72 @@
-/* dialogs: rules for ui/dialogs.rs. Tokens only (see theme.rs). */
+/* dialogs: rules for ui/dialogs.rs, ui/playlists.rs, ui/game_settings.rs,
+   ui/onboarding.rs and the launch note (ui/launch_notes.rs). Tokens only
+   (see theme.rs). */
+
+/* ---- Dialog bodies (adw::Dialog content) ---- */
+.dialog-body { background-color: transparent; }
+.dialog-body .form-label { color: var(--text-secondary); }
+.dialog-body .form-note { color: var(--text-muted); line-height: 1.4; }
+textview.conf-editor, textview.conf-editor text {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 6px;
+}
+.conf-scroller { border: 1px solid var(--line-3); border-radius: var(--radius); }
+.conf-scroller:focus-within { border-color: var(--accent); }
+
+/* ---- Playlist picker / management ---- */
+list.playlist-list { background: none; }
+list.playlist-list > row { background: none; padding: 0; }
+.playlist-row { padding: 6px 4px; border-bottom: 1px solid var(--line-1); }
+.playlist-row:hover { background-color: var(--fill-1); border-radius: var(--radius); }
+.playlist-row checkbutton { color: var(--text-primary); }
+.playlist-section { padding: 4px; }
+
+/* ---- Welcome ---- */
+checkbutton.welcome-option { padding: 4px 2px; }
+checkbutton.welcome-option:disabled { color: var(--text-muted); }
+.welcome-credit { line-height: 1.4; }
+.welcome-credit link { color: var(--accent); }
+
+/* ---- The launch note above the action bar ---- */
+.launch-note {
+  background-color: var(--fill-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 9px 10px 9px 11px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+.launch-note .note-text { line-height: 1.45; }
+.launch-note .note-mark {
+  min-width: 16px;
+  min-height: 16px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--om-foreground) 22%, transparent);
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.launch-note.is-blocking { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.launch-note.is-blocking .note-mark {
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  color: var(--danger);
+  font-style: normal;
+}
+.launch-note .note-action { margin-top: 2px; }
+button.note-dismiss {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 4px;
+  min-width: 0;
+  min-height: 0;
+  margin: -2px -2px 0 0;
+  border-radius: 5px;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+button.note-dismiss:hover { opacity: 1; background-color: var(--fill-2); color: var(--text-primary); }

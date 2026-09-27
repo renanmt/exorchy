@@ -22,6 +22,7 @@
 
 pub mod actions;
 pub mod game_settings;
+pub mod launch_notes;
 pub mod media;
 pub mod onboarding;
 pub mod playlists;
