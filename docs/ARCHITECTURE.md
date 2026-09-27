@@ -55,7 +55,6 @@ exorchy/
 │   │                         actions, bus, dialogs, util + the feature modules (settings, reading,
 │   │                         media, playlists, game_settings, onboarding)
 │   └── assets/               splash.jpg, exorchy.svg, collections/<col>.jpg (shelf art)
-├── legacy/webui/             the previous SolidJS UI: the porting reference until parity, then deleted
 ├── metadata/                 bundled XML (gz), configs zips, variant indexes, media index, exorchy.db.gz
 ├── torrents/                 every eXo .torrent (DOS packs, Win3x, Win9x, ScummVM, Media Pack)
 ├── manifest.json             content packs + emulator packs per collection
@@ -382,4 +381,3 @@ the per-collection differences: `docs/COLLECTIONS.md`.
 - eXorchy's own poster/emulator pack hosting: the manifest still points at
   Exodium's GitHub release assets (MIT-licensed tooling; eXo content either
   way). `scripts/gen_thumbnails.py` + `gen_previews.py` build drop-in packs.
-- Deleting `legacy/webui` once every feature module has reached parity.

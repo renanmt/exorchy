@@ -2,7 +2,8 @@
 
 Read this before writing UI code. The backend (`crates/core`) is finished and
 tested; the UI is being rebuilt in Rust with GTK4 + libadwaita from the web UI
-in `legacy/webui/src` (SolidJS), which stays as the reference until parity.
+from the previous SolidJS UI. That UI was deleted once every module reached parity;
+it is still readable in git history at the baseline commit (`git show main:src/...`).
 
 ## Layout
 
@@ -26,7 +27,7 @@ crates/app/src/
 ```
 
 Everything else in the tree: `crates/core` is the backend (`exorchy_core`,
-`host.rs` is the shim the commands run on), `legacy/webui/src` the reference,
+`host.rs` is the shim the commands run on), the baseline commit on `main` holds the old web UI,
 `packaging/` the PKGBUILD and desktop file (`org.exorchy.eXorchy.desktop`,
 named after the GApplication id `APP_ID` in `main.rs`).
 
@@ -83,6 +84,12 @@ XDG_DATA_HOME=$S/xdg/data XDG_STATE_HOME=$S/xdg/state XDG_CONFIG_HOME=$S/xdg/con
 The scratch profile is offline (no torrent session), so downloads are not
 offered there; the real profile is `~/.local/share/exorchy` (do not modify it).
 Look at the PNG (Read tool) to verify layouts. Do not use grim (it hangs on this compositor).
+Snapshots need painted frames: with the monitors off (DPMS) a Wayland window never gets one, so
+render headlessly instead - `gtk4-broadwayd :7 &` then `GDK_BACKEND=broadway BROADWAY_DISPLAY=:7`
+in front of the command above (`GDK_BACKEND=x11` via XWayland works too). The app is single-instance:
+a leftover instance makes later runs exit at once as a remote, so `pkill -x exorchy` first.
+More switches: `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
+`EXORCHY_SNAPSHOT_READING=1` (+ `_VIEW=list`, `EXORCHY_SNAPSHOT_ISSUE=<key>`, `EXORCHY_SNAPSHOT_DOC=<file>`).
 `EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
 
 ## Rules

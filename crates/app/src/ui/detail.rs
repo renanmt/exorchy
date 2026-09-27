@@ -406,7 +406,8 @@ impl DetailPanel {
         };
         add("Developer", row.developer.clone());
         add("Publisher", row.publisher.clone());
-        add("Released", row.release_date.clone().or(row.year.map(|y| y.to_string())));
+        // LaunchBox dates are ISO timestamps; the day is what the reader wants.
+        add("Released", row.release_date.as_deref().map(|d| d.chars().take(10).collect()).or(row.year.map(|y| y.to_string())));
         add("Genre", row.genre.clone());
         add("Series", row.series.clone());
         add("Play mode", row.play_mode.clone());

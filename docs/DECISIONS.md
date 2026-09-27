@@ -229,7 +229,7 @@ and quits; `EXORCHY_SNAPSHOT_GAME=<id>` opens a detail panel first; `EXORCHY_DUM
 the widget tree. It runs against the real backend on an isolated XDG profile
 (`docs/PORTING.md`), so it exercises the real startup order too.
 
-## 2026-09-27 - The web UI stays under `legacy/webui` until parity
+## 2026-09-27 - The web UI stayed under `legacy/webui` until parity, then was deleted
 
 The SolidJS sources are the specification for the port: every feature, string, invariant and
 test (`stallDetector.test.ts`, `launchNotes.test.ts`, ...) lives there. They are moved out of the
@@ -245,3 +245,47 @@ string: window title, desktop entry, README, About, backend messages. Identifier
 directories, the resource dir, the icon name. The GApplication id is `org.exorchy.eXorchy`, which
 is also the Wayland app id and the desktop file name so the launcher and Hyprland match the
 window.
+
+## 2026-09-27 - Settings is a sidebar + stack dialog with full-width pages
+
+Eight sections do not fit libadwaita's view switcher, so `settings.rs` mirrors the web layout:
+an `adw::Dialog` with a `gtk::ListBox` nav and a `gtk::Stack` of pages. The pages are plain
+scrolled boxes of `adw::PreferencesGroup`s rather than `adw::PreferencesPage`, whose clamp caps
+content at ~600 px and would squash the storage list and the pack rows. The storage usage bar is a
+400-column homogeneous `gtk::Grid` so every segment colour stays a CSS token.
+
+## 2026-09-27 - The document viewer is continuous-scroll poppler on its own thread
+
+`pdf.rs` keeps the `poppler::Document` on one dedicated thread (mpsc requests, oneshot replies) and
+renders pages to cairo surfaces that become `gdk::MemoryTexture`s; the view is a continuous scroll
+of per-page placeholders (an `Overlay` per page so a HiDPI 2× bitmap lays out at logical size),
+with a 6-page LRU budget, nearest-first scheduling and a generation counter on zoom. Manuals use the
+same viewer; HTML manuals are shown as text (no webview in the GTK shell).
+
+## 2026-09-27 - The Reading Room grid is a ListView of sections, each a FlowBox
+
+`GtkGridView` has no section headers, and the reading room's sections (publication names) are what
+the jump bar targets. A `ListView` whose rows are section boxes holding a `FlowBox` of cards keeps
+virtualisation per section and gives real headers. The game grid keeps `GridView` (one flat list,
+jump bar scrolls to positions).
+
+## 2026-09-27 - Launch notes are dismissed per kind; reopening the same game re-notifies
+
+`dismissed_notes` (config, comma list) stores the note kind, as the web did, so a dismissed
+"tuned for ECE" note stays dismissed for every ECE game. `DetailPanel::show` fires `on_shown` again
+when the panel was closed in between even for the same game: the media and note listeners tear down
+on close and must come back.
+
+## 2026-09-27 - Previews start muted; cached media plays by path
+
+The hero video defaults to muted (`preview_muted` unset) because a tiling desktop opens the panel
+often and the web's unmuted default was a surprise in a shared room; a stored preference wins.
+Cached videos and tracks are handed to GTK's GStreamer-backed `MediaFile` by file path, so the
+localhost media server the webview needed is not used.
+
+## 2026-09-27 - Headless snapshots use Broadway (or X11) when no frame is painted
+
+`EXORCHY_SNAPSHOT` needs a painted frame; with the monitors off (DPMS) a Wayland window never gets
+one and the render finds nothing. Running the same binary on `gtk4-broadwayd` (or XWayland) keeps
+the frame clock ticking without a display, so visual checks work unattended. The `PORTING.md`
+recipe says so; the app is single-instance, so a leftover instance must be killed first.

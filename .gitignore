@@ -5,11 +5,6 @@ metadata/*.db
 metadata/*.db-shm
 metadata/*.db-wal
 
-# The previous web UI, kept under legacy/ as the porting reference
-legacy/webui/node_modules/
-legacy/webui/dist/
-# Staged from pdfjs-dist by legacy/webui/scripts/copy-pdfjs-wasm.mjs
-legacy/webui/public/pdfjs/
 
 # Local dev data (emulator tarballs, thumbnails)
 .dev-data/
