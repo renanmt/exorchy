@@ -205,6 +205,8 @@ gridview.game-grid > child:focus-visible { outline: 2px solid var(--accent); out
 }
 .game-card:hover { background-color: var(--bg-hover); border-color: var(--line-4); }
 .game-card.installed { border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.game-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-fill); }
+.game-card.selected .game-card-title { color: var(--accent); }
 .game-card-art { background-color: var(--bg-secondary); }
 .game-card-art-empty { color: var(--text-muted); font-size: 0.9em; padding: 12px; }
 .game-card-body { padding: 8px 10px 10px 10px; }

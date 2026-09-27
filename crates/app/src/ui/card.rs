@@ -15,6 +15,16 @@ use gtk::prelude::*;
 use crate::ui::util::{format_bytes, parse_lang_entries, platform_tag};
 use crate::ui::{actions, bus, covers, downloads};
 
+thread_local! {
+    /// The game the detail panel shows; its card carries the `selected` class.
+    static SELECTED: Cell<Option<i64>> = const { Cell::new(None) };
+}
+
+/// Record which game is open; the library repaints the cards it knows.
+pub fn set_selected_id(id: Option<i64>) {
+    SELECTED.with(|s| s.set(id));
+}
+
 pub const CARD_WIDTH: i32 = 172;
 pub const ART_HEIGHT: i32 = 226;
 
@@ -209,6 +219,7 @@ impl Card {
         self.badges.set_visible(self.badges.first_child().is_some());
 
         self.set_favorited(game.favorited);
+        self.refresh_selected();
         if game.installed || game.in_library {
             self.widget.add_css_class("installed");
         } else {
@@ -287,6 +298,16 @@ impl Card {
                 Err(_) => card.set_favorited(prev),
             }
         });
+    }
+
+    /// Paint (or clear) the selection ring.
+    pub fn refresh_selected(&self) {
+        let selected = self.game_id().is_some() && self.game_id() == SELECTED.with(|s| s.get());
+        if selected {
+            self.widget.add_css_class("selected");
+        } else {
+            self.widget.remove_css_class("selected");
+        }
     }
 
     /// Re-read the download store for this game and paint the state.

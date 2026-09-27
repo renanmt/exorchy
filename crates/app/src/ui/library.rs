@@ -45,6 +45,9 @@ struct Filters {
     loading: bool,
     epoch: u64,
     total: usize,
+    /// A refresh was asked for while a page fetch was in flight; it runs
+    /// when that fetch lands instead of being dropped.
+    refresh_pending: bool,
 }
 
 thread_local! {
@@ -88,6 +91,8 @@ pub struct LibraryPage {
 
 impl LibraryPage {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
+        // A rebuilt page (data dir changed) must not repaint the old one's cards.
+        CARDS.with(|c| c.borrow_mut().clear());
         let detail = DetailPanel::new(window);
 
         // ── toolbar ──
@@ -431,6 +436,11 @@ impl LibraryPage {
         bus::on_running_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.detail.refresh_running();
         }));
+        // The open game's card wears a ring; closing the panel clears it.
+        self.detail.on_shown(|g| {
+            crate::ui::card::set_selected_id(g.and_then(|g| g.id));
+            CARDS.with(|c| c.borrow().values().for_each(|card| card.refresh_selected()));
+        });
         bus::on_collections_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.load_collections();
         }));
@@ -672,6 +682,7 @@ impl LibraryPage {
                     return;
                 }
                 page.filters.borrow_mut().loading = false;
+                page.run_pending_refresh();
                 match res {
                     Ok(list) => {
                         let n = list.games.len();
@@ -722,6 +733,7 @@ impl LibraryPage {
                     drop(f);
                     page.update_status();
                 }
+                page.run_pending_refresh();
             }),
         );
     }
@@ -764,6 +776,7 @@ impl LibraryPage {
             return;
         }
         if self.filters.borrow().loading {
+            self.filters.borrow_mut().refresh_pending = true;
             return;
         }
         let epoch = {
@@ -803,6 +816,15 @@ impl LibraryPage {
                 page.update_status();
             }),
         );
+    }
+
+    /// A refresh that arrived during a fetch runs once the fetch is done.
+    fn run_pending_refresh(self: &Rc<Self>) {
+        let pending = std::mem::take(&mut self.filters.borrow_mut().refresh_pending);
+        if pending {
+            let page = self.clone();
+            glib::idle_add_local_once(move || page.refresh_loaded());
+        }
     }
 
     /// Re-run `bind` on every recycled card from its current row.

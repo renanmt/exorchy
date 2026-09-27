@@ -212,7 +212,12 @@ impl DetailPanel {
         // Reopening the same game after a close is an open too: the listeners
         // (media, launch notes) tore down on the close and must come back.
         let reopened = !self.open.get();
-        self.game.replace(Some(game.clone()));
+        if same {
+            // The caller's row is newer than ours (a card after a refresh).
+            self.merge_row(&game);
+        } else {
+            self.game.replace(Some(game.clone()));
+        }
         if !same {
             self.selected.set(game.id);
             self.variants.replace(vec![game.clone()]);
@@ -242,6 +247,15 @@ impl DetailPanel {
     }
 
     /// The library changed for `id`: re-read the row if it is ours.
+    /// Take a fresh copy of the game the panel shows: the row itself and the
+    /// variant list the action bar renders from (a single-language game's
+    /// only variant IS the row, so it must follow every refresh).
+    fn merge_row(&self, fresh: &Game) {
+        self.game.replace(Some(fresh.clone()));
+        let merged = merged_variants(&self.variants.borrow(), fresh);
+        self.variants.replace(merged);
+    }
+
     pub fn refresh_by_id(self: &Rc<Self>, id: i64) {
         let mine = self.game.borrow().as_ref().and_then(|g| g.id) == Some(id) || self.variants.borrow().iter().any(|v| v.id == Some(id));
         if !mine {
@@ -253,7 +267,7 @@ impl DetailPanel {
         app::spawn(async move { games::get_game(core.state(), gid).await }, glib::clone!(#[weak(rename_to = panel)] self, move |res| {
             if let Ok(Some(fresh)) = res {
                 if panel.game.borrow().as_ref().and_then(|g| g.id) == fresh.id {
-                    panel.game.replace(Some(fresh.clone()));
+                    panel.merge_row(&fresh);
                     panel.load_variants(&fresh);
                     panel.load_metadata(&fresh);
                     panel.render();
@@ -678,6 +692,18 @@ fn btn(label: &str, extra: &[&str]) -> gtk::Button {
     b
 }
 
+/// The variant list with `fresh` in place of its own row. A list of one
+/// (no language variants) is replaced whole.
+fn merged_variants(variants: &[Game], fresh: &Game) -> Vec<Game> {
+    if variants.len() <= 1 {
+        return vec![fresh.clone()];
+    }
+    variants
+        .iter()
+        .map(|v| if v.id == fresh.id && fresh.id.is_some() { fresh.clone() } else { v.clone() })
+        .collect()
+}
+
 /// What will run the game, from the variant slug (the web UI's `emulatorName`).
 pub fn emulator_name(g: &Game) -> String {
     if g.torrent_source.as_deref() == Some("eXoScummVM") {
@@ -694,4 +720,30 @@ pub fn emulator_name(g: &Game) -> String {
 #[allow(dead_code)]
 pub fn title_markup(g: &Game) -> String {
     esc(&g.title)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: i64, lang: &str, installed: bool) -> Game {
+        Game { id: Some(id), language: lang.into(), installed, ..Game::default() }
+    }
+
+    #[test]
+    fn a_single_variant_follows_the_fresh_row() {
+        let stale = vec![row(1, "EN", false)];
+        let merged = merged_variants(&stale, &row(1, "EN", true));
+        assert!(merged[0].installed);
+        // Even a different id replaces a one-row list: the panel moved on.
+        assert_eq!(merged_variants(&stale, &row(2, "EN", true))[0].id, Some(2));
+    }
+
+    #[test]
+    fn only_the_matching_variant_is_replaced_in_a_group() {
+        let stale = vec![row(1, "EN", false), row(2, "DE", true)];
+        let merged = merged_variants(&stale, &row(1, "EN", true));
+        assert!(merged[0].installed && merged[1].installed);
+        assert_eq!(merged.len(), 2);
+    }
 }
