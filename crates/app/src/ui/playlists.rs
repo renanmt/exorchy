@@ -50,7 +50,6 @@ pub fn pick_for_game(parent: &impl IsA<gtk::Widget>, game: &Game) {
 
 /// The management dialog: rename / delete the user's playlists, create new
 /// ones, see the curated ones. For the library page's playlist filter.
-#[allow(dead_code)]
 pub fn manage(parent: &impl IsA<gtk::Widget>) {
     let d = build(parent, "Playlists", None, None);
     reload(&d);

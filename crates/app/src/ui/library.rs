@@ -570,7 +570,16 @@ impl LibraryPage {
             while let Some(c) = page.playlist_menu.first_child() {
                 page.playlist_menu.remove(&c);
             }
+            // The filtered playlist was deleted: back to the whole catalogue.
+            let current = page.filters.borrow().playlist;
+            if current.is_some() && !lists.iter().any(|p| Some(p.id) == current) {
+                page.filters.borrow_mut().playlist = None;
+                page.fetch();
+            }
             if lists.is_empty() {
+                let new_btn = gtk::Button::builder().label("New playlist…").css_classes(["btn", "ghost"]).build();
+                new_btn.connect_clicked(|b| crate::ui::playlists::manage(b));
+                page.playlist_menu.append(&new_btn);
                 return;
             }
             let mut labels = vec!["All playlists".to_string()];
@@ -589,6 +598,9 @@ impl LibraryPage {
                 }
             }));
             page.playlist_menu.append(&drop);
+            let manage = gtk::Button::builder().icon_name("document-edit-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Manage playlists").build();
+            manage.connect_clicked(|b| crate::ui::playlists::manage(b));
+            page.playlist_menu.append(&manage);
         }));
     }
 

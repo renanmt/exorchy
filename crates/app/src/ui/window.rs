@@ -144,6 +144,7 @@ fn show_library(window: &adw::ApplicationWindow, stack: &gtk::Stack, _toasts: &a
         p.load_collections();
         downloads::resume_all();
         crate::ui::onboarding::run(&window);
+        crate::ui::settings::autoopen_for_snapshot(window.upcast_ref());
     });
 }
 
