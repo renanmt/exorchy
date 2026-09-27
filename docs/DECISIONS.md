@@ -303,3 +303,14 @@ the window carries no hard minimum size.
 one and the render finds nothing. Running the same binary on `gtk4-broadwayd` (or XWayland) keeps
 the frame clock ticking without a display, so visual checks work unattended. The `PORTING.md`
 recipe says so; the app is single-instance, so a leftover instance must be killed first.
+
+## 2026-09-27 - Mount targets in confs and bats resolve case-insensitively (second field bug)
+
+After Dark 3.2 (eXoWin3x) exited 0.3 s after launch: its conf mounts `.\eXoWin3x\Adark3` and
+its CD image under it, but the archive unpacks the folder as `adark3`. The host-path rewriter
+only replaced a `.\` path when the target existed with that exact spelling, so the Windows
+path survived untouched and DOSBox Staging on ext4 found neither the drive nor the image
+("MOUNT: Image file not found"), then ran into the autoexec's `exit`. The first field bug
+(2026-09-27, above) fixed the same mismatch for the conf file's own path; `patch_dosbox_conf`
+and `rewrite_bat_host_paths` now fall back to `resolve_rel_ignoring_case` and write the on-disk
+spelling. Windows DOSBox never saw this because NTFS is case-insensitive.

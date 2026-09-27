@@ -511,9 +511,13 @@ pub(crate) fn rewrite_bat_host_paths(game_dir: &Path, working_dir: &Path) {
             }
             let fwd = body.replace('\\', "/");
             if working_dir.join(&fwd).exists() {
-                trim_trailing_sep(&format!("./{}", fwd))
-            } else {
-                format!(".\\{}", body)
+                return trim_trailing_sep(&format!("./{}", fwd));
+            }
+            // Case mismatch between the bat and the unpacked tree (see
+            // `patch_dosbox_conf`): use the on-disk spelling.
+            match resolve_rel_ignoring_case(working_dir, &fwd).and_then(|p| p.strip_prefix(working_dir).ok().map(|r| r.to_string_lossy().replace('\\', "/"))) {
+                Some(rel) => trim_trailing_sep(&format!("./{}", rel)),
+                None => format!(".\\{}", body),
             }
         });
         if rewritten == content {
@@ -574,11 +578,17 @@ pub(crate) fn patch_dosbox_conf(
         if body.is_empty() {
             return ".\\".to_string();
         }
-        let resolved = format!("{}{}", abs_prefix, body.replace('\\', "/"));
+        let fwd = body.replace('\\', "/");
+        let resolved = format!("{}{}", abs_prefix, fwd);
         if std::path::Path::new(&resolved).exists() {
-            trim_trailing_sep(&resolved)
-        } else {
-            format!(".\\{}", body)
+            return trim_trailing_sep(&resolved);
+        }
+        // eXo's confs spell folders as Windows saw them (`Adark3`); the
+        // archive unpacked `adark3`. On ext4 that is a different path, so
+        // the mount target is matched ignoring case and written as on disk.
+        match resolve_rel_ignoring_case(working_dir, &fwd) {
+            Some(found) => trim_trailing_sep(&found.to_string_lossy().replace('\\', "/")),
+            None => format!(".\\{}", body),
         }
     };
 
@@ -1417,6 +1427,39 @@ mod tests {
         // normalizes to forward slashes - normalize the expectation too.
         let abs_prefix = format!("{}/", working_dir.to_string_lossy()).replace('\\', "/");
         assert!(patched.contains(&abs_prefix), "absolute path prefix expected: {}", patched);
+    }
+
+    #[test]
+    fn mount_targets_are_matched_ignoring_case() {
+        // After Dark 3.2: the conf mounts `.\eXoWin3x\Adark3` and images
+        // `.\eXoWin3x\Adark3\cd\ADW320_C.ISO`; the archive unpacked `adark3`.
+        let tmp = tempfile::tempdir().unwrap();
+        let working_dir = tmp.path();
+        fs::create_dir_all(working_dir.join("eXoWin3x/adark3/cd")).unwrap();
+        fs::write(working_dir.join("eXoWin3x/adark3/cd/ADW320_C.ISO"), b"").unwrap();
+
+        let conf_content = "[autoexec]\nmount c .\\eXoWin3x\\Adark3\nimgmount d .\\eXoWin3x\\Adark3\\cd\\ADW320_C.ISO -t cdrom\nc:\nexit\n";
+        let conf_path = write_conf(working_dir, "dosbox.conf", conf_content);
+        let patched = fs::read_to_string(patch_dosbox_conf(&conf_path, working_dir, None, true).unwrap()).unwrap();
+
+        let dir = working_dir.join("eXoWin3x/adark3").to_string_lossy().replace('\\', "/");
+        assert!(patched.contains(&format!("mount c {dir}\n")), "on-disk spelling expected: {patched}");
+        assert!(patched.contains(&format!("imgmount d {dir}/cd/ADW320_C.ISO -t cdrom")), "{patched}");
+        assert!(!patched.contains(".\\"), "no Windows-relative path may survive: {patched}");
+    }
+
+    #[test]
+    fn bat_host_paths_are_matched_ignoring_case() {
+        let tmp = tempfile::tempdir().unwrap();
+        let working_dir = tmp.path();
+        let game = working_dir.join("eXoDOS/game1");
+        fs::create_dir_all(game.join("cd")).unwrap();
+        fs::write(game.join("cd/DISC1.CUE"), b"").unwrap();
+        fs::write(game.join("run.bat"), b"imgmount d .\\eXoDOS\\GAME1\\CD\\DISC1.CUE -t cdrom\r\n").unwrap();
+
+        rewrite_bat_host_paths(&game, working_dir);
+        let out = fs::read_to_string(game.join("run.bat")).unwrap();
+        assert!(out.contains("imgmount d ./eXoDOS/game1/cd/DISC1.CUE -t cdrom"), "{out}");
     }
 
     #[test]
