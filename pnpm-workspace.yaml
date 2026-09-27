@@ -1,0 +1,8 @@
+packages:
+  - "."
+
+# esbuild's postinstall pins its native binary - without it vite won't start.
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,70 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { parseLangEntries } from "./util";
+
+const api = vi.hoisted(() => ({
+  uninstallGame: vi.fn(async (_id: number) => {}),
+  resetGameData: vi.fn(async (_id: number) => ({ message: "", redownload: false })),
+}));
+vi.mock("./api/tauri", () => api);
+
+const variants = vi.hoisted(() => ({ rows: [] as any[], loadVariants: vi.fn() }));
+vi.mock("./stores/variants", () => ({ loadVariants: variants.loadVariants }));
+vi.mock("./stores/games", () => ({
+  refreshLoadedGames: vi.fn(),
+  notifyGameLibraryChanged: vi.fn(),
+}));
+vi.mock("./stores/downloads", () => ({
+  getDownloadState: () => undefined,
+  cancelGameDownload: vi.fn(async () => {}),
+  stopGameDownloadTracking: vi.fn(),
+}));
+vi.mock("./stores/toasts", () => ({ showToast: vi.fn() }));
+
+const row = (id: number, language: string, installed: boolean) => ({
+  id, language, installed, in_library: installed, title: `Game ${language}`,
+  shortcode: "AlienOdy", torrent_source: language === "EN" ? "eXoDOS" : "eXoDOS_GLP",
+});
+
+describe("performGroupUninstall", () => {
+  beforeEach(() => {
+    api.uninstallGame.mockClear();
+    variants.loadVariants.mockImplementation(async () => variants.rows);
+  });
+
+  it("removes every installed row of the card, not just the one backing it", async () => {
+    const { performGroupUninstall } = await import("./util");
+    variants.rows = [row(1, "EN", true), row(2, "DE", true), row(3, "ES", false)];
+    await performGroupUninstall(row(1, "EN", true) as any, () => {});
+    const ids = api.uninstallGame.mock.calls.map((c) => c[0]);
+    expect(ids).toEqual([1, 2]);
+  });
+
+  it("falls back to the row itself when the group cannot be read", async () => {
+    const { performGroupUninstall } = await import("./util");
+    variants.loadVariants.mockImplementation(async () => { throw new Error("nope"); });
+    await performGroupUninstall(row(1, "EN", true) as any, () => {});
+    expect(api.uninstallGame.mock.calls.map((c) => c[0])).toEqual([1]);
+  });
+});
+
+/** The grid card is backed by the English row, which for a German-only
+ *  install is the one version that is NOT installed. Gating the menu on that
+ *  row hid the uninstall entry for every such group. */
+describe("group state from the card's language map", () => {
+  const anyInstalled = (g: any) => parseLangEntries(g).some((e) => e.state > 0);
+
+  it("sees the installed translation even though the backing row is not", () => {
+    expect(anyInstalled({ available_languages: "EN:0,DE:2", installed: false, in_library: false }))
+      .toBe(true);
+  });
+
+  it("stays false when nothing in the group is on disk", () => {
+    expect(anyInstalled({ available_languages: "EN:0,DE:0", installed: false, in_library: false }))
+      .toBe(false);
+  });
+
+  it("falls back to the row itself for a single-language game", () => {
+    expect(anyInstalled({ available_languages: null, language: "EN", installed: true })).toBe(true);
+    expect(anyInstalled({ available_languages: null, language: "EN", installed: false })).toBe(false);
+  });
+});

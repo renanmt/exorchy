@@ -1,0 +1,6174 @@
+/* ============================================
+   Theme tokens
+   ============================================
+   Two layers. The --om-* layer is Omarchy's palette: src/stores/theme.ts
+   writes every --om-* property (plus --font-size-base and --font-mono) on
+   <html> from ~/.config/omarchy/current/theme, and sets data-mode. The values
+   here are only FALLBACKS (Tokyo Night) for when no theme is readable.
+   Everything below the fold is derived from that layer with color-mix, so a
+   theme switch re-colours the whole app without touching a single rule. */
+:root {
+  color-scheme: dark;
+
+  /* Omarchy palette fallbacks (Tokyo Night) */
+  --om-accent: #7aa2f7;
+  --om-selection: #292e42;
+  --om-muted: #414868;
+  --om-background: #1a1b26;
+  --om-dark-background: #13141c;
+  --om-darker-background: #0e0e14;
+  --om-lighter-background: #24283b;
+  --om-foreground: #a9b1d6;
+  --om-dark-foreground: #565f89;
+  --om-light-foreground: #c0caf5;
+  --om-bright-foreground: #c0caf5;
+  --om-red: #f7768e;
+  --om-yellow: #e0af68;
+  --om-orange: #eb927b;
+  --om-green: #9ece6a;
+  --om-cyan: #7dcfff;
+  --om-blue: #7aa2f7;
+  --om-magenta: #ad8ee6;
+  --om-brown: #75493d;
+  --om-bright-red: #ff899d;
+  --om-bright-yellow: #faba4a;
+  --om-bright-green: #9fe044;
+  --om-bright-cyan: #b4f9f8;
+  --om-bright-blue: #8db0ff;
+  --om-bright-magenta: #c7a9ff;
+
+  /* Typography: theme.ts overrides both from Omarchy's shell.toml */
+  --font-size-base: 12px;
+  --font-mono: ui-monospace, "JetBrainsMono Nerd Font", "CaskaydiaMono Nerd Font", "SF Mono", Menlo, monospace;
+
+  /* Surfaces: darker < dark < background < lighter */
+  --bg-primary: var(--om-darker-background);
+  --bg-secondary: var(--om-dark-background);
+  --bg-card: var(--om-background);
+  --bg-hover: var(--om-lighter-background);
+
+  /* Text tiers. dark_foreground and muted are pulled toward foreground: on
+     Tokyo Night they sit at 3.3:1 / 1.9:1 against --bg-card, unreadable at
+     the 11-12px hint sizes; mixed they land at ~5.5:1 / ~4.5:1 and keep the
+     order primary > secondary > muted. */
+  --text-primary: var(--om-foreground);
+  --text-secondary: color-mix(in srgb, var(--om-dark-foreground) 50%, var(--om-foreground));
+  --text-muted: color-mix(in srgb, var(--om-foreground) 50%, var(--om-muted));
+  --text-strong: var(--om-bright-foreground);
+
+  /* Accent */
+  --accent: var(--om-accent);
+  --accent-hover: color-mix(in srgb, var(--om-accent) 78%, var(--om-bright-foreground));
+  --accent-glow: color-mix(in srgb, var(--om-accent) 15%, transparent);
+  --accent-fill: color-mix(in srgb, var(--om-accent) 28%, transparent);
+  --on-accent: var(--om-darker-background);
+
+  /* Status */
+  --danger: var(--om-red);
+  --danger-glow: color-mix(in srgb, var(--om-red) 12%, transparent);
+  --success: var(--om-green);
+  --warning: var(--om-yellow);
+  --info: var(--om-blue);
+  --orange: var(--om-orange);
+  --selection: var(--om-selection);
+
+  /* Hairlines (borders/dividers) and hover fills: foreground over transparent
+     so they read on any surface and flip with light mode. */
+  --line-1: color-mix(in srgb, var(--om-foreground) 4%, transparent);
+  --line-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
+  --line-3: color-mix(in srgb, var(--om-foreground) 8%, transparent);
+  --line-4: color-mix(in srgb, var(--om-foreground) 12%, transparent);
+  --fill-1: color-mix(in srgb, var(--om-foreground) 3%, transparent);
+  --fill-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
+  --fill-3: color-mix(in srgb, var(--om-foreground) 10%, transparent);
+  --border-color: var(--line-3);
+
+  /* Backdrops and shadows */
+  --scrim: color-mix(in srgb, var(--om-darker-background) 60%, transparent);
+  --shadow: color-mix(in srgb, var(--om-darker-background) 55%, transparent);
+
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
+}
+
+/* Light themes: mixing handles the palette, only the things that must stay
+   "dark over content" regardless of the ladder need a different recipe. */
+:root[data-mode="light"] {
+  color-scheme: light;
+  --scrim: color-mix(in srgb, var(--om-darker-background) 72%, transparent);
+  --shadow: color-mix(in srgb, var(--om-foreground) 18%, transparent);
+}
+
+/* theme.ts adds this class around a palette swap so the whole UI cross-fades
+   instead of snapping. */
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease !important;
+}
+
+html {
+  font-size: var(--font-size-base);
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--text-strong);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+
+/* ============================================
+   Top Bar
+   ============================================ */
+.top-bar {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-1);
+}
+
+/* App name, first child of .top-bar (App.tsx). */
+.top-bar-brand {
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-strong);
+  padding: 0 12px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.top-bar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+
+/* Icon buttons in top bar */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  font-size: 1.167rem;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+
+/* ── Activity badge: download segment + sheet (top bar pill) ─────────────── */
+
+/* Download segment inside the activity pill (net-badge): appears only while
+   something is downloading, separated from the rate readout by a hairline. */
+.net-badge-dl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line-4);
+  color: var(--warning);
+}
+
+.net-badge-dl .indicator-progress .ark-progress-track {
+  width: 32px;
+  height: 3px;
+}
+
+.net-badge-dl-count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.net-badge-dl-count::after {
+  content: " \25BC";
+  font-size: .667rem;
+  opacity: 0.6;
+}
+
+/* ── Download sheet (flyout panel) ───────────────────────────────────────── */
+
+.download-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.download-sheet {
+  position: fixed;
+  top: 48px;
+  right: 12px;
+  width: 340px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 32px var(--shadow);
+  z-index: 1000;
+  padding: 8px 0;
+}
+
+.download-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.download-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.download-sheet-cover {
+  width: 24px;
+  height: 32px;
+  border-radius: 2px;
+  object-fit: cover;
+  flex: none;
+  background: var(--bg-secondary);
+}
+
+.download-sheet-row:hover {
+  background: var(--fill-1);
+}
+
+.download-sheet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.download-sheet-label {
+  display: block;
+  font-size: 1rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A game row's label is a link to its detail panel: the label's own type,
+   not the button's, and the hover is an underline and nothing else. */
+.download-sheet-label.is-link {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: inherit;
+  line-height: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.download-sheet-label.is-link:hover,
+.download-sheet-label.is-link:focus-visible {
+  background: none;
+  color: var(--text-primary);
+  text-decoration: underline;
+  outline: none;
+}
+
+.download-sheet-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0; /* let children shrink so the status can ellipsize */
+}
+
+.download-sheet-progress-row .ark-progress {
+  flex: 1;
+  min-width: 0;
+}
+
+.download-sheet-status {
+  font-size: .917rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  /* Cap status width so a long phase string ("Waiting for last pieces…") can't
+     starve the progress bar; ellipsis truncates instead. */
+  max-width: 50%;
+}
+
+.download-sheet-speed {
+  font-size: .833rem;
+  color: var(--accent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.download-sheet-cancel {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: 4px;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: .917rem;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.download-sheet-cancel:hover {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.download-sheet-empty {
+  padding: 14px 12px;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+/* Status line + settings shortcut. */
+.download-sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line-2);
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+.download-sheet-net {
+  min-width: 0;
+}
+
+.download-sheet-footer .link-btn {
+  white-space: nowrap;
+}
+
+
+/* ============================================
+   Search
+   ============================================ */
+.search-bar {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 6px 32px 6px 14px;
+  background: var(--fill-2);
+  border: 1px solid var(--line-2);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 1.083rem;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--fill-2);
+}
+
+.search-clear {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.167rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* ============================================
+   Library
+   ============================================ */
+/* Scroller and jump bar side by side: the bar takes its own column, so a
+   bar of publication names narrows the grid instead of covering it. */
+.library-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.library {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 20px 20px;
+  /* Reserve scrollbar space in layout so the native Windows scrollbar (~16px,
+     always visible) doesn't shift the grid when it appears.
+     macOS/Linux use overlay scrollbars so the reserved gutter is a no-op there. */
+  scrollbar-gutter: stable;
+}
+
+/* Theme-matched thin scrollbar for WebKit/Chromium (all Tauri platforms
+   currently use WebView2/WKWebView/WebKitGTK - all webkit-derived). Falls
+   back to the OS default on engines that don't implement these pseudos. */
+/* 12px wide with a 2px transparent inset: an 8px thumb was near-invisible on
+   a dark grid and too thin to grab (Linux report 2026-09-08); the inset keeps
+   the full 12px as hit area while the visible bar stays slim. */
+.library::-webkit-scrollbar,
+.pdf-reader-pages::-webkit-scrollbar,
+.document-viewer-text::-webkit-scrollbar,
+.settings-tab-body::-webkit-scrollbar,
+.storage-games::-webkit-scrollbar {
+  width: 12px;
+}
+.library::-webkit-scrollbar-track,
+.pdf-reader-pages::-webkit-scrollbar-track,
+.document-viewer-text::-webkit-scrollbar-track,
+.settings-tab-body::-webkit-scrollbar-track,
+.storage-games::-webkit-scrollbar-track {
+  background: transparent;
+}
+.library::-webkit-scrollbar-thumb,
+.pdf-reader-pages::-webkit-scrollbar-thumb,
+.document-viewer-text::-webkit-scrollbar-thumb,
+.settings-tab-body::-webkit-scrollbar-thumb,
+.storage-games::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--om-foreground) 30%, transparent);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.library::-webkit-scrollbar-thumb:hover,
+.pdf-reader-pages::-webkit-scrollbar-thumb:hover,
+.document-viewer-text::-webkit-scrollbar-thumb:hover,
+.settings-tab-body::-webkit-scrollbar-thumb:hover,
+.storage-games::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--om-foreground) 50%, transparent);
+  background-clip: padding-box;
+}
+
+/* ── Tab bar ── */
+.lib-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.lib-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px 9px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.lib-tab:hover {
+  color: var(--text-primary);
+}
+
+.lib-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.lib-tab-count {
+  font-size: .833rem;
+  font-weight: 600;
+  background: var(--fill-3);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 1px 6px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.lib-tab-count.active {
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+}
+
+/* Tab pane push transition - when activeTab changes, the new pane mounts
+   with a directional slide-in. The old pane unmounts instantly (no exit
+   animation) which keeps the implementation simple while still giving the
+   "swipe in" feel. Direction class is set per-click in switchTab(). */
+.tab-pane {
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+/* will-change scoped to the directional classes only - Library.tsx drops
+   them on animationend, so the GPU layer is allocated for the slide and not
+   retained for the rest of the pane's lifetime. Removing the animation-name
+   after it finished is visually free: fill-mode `both` held the `to` frame,
+   which is the element's resting state anyway. */
+.tab-pane-right,
+.tab-pane-left {
+  will-change: transform, opacity;
+}
+
+.tab-pane-right { animation-name: tab-push-from-right; }
+.tab-pane-left  { animation-name: tab-push-from-left; }
+
+@keyframes tab-push-from-right {
+  from { transform: translateX(36px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes tab-push-from-left {
+  from { transform: translateX(-36px); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+}
+
+/* ── Result counter in toolbar ── */
+.results-count {
+  margin-left: auto;
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+/* ── Empty state (My Library) ── */
+.lib-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.lib-empty-icon {
+  opacity: 0.3;
+  line-height: 0;
+}
+
+.lib-empty-text {
+  font-size: 1.333rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.lib-empty-sub {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.lib-empty-btn {
+  margin-top: 8px;
+  padding: 8px 20px;
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+  border: 1px solid var(--accent-fill);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lib-empty-btn:hover {
+  background: var(--accent-fill);
+}
+
+/* ── Tab bar height = 40px ── sticky offsets for Browse subtabs ── */
+/* ── Collection shelf: one box per collection above the Browse grid.
+   Deliberately NOT sticky - it scrolls away with the content, the toolbar
+   below stays pinned, and the grid gets the vertical space back. ── */
+.collection-bar {
+  padding: 10px 0 0;
+}
+
+.collection-shelf {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  /* Room for the cover reflection, which paints outside the box. */
+  padding: 4px 2px 10px;
+}
+
+.collection-card {
+  --card-accent: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px 8px;
+  min-width: 116px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  perspective: 320px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+/* Ambient glow in the collection's own box color - faint on hover, full on
+   the active card. */
+.collection-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(
+    60% 55% at 50% 30%,
+    color-mix(in srgb, var(--card-accent) 22%, transparent),
+    transparent 72%
+  );
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+
+.collection-card:hover::before {
+  opacity: 0.5;
+}
+
+.collection-card.active::before {
+  opacity: 1;
+}
+
+.collection-card.active {
+  background: var(--fill-1);
+  border-color: var(--accent-fill);
+  border-color: color-mix(in srgb, var(--card-accent) 45%, transparent);
+}
+
+/* The box itself. Inactive boxes sit dimmed and desaturated on the shelf; the
+   active one is lit, tilted back and lifted off the board. Effects live on
+   the wrap so the sheen moves with the tilt. No -webkit-box-reflect here:
+   WebKitGTK drops its mask once the wrap is transformed and filtered on
+   hover and paints the full copy over the label below. */
+.collection-cover-wrap {
+  position: relative;
+  border-radius: 5px;
+  transform-origin: bottom center;
+  box-shadow: 0 3px 8px var(--shadow), inset 0 0 0 1px var(--line-4);
+  filter: saturate(0.45) brightness(0.72);
+  transition: filter 0.25s, transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.3s;
+}
+
+.collection-card:hover .collection-cover-wrap {
+  filter: saturate(0.95) brightness(0.95);
+  transform: rotateX(6deg) translateY(-3px) scale(1.03);
+}
+
+.collection-card.active .collection-cover-wrap {
+  filter: none;
+  transform: rotateX(6deg) translateY(-4px) scale(1.06);
+  box-shadow: 0 8px 18px var(--shadow),
+    0 0 16px color-mix(in srgb, var(--card-accent) 45%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--om-foreground) 16%, transparent);
+}
+
+.collection-cover {
+  display: block;
+  width: 74px;
+  height: 96px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+/* "All" card: 2x2 mosaic of the shelf's own covers. */
+.collection-cover-all {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  background: linear-gradient(160deg, var(--bg-hover), var(--bg-secondary));
+}
+
+.collection-cover-all img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+/* Future collection without bundled art: initials box in the accent tint. */
+.collection-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--om-foreground) 85%, transparent);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--card-accent) 65%, var(--bg-hover)),
+    color-mix(in srgb, var(--card-accent) 30%, var(--bg-primary))
+  );
+}
+
+.collection-card-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.collection-card-count {
+  font-size: .875rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.collection-card-count b {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.collection-card.active .collection-card-name {
+  color: var(--text-primary);
+}
+
+/* ── Back to top: appears only while scrolling UP below the shelf. ── */
+.back-to-top {
+  position: fixed;
+  /* Above the now-playing bar when one is open (--player-h, like the detail
+     panel): at a plain 22px the pill sat on top of the bar's controls. */
+  bottom: calc(22px + var(--player-h));
+  left: 50%;
+  transform: translate(-50%, 12px);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line-4);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px var(--shadow);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.back-to-top.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.back-to-top:hover {
+  background: color-mix(in srgb, var(--bg-hover) 92%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0;
+  position: sticky;
+  top: 40px;
+  z-index: 10;
+  background: var(--bg-primary);
+}
+
+/* ── Pack hint (one-time, dismissible nudge above the Browse grid) ── */
+.pack-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0 12px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+}
+
+.pack-hint-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pack-hint-title {
+  font-size: 1.167rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pack-hint-desc {
+  margin-top: 3px;
+  font-size: 1.042rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Buttons in this app default to width:100% (they live in dialogs); in a
+   flex row that starves the text column down to one word per line. */
+.pack-hint-action {
+  flex-shrink: 0;
+  width: auto;
+  white-space: nowrap;
+}
+
+.pack-hint-dismiss {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.pack-hint-dismiss:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── Playlist hero (active playlist banner above the Browse grid) ── */
+.playlist-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 2px 0 12px;
+  padding: 14px 16px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 14%, transparent), color-mix(in srgb, var(--accent) 4%, transparent));
+  border: 1px solid var(--accent-fill);
+  border-radius: var(--border-radius-lg);
+}
+
+.playlist-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-hero-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.playlist-hero-count {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.playlist-hero-desc {
+  margin-top: 4px;
+  font-size: 1.042rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.playlist-hero-clear {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--om-foreground) 15%, transparent);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.playlist-hero-clear:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ============================================
+   Ark UI Select
+   ============================================ */
+.ark-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.select-wide .ark-select-trigger {
+  min-width: 192px;
+}
+
+.ark-select-trigger:hover {
+  border-color: color-mix(in srgb, var(--om-foreground) 15%, transparent);
+}
+
+.ark-select-trigger[data-state="open"] {
+  border-color: var(--accent);
+}
+
+.ark-select-arrow {
+  font-size: .667rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.ark-select-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-4);
+  border-radius: var(--border-radius);
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  /* The menu layer, like the context menus: the popup is portalled to the
+     body, and a Select inside a dialog (201/301) would otherwise open
+     behind it. zag copies this value onto the positioner. */
+  z-index: 401;
+  box-shadow: 0 8px 30px var(--shadow);
+  animation: selectFadeIn 0.12s ease;
+}
+
+.ark-select-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ark-select-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ark-select-content::-webkit-scrollbar-thumb {
+  background: var(--fill-3);
+  border-radius: 3px;
+}
+
+@keyframes selectFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ark-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ark-select-item:hover,
+.ark-select-item[data-highlighted] {
+  background: var(--bg-hover);
+}
+
+.ark-select-item[data-state="checked"] {
+  color: var(--accent-hover);
+}
+
+/* Tree-style indent for hierarchical options (e.g. Sports → Baseball).
+   Children get a left tick marker so they read as part of the parent
+   group without adding an explicit divider. */
+.ark-select-item.depth-1 {
+  padding-left: 26px;
+  font-size: .958rem;
+  color: var(--text-secondary);
+  position: relative;
+}
+.ark-select-item.depth-1::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 6px;
+  height: 1px;
+  background: color-mix(in srgb, var(--om-foreground) 18%, transparent);
+}
+
+.ark-select-indicator {
+  font-size: .833rem;
+  color: var(--accent);
+}
+
+/* Non-selectable section header inside a Select dropdown (e.g. the
+   "My Playlists" / "Curated" groups of the playlist picker). */
+.ark-select-group-label {
+  padding: 8px 10px 4px;
+  font-size: .833rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  cursor: default;
+}
+.ark-select-group-label:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--line-2);
+}
+
+/* ============================================
+   Game Grid
+   ============================================ */
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.sections-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-separator {
+  position: sticky;
+  /* top set via inline style */
+  z-index: 8;
+  background: var(--bg-primary);
+  padding: 10px 6px 6px;
+  font-size: 2.333rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+  border-bottom: 1px solid var(--line-2);
+  margin-bottom: 8px;
+  box-shadow: 0 -12px 0 0 var(--bg-primary);
+}
+
+/* Close each section with a divider so its end reads while the next header
+   is still approaching (#5). The line cannot sit on the sticky header itself
+   (it would travel with it), and the margin must clear the header's 12px
+   opaque top strip (the box-shadow above) or the strip paints over it. */
+.game-section:not(:last-child) {
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--line-3);
+  margin-bottom: 16px;
+}
+
+/* ── List view (#21) ── */
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line-4);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  /* Always flush right, so the switch sits in the same spot on both tabs
+     and regardless of which selects are visible. */
+  margin-left: auto;
+}
+
+/* When the results count precedes it, the count's own auto margin already
+   pushes both to the right edge - a second auto margin would split the gap. */
+.results-count + .view-toggle {
+  margin-left: 0;
+}
+
+.library-toolbar-plain {
+  position: static;
+  /* ≥12px bottom clearance: the shelf title below carries an opaque 12px
+     upward box-shadow and is positioned (sticky), so it paints over this
+     static toolbar - with less clearance it slices the toggle's bottom off. */
+  padding: 14px 0 16px;
+}
+
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  font-size: 1.083rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.view-toggle-btn.active {
+  background: var(--fill-3);
+  color: var(--text-primary);
+}
+
+.view-toggle-btn:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+/* Same box as the toolbar's selects (padding, font, border) so the row of
+   controls keeps one height - only the radius differs. */
+.filter-chip {
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: 999px;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  font-size: 1rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filter-chip:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.filter-chip.active {
+  background: var(--fill-3);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.game-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header and rows share one template so the columns stay aligned. */
+.game-list-header,
+.game-row {
+  display: grid;
+  grid-template-columns:
+    28px 24px 26px minmax(200px, 2.4fr) 44px minmax(110px, 1.3fr)
+    minmax(110px, 1.3fr) minmax(110px, 1.3fr) 58px 68px 104px;
+  gap: 10px;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.game-list-header {
+  position: sticky;
+  /* top set via inline style - same stack as the grid separators */
+  z-index: 8;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--line-4);
+  box-shadow: 0 -12px 0 0 var(--bg-primary);
+}
+
+.list-col {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: .917rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: left;
+  padding: 10px 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.list-col.sortable {
+  cursor: pointer;
+}
+
+.list-col.sortable:hover {
+  color: var(--text-primary);
+}
+
+.game-row {
+  min-height: 40px;
+  border-bottom: 1px solid var(--line-1);
+  cursor: pointer;
+  /* Uniform row height makes the intrinsic size exact: offscreen rows skip
+     layout and paint entirely, which is what keeps 8k+ rows scrollable. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 41px;
+}
+
+.game-row:hover {
+  background: var(--bg-hover);
+}
+
+.game-row > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.083rem;
+  color: var(--text-secondary);
+}
+
+.game-row .row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.row-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-list-header .row-year,
+.game-list-header .row-size,
+.game-row .row-year,
+.game-row .row-size {
+  text-align: right;
+}
+
+.game-row .row-fav {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-size: 1.167rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.game-row .row-fav:hover {
+  opacity: 1;
+}
+
+.game-row .row-fav.is-favorited {
+  color: var(--warning);
+  opacity: 1;
+}
+
+.game-row .row-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.row-play-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.row-play-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.row-play-btn.is-current {
+  color: var(--accent-hover);
+}
+
+.row-play-btn.is-busy {
+  animation: row-play-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes row-play-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Already on disk: plays instantly, no torrent read. */
+.row-play-btn.is-cached::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.row-play-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.game-row.is-playing {
+  background: var(--accent-glow);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.game-row .row-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+}
+
+.row-cancel {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: .917rem;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.row-cancel:hover {
+  color: var(--danger);
+}
+
+/* Narrow windows: drop publisher, then developer - the template must lose
+   the matching tracks or every cell shifts one column over. */
+@media (max-width: 1150px) {
+  .game-list-header,
+  .game-row {
+    grid-template-columns:
+      28px 24px 26px minmax(200px, 2.4fr) 44px minmax(110px, 1.3fr)
+      minmax(110px, 1.3fr) 58px 68px 104px;
+  }
+
+  .game-list-header .row-pub,
+  .game-row .row-pub {
+    display: none;
+  }
+}
+
+@media (max-width: 950px) {
+  .game-list-header,
+  .game-row {
+    grid-template-columns:
+      28px 24px 26px minmax(160px, 2.4fr) 44px minmax(100px, 1.3fr) 58px 68px 104px;
+  }
+
+  .game-list-header .row-dev,
+  .game-row .row-dev {
+    display: none;
+  }
+}
+
+/* ── Jump bar ── */
+/* The slot is a flex column so the bar centres vertically and, with
+   min-height 0, scrolls inside itself instead of growing the shell. An empty
+   slot has no width of its own - the bar carries the margins. Solid's Portal
+   wraps its children in a div; display: contents keeps the bar the flex item. */
+.jump-bar-slot {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+.jump-bar-slot > div {
+  display: contents;
+}
+
+.jump-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  margin: 16px 8px 16px 0;
+  min-height: 0;
+  max-width: 200px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Thin Firefox scrollbar; webkit version below. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--om-foreground) 12%, transparent) transparent;
+  padding: 6px 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: 8px;
+}
+
+.jump-bar::-webkit-scrollbar {
+  width: 4px;
+}
+.jump-bar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--om-foreground) 14%, transparent);
+  border-radius: 2px;
+}
+.jump-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.jump-bar-item {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: .917rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  /* line-height 1 + flex-shrink 0 stops items from being squeezed below the
+     glyph height when the bar overflows - that was producing the visible
+     overlap when 40+ years had to fit. */
+  line-height: 1;
+  min-height: 18px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  transition: color 0.1s, background 0.1s;
+}
+
+/* Names (genres, publications) read left-aligned; the ellipsis cuts at the
+   bar's real width, the tooltip carries the full label. */
+.jump-bar.wide .jump-bar-item {
+  text-align: left;
+}
+
+.jump-bar-item:hover {
+  color: var(--accent-hover);
+  background: var(--accent-glow);
+}
+
+/* ============================================
+   Game Card - cover-dominant
+   ============================================ */
+.game-card {
+  position: relative;
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: var(--bg-card);
+  /* Isolate each card's layout/paint so appending new cards doesn't trigger
+     full-grid reflow, and skip layout and paint entirely while the card is
+     offscreen. The body is absolutely positioned, so a card is exactly its
+     cover: 4/3 of the grid track, which the fallback approximates until the
+     card has rendered once and the browser remembers its real size. The
+     preload observer watches this element, not the cover, so it keeps its
+     full margin - only the contents are skipped, the box stays laid out. */
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
+}
+
+.game-card:hover {
+  transform: scale(1.04);
+  box-shadow: 0 8px 30px var(--shadow), 0 0 0 1px var(--accent-glow);
+  z-index: 2;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Anchor for the two cover layers. The sharp one stays in normal flow so it
+   keeps defining the card's height - only the blurry understudy is taken out
+   of it, which leaves the `:has(.game-card-thumb)` aspect-ratio rule intact. */
+.game-card-art {
+  position: relative;
+}
+
+.game-card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-secondary);
+}
+
+/* A cover only fades when it REPLACES one already on screen - installing a
+   poster pack swapping blurry for sharp. First paint has nothing to dissolve
+   from, and fading it in put a 350 ms ramp on every tile of every scroll. */
+.game-card-thumb.is-fading-in {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.game-card-thumb.is-fading-in.is-loaded {
+  opacity: 1;
+}
+
+/* The outgoing cover, held underneath until its replacement has decoded. No
+   transition of its own: it is the floor the new one dissolves onto. */
+.game-card-thumb-base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-secondary);
+}
+
+.game-card-body {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 32px 10px 10px;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--om-darker-background) 85%, transparent) 40%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Card without thumbnail - show body at bottom of fixed-height card */
+.game-card:not(:has(.game-card-thumb)) {
+  aspect-ratio: 3 / 4;
+}
+
+.game-card:not(:has(.game-card-thumb)) .game-card-body {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: none;
+}
+
+.game-card-title {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--text-strong);
+  text-shadow: 0 1px 3px var(--shadow);
+}
+
+/* Year and genre are two different KINDS of fact, and side by side with only
+   a gap between them they read as one string ("1995 Action"). A separator
+   gives them structure without adding colour - the grid shows thousands of
+   these at once, and a hue per genre turned the whole page restless. */
+.game-card-meta {
+  display: flex;
+  gap: 5px;
+  font-size: .833rem;
+  color: color-mix(in srgb, var(--om-foreground) 60%, transparent);
+}
+
+.game-card-meta > span + span::before {
+  content: "\00B7";
+  margin-right: 5px;
+  opacity: 0.55;
+}
+
+/* The genre is the half you scan by, so it keeps the brighter tone. */
+.game-card-meta .genre {
+  color: color-mix(in srgb, var(--om-foreground) 78%, transparent);
+}
+
+.genre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
+
+.game-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* Badges - overlaid on cover */
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-lang {
+  background: color-mix(in srgb, var(--info) 25%, transparent);
+  color: var(--info);
+}
+
+/* Collection family, shown only in the "All" view where it is not implied. */
+.badge-platform {
+  background: var(--fill-3);
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+/* List-view cover: a 3:4 tile inside the 40px row. */
+.game-row .row-cover {
+  width: 26px;
+  height: 34px;
+  border-radius: 2px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.game-row .row-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.badge-lang.lang-downloading {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
+}
+
+.badge-lang.lang-installed {
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+
+.badge-size,
+.badge-genre {
+  background: var(--fill-3);
+  color: color-mix(in srgb, var(--om-foreground) 78%, transparent);
+}
+
+.game-card.installed {
+  box-shadow: inset 0 0 0 2px var(--accent-glow);
+}
+
+/* Hover overlay */
+.game-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 0%, transparent);
+  transition: background 0.2s;
+  pointer-events: none;
+  border-radius: var(--border-radius-lg);
+}
+
+.game-card:hover::after {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* Context menu */
+.context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 61;
+  background: var(--bg-card);
+  border: 1px solid var(--line-4);
+  border-radius: var(--border-radius);
+  padding: 4px;
+  box-shadow: 0 8px 24px var(--shadow);
+  min-width: 120px;
+  max-width: 240px;
+}
+
+/* Anchored by its right edge: the ⋯ button sits at the end of the action bar,
+   and a left-anchored menu hangs off the panel at its narrow end. */
+.context-menu.is-right-anchored {
+  transform: translateX(-100%);
+}
+
+/* The grid's own context menu sits at 61, which is under the detail panel
+   (150) - opened from there it rendered behind it and read as a dead button.
+   Same pair of layers the playlist menu already uses over the panel. */
+.context-menu.is-above-panel {
+  z-index: 401;
+}
+
+.context-backdrop.is-above-panel {
+  z-index: 400;
+}
+
+.context-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.context-menu-item.danger {
+  color: var(--danger);
+}
+
+/* ── Playlist picker (context-menu variant with membership checkmarks) ── */
+/* Opens from the game detail panel too (panel z 150, its backdrop 149) -
+   the default context-menu layer (60/61) would put it BEHIND the panel,
+   invisible but swallowing the click. Sits above every overlay except the
+   window resize edges (9999). */
+.playlist-menu {
+  min-width: 180px;
+  max-width: 260px;
+  /* Long playlist collections scroll instead of growing past the viewport. */
+  max-height: 50vh;
+  overflow-y: auto;
+  z-index: 401;
+}
+
+.playlist-menu-backdrop {
+  z-index: 400;
+}
+
+.playlist-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playlist-menu-check {
+  width: 14px;
+  flex-shrink: 0;
+  font-size: .917rem;
+  color: var(--accent);
+  visibility: hidden;
+}
+
+.playlist-menu-check.checked {
+  visibility: visible;
+}
+
+.playlist-menu-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-menu-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fill-3);
+}
+
+
+.game-card-status {
+  font-size: .833rem;
+  color: var(--accent-hover);
+  margin-top: 2px;
+}
+
+.game-card-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  min-height: 18px;
+}
+
+.card-action-label {
+  font-size: .833rem;
+  font-weight: 600;
+}
+
+.action-installed {
+  color: var(--success);
+}
+
+.action-incomplete {
+  color: var(--warning);
+}
+
+.action-download {
+  color: var(--text-muted);
+}
+
+/* Offline mode: no download affordance, just a state label. */
+.action-offline {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.card-cancel-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: .833rem;
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.card-cancel-btn:hover {
+  color: var(--danger);
+}
+
+.action-downloading {
+  color: var(--accent-hover);
+  flex: 1;
+  text-align: right;
+  font-weight: 400;
+}
+
+/* ============================================
+   Ark UI Progress
+   ============================================ */
+.ark-progress {
+  width: 100%;
+  flex: 1;
+}
+
+.ark-progress.mini .ark-progress-track {
+  height: 3px;
+}
+
+.ark-progress-track {
+  height: 4px;
+  background: var(--fill-3);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative; /* needed so the indeterminate bar can escape left/right */
+}
+
+.ark-progress-range {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  will-change: width;
+  transition: width 0.6s ease-out;
+}
+
+.ark-progress-range.indeterminate {
+  /* Overrides both determinate styles AND Ark's inline width */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35% !important;
+  transition: none;
+  will-change: transform;
+  animation: indeterminate-slide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes indeterminate-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(286%); }
+}
+
+/* ── Circular progress ring ──────────────────────────────────────────────── */
+
+.circular-progress {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.circular-progress svg {
+  overflow: visible;
+  display: block;
+}
+
+.circular-progress-track {
+  stroke: color-mix(in srgb, var(--om-foreground) 12%, transparent);
+}
+
+.circular-progress-range {
+  stroke: var(--accent);
+  transition: stroke-dashoffset 0.6s ease-out;
+}
+
+/* Indeterminate: rotate the whole SVG so the partial arc sweeps around.
+   Using transform-box keeps rotation centered on the SVG viewBox center. */
+.circular-progress.indeterminate svg {
+  animation: circular-spin 1.2s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+.circular-progress.indeterminate .circular-progress-range {
+  transition: none;
+}
+
+@keyframes circular-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.circular-progress-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .917rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.circular-progress-pct {
+  font-size: 1.083rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px var(--shadow);
+}
+
+.circular-progress-pct.muted {
+  font-size: 1.333rem;
+  opacity: 0.8;
+}
+
+/* ── Game card download overlay ──────────────────────────────────────────── */
+
+.game-card-download-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--om-darker-background) 55%, transparent);
+  backdrop-filter: blur(2px);
+  z-index: 2;
+  border-radius: inherit;
+}
+
+.game-card-overlay-cancel {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--om-darker-background) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--om-foreground) 20%, transparent);
+  border-radius: 50%;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.game-card-overlay-cancel:hover {
+  background: color-mix(in srgb, var(--danger) 80%, transparent);
+  border-color: var(--danger);
+}
+
+/* ============================================
+   Ark UI Dialog
+   ============================================ */
+.ark-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  animation: modalBackdropIn 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.ark-dialog-positioner {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 201;
+}
+
+.ark-dialog-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius-lg);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  animation: modalContentIn 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+  box-shadow: 0 16px 50px var(--shadow);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Shared modal entry animations - backdrop fades + ramps blur, content
+   fades and lifts a touch (less jarring than instantaneous appearance).
+   Used by ark dialog, manual viewer, lightbox, game settings. */
+@keyframes modalBackdropIn {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to   { opacity: 1; }
+}
+
+@keyframes modalContentIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* Exit pair for dialogs that stay mounted during close (`.closing` is set
+   for the animation's duration, then the dialog unmounts - see
+   PlaylistNameDialog's EXIT_MS). `forwards` holds the faded-out end state
+   for the frame between animation end and unmount. */
+.ark-dialog-backdrop.closing {
+  animation: modalBackdropOut 0.18s ease forwards;
+}
+
+.ark-dialog-content.closing {
+  animation: modalContentOut 0.18s ease forwards;
+}
+
+@keyframes modalBackdropOut {
+  from { opacity: 1; }
+  to   { opacity: 0; backdrop-filter: blur(0); }
+}
+
+@keyframes modalContentOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
+/* Playlist dialog gets a springier entry than the shared modalContentIn -
+   it's small and opened from a deliberate click, so a visible pop reads as
+   responsiveness rather than noise. */
+.playlist-dialog {
+  animation: playlistDialogIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.playlist-dialog.closing {
+  animation: modalContentOut 0.18s ease forwards;
+}
+
+@keyframes playlistDialogIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ark-dialog-title {
+  font-size: 1.333rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+/* Blank lines in a message survive: a dialog that has to explain a choice AND
+   its consequences reads as one wall of text otherwise. Messages without a
+   newline are unaffected. */
+.ark-dialog-desc {
+  font-size: 1.083rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+  white-space: pre-line;
+}
+
+.ark-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* Dialog buttons size to their label. `.btn-primary` carries `width: 100%` for
+   the setup screen's stacked layout, which next to a second button here turns
+   the confirming one into a full-width slab. */
+.ark-dialog-actions .app-btn {
+  width: auto;
+}
+
+/* ── Welcome modal content-pack picker ─────────────────────────────────────── */
+
+.welcome-pack-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.welcome-pack-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  background: var(--fill-1);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.welcome-pack-option:hover {
+  background: var(--fill-2);
+}
+
+.welcome-pack-option.disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.welcome-pack-option input[type="radio"] {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+.welcome-pack-label {
+  font-size: 1.083rem;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.welcome-pack-size {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.welcome-pack-future {
+  font-size: .917rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.reset-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.083rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.reset-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.reset-warning {
+  font-size: 1rem;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  border-radius: var(--border-radius);
+  padding: 8px 10px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* ============================================
+   Ark UI Tooltip
+   ============================================ */
+.ark-tooltip {
+  background: var(--bg-hover);
+  border: 1px solid var(--line-4);
+  color: var(--text-primary);
+  font-size: .917rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 202; /* above dialogs (201) but below resize edges (9999) */
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--om-darker-background) 30%, transparent);
+  animation: fadeIn 0.1s ease;
+}
+
+/* ============================================
+   Section headers
+   ============================================ */
+.library-section {
+  margin-bottom: 40px;
+}
+
+.library-section + .library-section {
+  border-top: 1px solid var(--line-2);
+  padding-top: 8px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 2.333rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  padding: 10px 6px 6px;
+  letter-spacing: -1px;
+  border-bottom: 1px solid var(--line-2);
+  margin-bottom: 8px;
+  position: sticky;
+  top: 40px;
+  z-index: 9;
+  background: var(--bg-primary);
+  box-shadow: 0 -12px 0 0 var(--bg-primary);
+}
+
+.section-count {
+  font-size: .833rem;
+  font-weight: 600;
+  background: var(--fill-2);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 1px 7px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── User playlist shelves (My Library) ── */
+.shelf-menu-btn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.shelf-menu-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.playlist-shelf-empty {
+  padding: 20px 6px 8px;
+  font-size: 1.042rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.playlist-new-btn {
+  display: block;
+  margin: 8px 0 24px;
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--om-foreground) 20%, transparent);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.playlist-new-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.playlist-name-input {
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-4);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 1.083rem;
+  outline: none;
+}
+
+.playlist-name-input:focus {
+  border-color: var(--accent);
+}
+
+.playlist-name-error {
+  margin-bottom: 8px;
+  font-size: 1rem;
+  color: var(--danger);
+}
+
+.scroll-sentinel {
+  padding: 16px 0;
+  min-height: 1px;
+}
+
+/* ============================================
+   Loading / Error
+   ============================================ */
+.loading {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+}
+
+.error {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  border-radius: var(--border-radius);
+  color: var(--danger);
+  font-size: 1.083rem;
+}
+
+/* ============================================
+   Settings dialog
+   ============================================ */
+.settings-tab-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-top: 4px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Each settings group stacks its section title + rows with a smaller
+   intra-section gap, so within a section rows sit close together but
+   sections themselves breathe. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Danger Zone: red-tinted heading so the risk reads at a glance. */
+.settings-section.danger .settings-section-title {
+  color: var(--danger);
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--fill-2);
+  margin: 4px 0;
+}
+
+.setting-label {
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Section heading inside the settings body - smaller, quieter than the
+   dialog title but visually distinct from individual row labels so that
+   groups of rows read as a group. */
+.settings-section-title {
+  font-size: .917rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0;
+}
+
+.settings-section-hint {
+  font-size: 1rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pack-collection-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.pack-collection-title {
+  margin: 6px 0 2px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Content pack "chip" - gives each pack a subtle container so the action
+   buttons breathe and the progress bar below has a natural place to sit. */
+.pack-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--border-radius);
+}
+
+.pack-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pack-name {
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.pack-desc {
+  font-size: .958rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.pack-status-inline {
+  font-size: .917rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex: none;
+}
+
+.pack-progress {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pack-progress .ark-progress {
+  flex: 1;
+}
+
+.setting-value {
+  font-size: 1rem;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A note that belongs to the row above rather than a setting of its own:
+   no label column, no control, and pulled up tight against it. */
+.setting-hint {
+  font-size: 1rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  flex: 1;
+}
+
+/* Settings-dialog toggle row: a native checkbox + label/hint stack.
+   Clicking anywhere on the row toggles the checkbox (it's the <label>). */
+.setting-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.setting-toggle:hover {
+  background: var(--fill-2);
+}
+
+.setting-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.setting-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setting-toggle-label {
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.setting-toggle-hint {
+  font-size: .958rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.btn-primary {
+  padding: 10px 24px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 1.083rem;
+  font-weight: 500;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--om-foreground) 15%, transparent);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  background: var(--fill-2);
+  color: var(--text-primary);
+  border: 1px solid var(--line-3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .917rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-small:disabled,
+.btn-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn-small .btn-spinner,
+.btn-danger .btn-spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+
+.btn-small:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn-small:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-danger {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: .917rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.full-width {
+  width: 100%;
+  text-align: center;
+  padding: 10px;
+}
+
+/* ============================================
+   Setup page
+   ============================================ */
+.setup-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+
+.setup-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-1);
+  border-radius: var(--border-radius-lg);
+  padding: 32px;
+  max-width: 560px;
+  width: 100%;
+}
+
+.setup-card h2 {
+  color: var(--accent);
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.setup-subtitle {
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.setup-info {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  padding: 10px;
+  background: var(--fill-1);
+  border-radius: var(--border-radius);
+}
+
+.setup-step {
+  margin-top: 14px;
+}
+
+.setup-step label {
+  display: block;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.path-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.setup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-divider {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: .917rem;
+  position: relative;
+}
+
+.setup-divider span {
+  background: var(--bg-secondary);
+  padding: 0 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.setup-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--fill-2);
+}
+
+.setup-hint {
+  font-size: .917rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: -4px;
+}
+
+.setup-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.setup-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--border-radius-lg);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.setup-mode-btn:hover {
+  background: var(--fill-2);
+  border-color: var(--accent);
+}
+
+/* Radio-style variant: the network step keeps the picked card highlighted
+   instead of navigating away on click. */
+.setup-mode-btn.is-selected {
+  background: var(--fill-2);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.setup-mode-icon {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.setup-mode-title {
+  font-size: 1.083rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.setup-mode-desc {
+  font-size: .917rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.setup-preview {
+  font-size: .917rem;
+  color: var(--text-secondary);
+  background: var(--fill-1);
+  border-radius: var(--border-radius);
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.setup-preview strong {
+  color: var(--accent);
+}
+
+.setup-note {
+  font-size: .917rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+.welcome-credit {
+  font-size: .917rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 16px;
+}
+
+/* Inline link-styled button - shared by the welcome credit and the download
+   sheet's settings shortcut. */
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.setup-validation {
+  font-size: .917rem;
+  padding: 6px 10px;
+  border-radius: var(--border-radius);
+  margin-top: 4px;
+}
+
+.setup-validation--checking {
+  color: var(--text-muted);
+}
+
+.setup-validation--ok {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.setup-validation--err {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.progress-text {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 6px;
+}
+
+.favorite-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  background: color-mix(in srgb, var(--om-darker-background) 45%, transparent);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.167rem;
+  color: color-mix(in srgb, var(--om-foreground) 75%, transparent);
+  cursor: pointer;
+  opacity: 0;
+  overflow: visible; /* let the ring and sparks escape the button bounds */
+  transition: opacity 0.15s ease, color 0.2s ease, transform 0.1s ease;
+}
+
+.game-card:hover .favorite-btn,
+.favorite-btn.is-favorited {
+  opacity: 1;
+}
+
+.favorite-btn.is-favorited {
+  color: var(--warning);
+}
+
+.favorite-btn:hover {
+  transform: scale(1.15);
+  color: var(--warning);
+}
+
+/* The star glyph sits in its own span so it can scale/glow independently
+   of the surrounding ring and sparks. Without this, animating the button
+   directly would also scale the sparks that live inside it. */
+.fav-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  line-height: 1;
+}
+
+/* ── Favorite burst (Lottie-style) ────────────────────────────────────────
+   On favoriting: the star pops with elastic easing, a gold ring expands
+   outward, and six sparkle dots radiate on 60° spokes. On unfavoriting:
+   just a quick shrink-recover - no halo, no sparkles. */
+
+.favorite-btn.animating.is-favorited .fav-star {
+  animation: fav-star-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.favorite-btn.animating:not(.is-favorited) .fav-star {
+  animation: fav-star-shrink 0.22s ease-out;
+}
+
+@keyframes fav-star-pop {
+  0%   { transform: scale(1);    filter: drop-shadow(0 0 0 color-mix(in srgb, var(--warning) 0%, transparent)); }
+  40%  { transform: scale(1.55); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--warning) 90%, transparent)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 0 0 color-mix(in srgb, var(--warning) 0%, transparent)); }
+}
+
+@keyframes fav-star-shrink {
+  0%   { transform: scale(1);    }
+  45%  { transform: scale(0.82); }
+  100% { transform: scale(1);    }
+}
+
+/* Expanding ring - born inside the button, scales out past its bounds. */
+.fav-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--warning) 85%, transparent);
+  pointer-events: none;
+  animation: fav-ring-expand 0.55s ease-out forwards;
+}
+
+@keyframes fav-ring-expand {
+  0%   { opacity: 0.9; transform: scale(0.4); border-width: 3px; }
+  60%  { opacity: 0.7; }
+  100% { opacity: 0;   transform: scale(1.55); border-width: 0.5px; }
+}
+
+/* Six sparks fly outward on 60° spokes. Each spark reads its angle from
+   a CSS custom property set inline by the component, so one keyframe
+   drives all six with no JS per-spark. Chained transforms: translate to
+   center, rotate by angle, then translateY(-distance) to throw outward
+   along the rotated axis. */
+.fav-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fav-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--warning); /* same gold as ring + is-favorited color */
+  border-radius: 50%;
+  box-shadow: 0 0 4px color-mix(in srgb, var(--warning) 80%, transparent);
+  transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(0) scale(0);
+  animation: fav-spark-fly 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes fav-spark-fly {
+  0%   { transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-2px)  scale(0);   opacity: 0; }
+  20%  { transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-6px)  scale(1);   opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--angle, 0deg)) translateY(-15px) scale(0.2); opacity: 0; }
+}
+
+/* Honor reduced-motion - plain color swap, no bursts. */
+@media (prefers-reduced-motion: reduce) {
+  .game-detail-note-slot,
+  .game-detail-collapse {
+    transition: none;
+  }
+  .favorite-btn.animating.is-favorited .fav-star,
+  .favorite-btn.animating:not(.is-favorited) .fav-star,
+  .fav-ring,
+  .fav-spark {
+    animation: none;
+  }
+  .fav-ring,
+  .fav-sparks {
+    display: none;
+  }
+}
+
+/* ============================================
+   Game Detail Panel
+   ============================================ */
+
+.game-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 149;
+  background: color-mix(in srgb, var(--om-darker-background) 50%, transparent);
+  backdrop-filter: blur(3px);
+  animation: modalBackdropIn 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.game-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* The description now runs the full width instead of sharing it with the
+     field table, so this only has to be a comfortable reading measure - it no
+     longer has to be wide enough for two columns at once. */
+  width: clamp(380px, 40vw, 560px);
+  z-index: 150;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--line-3);
+  /* Panel itself does NOT scroll - it's a flex column with hero/actions fixed
+     and the fields+description region scrolling internally. Keeps the
+     screenshots strip pinned at the bottom regardless of description length. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+  box-shadow: -12px 0 40px var(--shadow);
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.game-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--om-darker-background) 40%, transparent);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.game-detail-close:hover {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  color: var(--danger);
+}
+
+/* ── Hover controls over the artwork ─────────────────────────────────────────
+   Close, sound, replay and the zoom hint all sit ON the cover. At rest the
+   panel opens on the artwork alone; the controls arrive with the pointer.
+   Focus counts as hover, or a keyboard user tabs to buttons they cannot see. */
+.game-detail-close,
+.game-detail-video-sound,
+.game-detail-video-replay,
+.game-detail-zoom-hint {
+  opacity: 0;
+}
+
+.game-detail-hero:hover .game-detail-close,
+.game-detail-hero:hover .game-detail-video-replay,
+.game-detail-hero:hover .game-detail-zoom-hint,
+.game-detail-close:focus-visible {
+  opacity: 1;
+}
+
+.game-detail-hero:hover .game-detail-video-sound {
+  opacity: 0.75;
+}
+
+/* Centred, and deliberately NOT a button: the artwork underneath already
+   opens the lightbox, and a real target here would swallow clicks aimed at
+   the middle of the cover. */
+.game-detail-zoom-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--om-darker-background) 50%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.game-detail-hero {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Stacking context for the cover/video crossfade. Without it the overlay
+   would also cover the title block below. */
+.game-detail-hero-art {
+  position: relative;
+  line-height: 0;
+}
+
+.game-detail-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  /* Cap the height so a wider panel doesn't spend its extra pixels on box art
+     that then pushes everything else below the fold. */
+  max-height: 240px;
+  /* CONTAIN, not cover. Box art is portrait (3:4) and the hero is 16:9, so
+     cover threw away the top and bottom third - the panel opened on a crop of
+     the middle of the artwork, often just a background texture. */
+  object-fit: contain;
+  display: block;
+  cursor: pointer;
+}
+
+/* The same artwork, blown up and blurred, fills what `contain` leaves empty.
+   Cheaper than letterbox bars and it carries the cover's own palette into the
+   panel. scale() hides the soft edge the blur pulls in from the border. */
+.game-detail-thumb-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(22px) saturate(1.25);
+  transform: scale(1.15);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.game-detail-thumb-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, var(--bg-card) 0%, color-mix(in srgb, var(--accent) 18%, var(--bg-card)) 50%, color-mix(in srgb, var(--accent) 38%, var(--bg-secondary)) 100%);
+}
+
+.game-detail-hero-info {
+  padding: 12px 16px 8px;
+}
+
+.game-detail-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+
+.game-detail-body {
+  padding: 8px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0; /* required for nested .game-detail-scroll to size + scroll */
+  /* Escape hatch for very short windows: once the pinned blocks (actions or
+     Versions list + media strip) plus the scroll region's min-height exceed
+     the panel, the body scrolls instead of clipping the gallery. */
+  overflow-y: auto;
+}
+
+/* Scroll region for description + notes - squeezed between fixed fields
+   above and the (sometimes-pinned) media strip below. min-height: 0 so it
+   actually shrinks; default flex auto-min keeps content from being squeezed. */
+.game-detail-scroll {
+  flex: 1;
+  /* Floor, not 0: with min-height: 0 the flex solver was free to squeeze this
+     region out of existence when the fixed siblings filled the panel, which
+     hid the description entirely instead of making it scrollable. */
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Subtle scrollbar so users can see there's more content. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--om-foreground) 12%, transparent) transparent;
+}
+.game-detail-scroll::-webkit-scrollbar { width: 4px; }
+.game-detail-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--om-foreground) 14%, transparent); border-radius: 2px; }
+.game-detail-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* A compatibility note is an aside, not an alarm. The accent bar down one
+   edge made every one of them read as a system warning and pulled the eye off
+   the actions below, so the container is a plain hairline card and the only
+   varying element is a small round mark - "i" for what merely differs, "!"
+   for a launch that cannot work. No color bar, no fill tint by severity. */
+/* The note comes and goes on a user action (pressing Download clears the
+   dependency note), and an abrupt unmount shifted the whole panel body.
+   The slot animates its own height instead: `grid-template-rows` between
+   0fr and 1fr is the one way to transition to a content-derived height.
+   The child needs `min-height: 0` or it refuses to shrink. */
+.game-detail-note-slot,
+.game-detail-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.22s cubic-bezier(0.2, 0.7, 0.3, 1),
+              opacity 0.16s ease;
+}
+
+.game-detail-note-slot.is-open,
+.game-detail-collapse.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* The clipped box carries no padding or border of its own: a border-box
+   element cannot be laid out shorter than those, so the note itself would
+   keep 20px in the collapsed state. */
+.game-detail-note-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The description's language hint comes and goes with the chip. It sits in
+   the scroll region, so only its own height moves - but that is the line the
+   eye is reading. */
+.game-detail-collapse > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.game-detail-note {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 9px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--fill-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--border-radius);
+  padding: 9px 10px 9px 11px;
+  margin-bottom: 12px;
+}
+
+.game-detail-note-mark {
+  /* Optically centred on the first line of text rather than the box: with
+     align-items: start a 16px circle beside a 18px line sits 1px high. */
+  margin-top: 1px;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid color-mix(in srgb, var(--om-foreground) 22%, transparent);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: .833rem;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.game-detail-note.is-blocking .game-detail-note-mark {
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  color: var(--danger);
+  font-style: normal;
+}
+
+.game-detail-note-text {
+  margin: 0;
+}
+
+/* A note's remedy button (e.g. "Download emulator") goes on its own row,
+   aligned with the text column, not squeezed into the dismiss slot. */
+.game-detail-note-action {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 2px;
+}
+
+/* Visible at rest, because a note the user cannot see how to silence is just
+   a note. Quiet enough not to compete with the action bar underneath. */
+.game-detail-note-dismiss {
+  flex: none;
+  margin: -2px -2px 0 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: .917rem;
+  line-height: 1;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.game-detail-note-dismiss:hover {
+  opacity: 1;
+  background: var(--fill-2);
+  color: var(--text-primary);
+}
+
+.game-detail-note-dismiss:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.game-detail-status {
+  font-size: .917rem;
+  color: var(--accent-hover);
+}
+
+.game-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+  /* Reserve enough room for the tallest action set so the row doesn't grow
+     when Manual / Settings buttons appear post-metadata-load. */
+  min-height: 36px;
+}
+
+/* The Play button while its game runs: same geometry, danger tint. */
+.game-detail-btn.is-stop {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.game-detail-btn.is-stop:hover {
+  background: color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.game-detail-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.game-detail-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* Offline mode stand-in for the download button - a label, not an action. */
+.game-detail-btn.btn-offline {
+  background: var(--fill-1);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Inline button spinner - used for "Starting…" and similar in-flight states.
+   Small enough to sit beside text without bumping button height. */
+.btn-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: btn-spinner-rotate 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Both ends spell out the full transform list. The compositing block gives
+   .btn-spinner a base `translateZ(0)`; with only a `to` keyframe WebKit then
+   interpolates mismatched lists via matrices, and rotate(360deg) IS the
+   identity matrix - the spinner stood perfectly still (measured on WebKitGTK
+   2.52.6). */
+@keyframes btn-spinner-rotate {
+  from { transform: translateZ(0) rotate(0deg); }
+  to   { transform: translateZ(0) rotate(360deg); }
+}
+
+.btn-play {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+  flex: 1;
+}
+
+.btn-play:hover {
+  background: color-mix(in srgb, var(--success) 25%, transparent);
+}
+
+.btn-download {
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+  flex: 1;
+}
+
+.btn-download:hover {
+  background: var(--accent-fill);
+}
+
+.btn-downloading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-hover);
+  border-radius: var(--border-radius);
+  padding: 7px 16px;
+  font-size: .917rem;
+  color: var(--text-secondary);
+}
+
+.btn-cancel {
+  background: none;
+  border: 1px solid var(--line-3);
+  color: var(--text-muted);
+  border-radius: var(--border-radius);
+  padding: 5px 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-cancel:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.btn-cancel:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-uninstall {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--line-3);
+}
+
+.btn-uninstall:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.btn-reset {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--line-3);
+}
+
+.btn-reset:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.btn-playlist {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--line-3);
+}
+
+.btn-playlist:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Language switcher: one chip per variant, the selected one scopes the whole
+   panel (actions, description, manual, screenshots). */
+.variant-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.variant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.variant-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.variant-chip:hover:not(:disabled) {
+  background: var(--fill-2);
+}
+
+.variant-chip.is-selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.variant-chip-state {
+  font-size: .917rem;
+  white-space: nowrap;
+}
+
+.variant-chip-label {
+  font-size: 1rem;
+  padding-left: 4px;
+  white-space: nowrap;
+}
+
+/* Language qualifier on a button label, e.g. Manual [EN] on a DE selection. */
+.btn-suffix {
+  font-size: .833rem;
+  opacity: 0.75;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 2px;
+}
+
+.game-detail-section-label {
+  font-size: .833rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.game-detail-loading {
+  font-size: 1rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+
+.game-detail-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Says which language the description below actually is, when the selected
+   variant has no text of its own (true for all PL/ES rows). */
+.game-detail-fallback-note {
+  font-size: .917rem;
+  color: var(--text-muted);
+  background: var(--fill-1);
+  border-radius: var(--border-radius);
+  padding: 5px 8px;
+}
+
+/* The "Information" long tail. Full panel width now, so two label/value pairs
+   fit per line and nothing wraps - the block is both shorter and calmer than
+   the single narrow column it replaced. Rows are `display: contents`, so the
+   columns align across the whole grid rather than per row. */
+.game-detail-fields {
+  display: grid;
+  grid-template-columns: 13px auto minmax(0, 1fr) 13px auto minmax(0, 1fr);
+  align-items: baseline;
+  /* The row gap has to beat the LINE gap inside a value, or a wrapped value
+     runs straight into the next field and the block reads as one paragraph. */
+  gap: 9px 8px;
+  min-width: 0;
+}
+
+@media (max-width: 470px) {
+  .game-detail-fields {
+    grid-template-columns: 13px auto minmax(0, 1fr);
+  }
+}
+
+.game-detail-info {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+/* ── Credits and tags under the title ────────────────────────────────────────
+   The pictogram replaces the label here: with three lines whose values read
+   as names and a year, uppercase labels were three columns of furniture. */
+.game-detail-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.game-detail-credit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.game-detail-credit .game-detail-field-icon {
+  transform: none;
+  flex: none;
+}
+
+/* Tinted per CATEGORY, not per state: the same category is the same colour on
+   every game, so the row reads as a legend. Deliberately quieter than the
+   badges in the grid - this is context, not a call to action. */
+.game-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.game-detail-tag {
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: .917rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.game-detail-tag.is-genre {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--om-magenta);
+}
+
+.game-detail-tag.is-platform {
+  background: color-mix(in srgb, var(--info) 15%, transparent);
+  color: var(--info);
+}
+
+.game-detail-tag.is-mode {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+.game-detail-tag.is-emulator {
+  background: color-mix(in srgb, var(--warning) 13%, transparent);
+  color: var(--warning);
+}
+
+/* Icon, label, value. A grid rather than flex so the three columns line up
+   down the whole block - with flex, a wrapping value pulled its label out of
+   alignment with the rest and the icon rail lost its rhythm. */
+.game-detail-field {
+  display: contents;
+  font-size: .958rem;
+  color: var(--text-primary);
+}
+
+/* Dimmer than the label it precedes: it marks the row, it does not name it. */
+.game-detail-field-icon {
+  /* Baseline alignment puts an inline SVG's bottom edge on the text baseline,
+     which sits it a touch high next to 10px uppercase. */
+  transform: translateY(2px);
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.game-detail-field-label {
+  color: var(--text-muted);
+  font-size: .833rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.game-detail-field > span:last-child {
+  word-break: break-word;
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.game-detail-stars {
+  color: var(--warning);
+  letter-spacing: 1px;
+}
+
+.game-detail-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.game-detail-notes {
+  font-size: .917rem;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.game-detail-loading {
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   Media browser (manual + gallery) in detail panel
+   ============================================ */
+.game-detail-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-1);
+}
+
+.btn-manual {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+.btn-manual:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warning) 22%, transparent);
+}
+
+/* While the metadata scan runs (or no manual resolved) the button is inert -
+   without this it kept its amber + hover and read as clickable. */
+.btn-manual:disabled {
+  background: var(--fill-1);
+  color: var(--text-muted);
+}
+
+/* Outline star until it is set, then filled and amber - the same reading as
+   the grid's overlay star, so the two never disagree at a glance. */
+.btn-fav {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 7px 12px;
+  font-size: 1.167rem;
+  line-height: 1;
+}
+
+.btn-fav:hover:not(:disabled) {
+  background: var(--fill-3);
+  color: var(--text-primary);
+}
+
+.btn-fav.is-favorited {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+
+/* Deliberately the quietest control in the bar: it holds what is rarely
+   wanted, including the two operations that destroy data. */
+.btn-more {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 7px 12px;
+  letter-spacing: 0.08em;
+}
+
+.btn-more:hover:not(:disabled) {
+  background: var(--fill-3);
+  color: var(--text-primary);
+}
+
+.btn-settings {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 7px 10px;
+}
+
+.btn-settings:hover {
+  background: var(--fill-3);
+  color: var(--text-primary);
+}
+
+/* ── Game Settings Dialog ────────────────── */
+.game-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+  animation: modalBackdropIn 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.game-settings-positioner {
+  position: fixed;
+  inset: 0;
+  z-index: 301;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.game-settings-content {
+  width: min(480px, 100%);
+  max-height: 80vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: none;
+  box-shadow: 0 16px 50px var(--shadow);
+  animation: modalContentIn 0.24s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.game-settings-title {
+  font-size: 1.167rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 16px 20px 12px;
+  margin: 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.game-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.game-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-settings-label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.game-settings-select {
+  /* appearance: none keeps WebKitGTK from painting these with the native GTK
+     theme (light chrome in a dark dialog on Linux); the chevron the native
+     look provided comes back as an inline SVG. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-primary);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: var(--text-primary);
+  border: 1px solid var(--line-4);
+  border-radius: 4px;
+  padding: 5px 24px 5px 10px;
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Why a control above is inert. Sits under its row rather than replacing it:
+   a setting that silently disappears reads as a bug. */
+.game-settings-note {
+  margin: -6px 0 0;
+  font-size: .917rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.game-settings-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-settings-cycles {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.game-settings-cycles-input {
+  width: 80px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--line-4);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.game-settings-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.game-settings-textarea {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--line-4);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: .917rem;
+  line-height: 1.5;
+  min-height: 140px;
+  resize: vertical;
+  scrollbar-width: thin;
+}
+
+.game-settings-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.game-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line-2);
+}
+
+.game-settings-error {
+  margin-right: auto;
+  color: var(--danger);
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 7px 16px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.game-detail-gallery-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
+.gallery-thumb {
+  width: 64px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  outline: 1px solid transparent;
+  transition: outline-color 0.1s ease;
+}
+
+.gallery-thumb:hover {
+  outline-color: color-mix(in srgb, var(--om-foreground) 30%, transparent);
+}
+
+/* ── Lightbox ───────────────────────────────── */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(6px);
+  z-index: 300;
+  animation: modalBackdropIn 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.lightbox-positioner {
+  position: fixed;
+  inset: 0;
+  z-index: 301;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0 0;
+  box-sizing: border-box;
+  outline: none;
+  animation: modalContentIn 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* A column: the stage takes what the strip and the counter below it leave.
+   Nothing overlays the picture - the strip used to be absolute and sat on
+   the seek bar of a tall video and on the foot of a tall image. */
+.lightbox-stage {
+  width: 90vw;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: pan-y;
+  overflow: hidden;
+  cursor: default;
+}
+
+.lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  image-rendering: pixelated;
+  cursor: zoom-in;
+}
+
+.lightbox-image.zoomed {
+  cursor: zoom-out;
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 52px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: 1px solid var(--line-4);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 3.167rem;
+  line-height: 1;
+  padding-bottom: 4px;
+  transition: background 0.15s ease;
+}
+
+.lightbox-nav:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.lightbox-prev { left: 24px; }
+.lightbox-next { right: 24px; }
+
+.lightbox-counter {
+  flex: 0 0 auto;
+  order: 1;
+  margin: 8px auto 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lightbox-thumbs {
+  flex: 0 0 auto;
+  margin: 12px auto 0;
+  display: flex;
+  gap: 4px;
+  max-width: 80vw;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+}
+
+.lightbox-thumb-item {
+  width: 48px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.5;
+  outline: 2px solid transparent;
+  transition: opacity 0.1s ease, outline-color 0.1s ease;
+}
+
+.lightbox-thumb-item:hover {
+  opacity: 0.8;
+}
+
+.lightbox-thumb-item.active {
+  opacity: 1;
+  outline-color: #fff;
+}
+
+.lightbox-broken {
+  color: var(--text-muted);
+  font-size: 1.083rem;
+}
+
+.lightbox-preload {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── Document viewer (manuals, Lesesaal issues) ────────── */
+.document-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  z-index: 300;
+  animation: modalBackdropIn 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.document-viewer-positioner {
+  position: fixed;
+  inset: 0;
+  z-index: 301;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.document-viewer-content {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  outline: none;
+  animation: modalContentIn 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.document-viewer-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.document-viewer-titles {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.document-viewer-title {
+  font-size: 1.167rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.document-viewer-subtitle {
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+.document-viewer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.document-viewer-btn:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--om-foreground) 15%, transparent);
+}
+
+.document-viewer-btn.is-active {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+
+.document-viewer-btn.is-danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.document-viewer-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.333rem;
+  cursor: pointer;
+}
+
+.document-viewer-close:hover {
+  color: var(--text-primary);
+}
+
+.document-viewer-zoom {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.document-viewer-zoom-btn {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: none;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.document-viewer-zoom-btn:hover {
+  color: var(--text-primary);
+}
+
+.document-viewer-zoom-pct {
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--line-3);
+  border-right: 1px solid var(--line-3);
+}
+
+.document-viewer-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--danger-glow);
+  border-bottom: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.document-viewer-notice-path {
+  color: var(--text-muted);
+  user-select: text;
+  word-break: break-all;
+}
+
+.document-viewer-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+}
+
+.document-viewer-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-viewer-image {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+}
+
+.document-viewer-image img {
+  max-width: 100%;
+  border-radius: var(--border-radius);
+}
+
+/* HTML and text manuals are authored for a white page. */
+.document-viewer-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: #fff;
+  overflow: hidden;
+}
+
+.document-viewer-iframe-wrap {
+  flex: 1;
+  display: flex;
+}
+
+.document-viewer-iframe {
+  flex: 1;
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.document-viewer-text {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--bg-primary);
+  white-space: pre-wrap;
+}
+
+/* Full-screen blocking overlay shown while factory_reset runs. Sits above
+   every other dialog/page so the user can't interact with stale Library or
+   Settings state while we tear down the DB and game folders. */
+.reset-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--om-darker-background) 85%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.reset-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 48px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 0 40px var(--accent-glow);
+}
+
+.reset-overlay-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: circular-spin 0.9s linear infinite;
+}
+
+.reset-overlay-title {
+  font-size: 1.5rem;
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.reset-overlay-hint {
+  font-size: 1.083rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 320px;
+}
+
+/* ============================================
+   Toast notifications
+   ============================================ */
+.toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 40px));
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line-4);
+  border-left-width: 3px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--shadow);
+  font-size: 1.042rem;
+  color: var(--text-primary);
+  animation: toast-slide-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.toast-info { border-left-color: var(--accent); }
+.toast-success { border-left-color: var(--success); }
+.toast-warning { border-left-color: var(--warning); }
+.toast-error { border-left-color: var(--danger); }
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .917rem;
+  font-weight: 700;
+  font-family: inherit;
+  margin-top: 1px;
+}
+
+.toast-icon-info { background: var(--accent-glow); color: var(--accent-hover); }
+.toast-icon-success { background: color-mix(in srgb, var(--success) 18%, transparent); color: var(--success); }
+.toast-icon-warning { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
+.toast-icon-error { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-message {
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.toast-detail {
+  margin-top: 3px;
+  font-size: .958rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* State-swap fade: applied to containers whose contents get replaced by a
+   different state (action row <-> "Uninstalling" label). Solid remounts the
+   subtree, so an entry animation reads as a crossfade. */
+.fade-swap {
+  animation: fade-swap-in 180ms ease-out;
+}
+
+@keyframes fade-swap-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-swap { animation: none; }
+}
+
+.btn-uninstalling {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+
+.toast-action {
+  margin-top: 8px;
+  padding: 4px 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.toast-action:hover {
+  background: var(--accent-hover);
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.333rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.toast-dismiss:hover {
+  color: var(--text-primary);
+  background: var(--fill-2);
+}
+
+@keyframes toast-slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Preview video ───────────────────────────────────────────────────────────
+   The video occupies the hero while it plays and hands the cover back when it
+   ends, so both are stacked and cross-faded rather than swapped in the DOM -
+   swapping would collapse the hero's height for a frame. */
+.game-detail-hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  display: block;
+  /* Transparent, NOT black. object-fit: cover leaves no letterbox to fill, so
+     the only thing a black background painted was the gap between "the element
+     exists" and "it has decoded a frame" - and since the video fades in on top
+     of the cover, that gap read as a cut to black. Transparent lets the cover
+     show through until there is a real frame to cross-fade to. */
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.game-detail-hero-video.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  /* An ANIMATION, not only the transition below: when the element mounts and
+     turns visible in the same style flush (a fetch that just finished starts
+     with no cover beat), a transition has no rendered before-state and is
+     skipped - the video popped in hard. The animation plays on every class
+     add; fading OUT stays with the transition. */
+  animation: heroVideoFadeIn 0.45s ease;
+}
+
+@keyframes heroVideoFadeIn {
+  from { opacity: 0; }
+}
+
+/* Linux: the element's own presentation is untrusted (green/stale frames on
+   NVIDIA, videoCanvas.ts) - the canvas twin above it shows the pixels. The
+   element keeps a NEAR-zero opacity rather than zero, so no engine heuristic
+   reads it as invisible and suspends its playback; it stays the click target. */
+.game-detail-hero-video.has-canvas,
+.game-detail-hero-video.has-canvas.is-visible {
+  opacity: 0.02;
+}
+
+/* The twin fades exactly like the element it mirrors and never takes a
+   click - those belong to the video underneath. */
+.game-detail-hero-video.game-detail-hero-canvas {
+  pointer-events: none;
+}
+
+/* The cover stays mounted AND fully opaque underneath: the video covers it
+   completely while visible, so dimming it bought nothing and cost a
+   half-transparent mid-point in every cross-fade. Keeping it lit means every
+   direction - start, end, replay, switching games - dissolves against the
+   artwork instead of through a dark frame. */
+.game-detail-thumb {
+  transition: opacity 0.45s ease;
+}
+
+/* Fetch progress, bottom-left of the hero so it never covers the close button. */
+.game-detail-video-status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--om-darker-background) 62%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: .917rem;
+  /* The hero art zeroes line-height to kill the inline gap under the cover,
+     and every pill inherits it. One with a spinner still got its height from
+     that 12px flex item; the text-only "No video" pill collapsed to 8px of
+     padding with the label hanging out of its own background. Buttons escaped
+     via the UA's line-height/font, which is the other half of why the three
+     looked like three different components. */
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  animation: videoStatusIn 0.3s ease;
+}
+
+@keyframes videoStatusIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.game-detail-video-retry {
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.game-detail-video-retry:hover {
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+.game-detail-video-error {
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--danger) 70%, var(--text-strong));
+}
+
+.game-detail-video-replay {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--om-darker-background) 62%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  /* No entry animation. `videoStatusIn ... forwards` left the button parked at
+     opacity 1 - an animation's fill wins over the declarative value - so the
+     hover rule below never actually did anything and Replay sat on the cover
+     permanently. */
+  transition: opacity 0.3s ease, background 0.15s;
+}
+
+.game-detail-video-replay:hover {
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+/* Bottom-RIGHT, so it never shares a corner with the progress pill or the
+   replay button - both of which live bottom-left. Visible while the preview
+   runs rather than on hover only: muting is the reason someone reaches for
+   the hero at all, and a control they have to find first is no control. */
+.game-detail-video-sound {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--om-darker-background) 62%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  font-family: inherit;
+  /* Grid, not line-height: the icon is an <svg>, and an inline child would
+     sit on the text baseline and hang a pixel low inside the circle. */
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.2s, background 0.15s;
+}
+
+.game-detail-video-sound:hover,
+.game-detail-video-sound:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+.game-detail-video-sound:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The thumbnail strip floats over the stage, which is fine for images but put
+   it right on top of the video's native control bar - the seek handle was
+   unreachable. Shrinking the stage from the bottom lifts the controls clear;
+   padding rather than height because the stage is centred, and a smaller box
+   would just split the gap between top and bottom again. */
+/* Lightbox: the video is just another entry in the strip. */
+.lightbox-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--border-radius);
+  background: #000;
+  animation: lightboxFadeIn 0.25s ease;
+}
+
+/* Shrink-wraps the video so the Linux canvas twin (videoCanvas.ts) can sit
+   exactly on its box; the element still defines the width and aspect. The
+   height is the stage's, not `max-height: 100%`: a percentage max-height on
+   the video resolves to nothing inside an auto-height box. */
+.lightbox-video-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  height: 100%;
+}
+
+/* Same rationale as .game-detail-hero-video.has-canvas: near-zero, not zero. */
+.lightbox-video.has-canvas {
+  opacity: 0.02;
+}
+
+.lightbox-video-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--border-radius);
+  background: #000;
+  cursor: pointer;
+}
+
+@keyframes lightboxFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightbox-thumb-video {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 1.083rem;
+}
+
+/* ── Network mode: switch + status badge ─────────────────────────────────────
+   A switch rather than a checkbox, because this starts and stops a network
+   service - it is a mode, not one option among several. */
+.setting-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.setting-switch:hover {
+  background: var(--fill-2);
+}
+
+.setting-switch[data-disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.setting-switch-control {
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--om-foreground) 16%, transparent);
+  transition: background 0.2s ease;
+  position: relative;
+}
+
+.setting-switch-control[data-state="checked"] {
+  background: var(--accent);
+}
+
+.setting-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-strong);
+  box-shadow: 0 1px 3px var(--shadow);
+  transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.setting-switch-thumb[data-state="checked"] {
+  transform: translateX(14px);
+}
+
+/* Permanent reminder in the top bar - offline changes what the app can do. */
+/* Network state in the top bar. Offline is amber (a state you chose and might
+   forget about), online is quiet grey until bytes actually move. */
+.net-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: .917rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.net-badge--offline {
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+.net-badge--offline:hover {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.net-badge--online {
+  border: 1px solid var(--line-4);
+  background: var(--fill-1);
+  color: var(--text-secondary);
+}
+
+.net-badge--online:hover {
+  background: var(--fill-3);
+}
+
+.net-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Only pulses while bytes move - a permanently animated badge in the corner
+   is the kind of motion that makes an app feel restless. */
+.net-badge-dot.is-active {
+  background: var(--success);
+  animation: netPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes netPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.net-badge-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* Keeps the badge from resizing on every poll as digits change width. */
+  min-width: 62px;
+}
+
+/* Speed limit inputs in Settings → Network. */
+/* A setting whose explanation is longer than its control (the Windows 9x
+   multiplayer grant): label, reasons and action stack instead of competing
+   for one line. */
+.setting-row--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.setting-row--stacked .app-btn {
+  margin-top: 2px;
+}
+
+.setting-badge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: .833rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+
+/* A command the user runs themselves - selectable, never truncated. */
+.setting-code {
+  font-family: var(--font-mono);
+  font-size: .917rem;
+  color: var(--text-secondary);
+  background: var(--fill-1);
+  border-radius: var(--border-radius);
+  padding: 6px 8px;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.limit-inputs {
+  display: flex;
+  gap: 12px;
+}
+
+.limit-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+.limit-field input {
+  width: 68px;
+  padding: 5px 7px;
+  background: var(--bg-primary);
+  border: 1px solid var(--line-4);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.limit-field input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.limit-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Shared button layout ────────────────────────────────────────────────────
+   Applied by the Button component to every variant. An inline SVG otherwise
+   sits on the text baseline, which left icons visibly low next to their
+   label (reported on the setup screen's "← Back"). */
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.2;
+  /* A label broken across two lines reads as two controls. Buttons are short
+     by design; if one is too long for its row, the row is wrong. */
+  white-space: nowrap;
+}
+
+.app-btn > svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* The app icon on the first-run screen. Deliberately the real bundle icon and
+   not src/assets/logo.svg - that one is the SolidJS logo from the project
+   template, which happened to be the favicon until now. */
+.setup-logo {
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  filter: drop-shadow(0 6px 18px var(--shadow));
+}
+
+/* Opt-out checkbox inside a confirm dialog ("Don't ask again"). */
+.dialog-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Settings row that is a statement plus one action (Windows 9x multiplayer).
+   Framed like the switches above it so the Network section reads as one
+   group rather than a list with a loose line at the end. */
+/* Spinner row inside a blocking progress dialog (folder migration). */
+.dialog-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+/* ── Linux software rendering ──────────────────────────────────────────────
+   Linux runs WebKit's fallback renderer (the DMA-BUF path aborts with a
+   Wayland protocol error on NVIDIA - see lib.rs), where backdrop blur is
+   recomputed on the CPU every frame; two dialogs even ANIMATE the blur, and
+   transitions visibly stutter. The overlays keep their rgba dim - only the
+   blur goes. Class set in App.tsx at mount. */
+html.soft-render * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── WebKitGTK compositing ─────────────────────────────────────────────────
+   A hovered card (scale transition) or the sliding tab pane gets its own
+   compositing layer, and WebKitGTK's overlap test lags a frame behind the
+   scroll: a sticky bar painted in the root layer then shows the card's
+   title through it. Promoting the sticky bars themselves ends that, and a
+   composited spinner rotates as one texture instead of re-rasterizing its
+   ring at every frame (the 1 px jitter). Harmless on the other platforms. */
+.lib-tabs,
+.library-toolbar,
+.grid-separator,
+.game-list-header,
+.section-title,
+.btn-spinner {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* ============================================
+   Now Playing bar (theme music player)
+   ============================================
+   A bottom row of the flex column, like .top-bar at the top. Its height
+   lives in --player-h so the fixed detail panel and its backdrop can leave
+   the bar reachable while a game is open. */
+:root {
+  --player-h: 0px;
+}
+
+body.has-player {
+  --player-h: 56px;
+}
+
+.now-playing-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--player-h);
+  padding: 0 12px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--line-2);
+  z-index: 1;
+}
+
+.player-cover {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.player-cover-placeholder {
+  color: var(--text-muted);
+  font-size: 1.5rem;
+}
+
+/* Title block and seek bar share the flexible middle; the basis keeps the
+   title from collapsing to its ellipsis while the seek bar has room. */
+.player-meta {
+  min-width: 0;
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-title {
+  font-size: 1.083rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-sub {
+  font-size: .917rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-sub.is-error {
+  color: var(--danger);
+}
+
+.player-seek {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 200px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: .917rem;
+}
+
+.player-time {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.player-seek-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+/* Narrow windows keep the title and the controls; the seek bar is the part
+   that has nowhere left to go. */
+@media (max-width: 700px) {
+  .player-seek {
+    display: none;
+  }
+}
+
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.player-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.167rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* The bar is up while the first track is still being fetched: the transport
+   keeps its place so nothing shifts once the bytes land. */
+.player-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.player-btn-main {
+  width: 34px;
+  height: 34px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.player-btn-main:hover:not(:disabled) {
+  background: var(--accent-hover);
+  color: var(--text-strong);
+}
+
+.player-continuous.is-on {
+  color: var(--accent);
+}
+
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+/* The icon is an inline SVG: without this it sits on the text baseline. */
+.player-volume > span {
+  display: flex;
+}
+
+.player-volume input[type="range"] {
+  width: 90px;
+  accent-color: var(--accent);
+}
+
+.player-close {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+}
+
+/* The panel covers the viewport height; with a player open it stops above
+   the bar, and so does the backdrop - or it swallows the bar's clicks. */
+.game-detail-backdrop,
+.game-detail-panel {
+  bottom: var(--player-h);
+}
+
+/* Theme row in the detail panel: sits with the Information block. */
+.game-detail-music {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+
+.game-detail-music-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  min-height: 28px;
+}
+
+.game-detail-music-row .btn-spinner {
+  flex-shrink: 0;
+}
+
+.game-detail-music-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Reading Room (§19) ──────────────────────────────────────────────── */
+/* The tab reuses Browse's toolbar, grid, list, separators and jump bar; only
+   what a document needs that a game does not is defined here. */
+
+.reading-kinds {
+  display: flex;
+  gap: 6px;
+}
+
+.reading-note {
+  padding: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.grid-separator .section-count {
+  vertical-align: middle;
+  margin-left: 10px;
+}
+
+/* Scans are not 3:4 (magazines ~0.73, some catalogs landscape): the tile
+   keeps the grid's box and the cover is contained, never cropped. */
+.issue-card .game-card-thumb {
+  object-fit: contain;
+  background: var(--bg-secondary);
+}
+
+.issue-card .card-action-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The label sits beside the size here, so it does not take the bar's width. */
+.issue-card .action-downloading {
+  flex: 0 1 auto;
+  text-align: left;
+}
+
+/* The series name is the meta line's second half; the genre cap is too
+   narrow for "Computer Gaming World". */
+.issue-card .game-card-meta .genre {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+
+.issue-play {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.issue-play:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.issue-play:disabled {
+  cursor: default;
+}
+
+.card-action-size {
+  margin-left: auto;
+  font-size: .833rem;
+  color: color-mix(in srgb, var(--om-foreground) 50%, transparent);
+  white-space: nowrap;
+}
+
+.action-resume {
+  color: var(--accent-hover);
+}
+
+.badge-disk {
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  color: var(--orange);
+}
+
+.badge-ondisk {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent-hover);
+}
+
+/* List columns: fav | cover | title | publication | year | kind | size | status */
+.issue-list-header,
+.issue-row {
+  grid-template-columns:
+    28px 26px minmax(220px, 2.4fr) minmax(150px, 1.4fr) 44px 96px 68px 120px;
+}
+
+.issue-row .row-cover img {
+  object-fit: contain;
+}
+
+@media (max-width: 1000px) {
+  .issue-list-header,
+  .issue-row {
+    grid-template-columns:
+      28px 26px minmax(200px, 2.4fr) minmax(130px, 1.4fr) 44px 68px 120px;
+  }
+
+  .issue-list-header .row-kind,
+  .issue-row .row-kind {
+    display: none;
+  }
+}
+
+/* ── Issue fetch panel (inside the document viewer) ─────────────────── */
+
+.issue-fetch {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 24px;
+  width: min(560px, 100%);
+}
+
+.issue-fetch-cover {
+  aspect-ratio: 3 / 4;
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: 0 8px 30px var(--shadow);
+}
+
+.issue-fetch-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.issue-fetch-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  align-self: center;
+}
+
+.issue-fetch-headline {
+  font-size: 1.333rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.issue-fetch-detail {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.issue-fetch-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.issue-fetch-pct {
+  min-width: 34px;
+  text-align: right;
+  font-size: .917rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.issue-fetch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.issue-fetch-actions .lib-empty-btn {
+  margin-top: 0;
+  padding: 6px 14px;
+}
+/* ── PDF reader ──────────────────────────────────────────────────────── */
+
+.pdf-reader {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  outline: none;
+}
+
+.pdf-reader-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.pdf-reader-pager,
+.pdf-reader-zoom,
+.pdf-reader-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-reader-search {
+  margin-left: auto;
+}
+
+.pdf-reader-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+  min-width: 28px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.pdf-reader-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--om-foreground) 15%, transparent);
+}
+
+.pdf-reader-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pdf-reader-zoom-pct {
+  min-width: 52px;
+}
+
+.pdf-reader-page-input {
+  width: 56px;
+  background: var(--bg-primary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 1rem;
+  padding: 3px 6px;
+  text-align: center;
+}
+
+.pdf-reader-page-total,
+.pdf-reader-hits {
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+.pdf-reader-search-input {
+  width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 1rem;
+  padding: 4px 8px;
+}
+
+.pdf-reader-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pdf-reader-hitbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.pdf-reader-hitbar-label {
+  flex: 0 0 auto;
+  font-size: .917rem;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.pdf-reader-hit {
+  flex: 0 0 auto;
+  background: var(--bg-card);
+  border: 1px solid var(--line-3);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: .917rem;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.pdf-reader-hit:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.pdf-reader-pages {
+  flex: 1;
+  min-height: 0;
+  /* Both axes: a page zoomed past the fit width is wider than the column,
+     and a clipped one cannot be panned to. */
+  overflow: auto;
+  /* Reading is scrolling, so the bar has to be there before the first wheel
+     tick - macOS hides an overlay scrollbar until then. Styled with the
+     library's rule below. */
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  /* "safe" keeps a page wider than the column reachable: centring alone
+     pushes its left edge past the scroll origin. */
+  align-items: safe center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-primary);
+}
+
+.pdf-reader-page {
+  position: relative;
+  /* The placeholder carries the page's aspect so the scrollbar is right
+     before anything is rendered - the same rule the grid needs (§13). */
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.pdf-reader-page-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.pdf-reader-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pdf-reader-page-number {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: .833rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--om-darker-background) 45%, transparent);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.pdf-reader-loading,
+.pdf-reader-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 1.083rem;
+}
+
+/* Magazine mentions in the game panel (§19). */
+.game-detail-article-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-detail-article {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-detail-article:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.game-detail-article-kind {
+  color: var(--accent-hover);
+  font-size: .917rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.game-detail-article-issue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-detail-article-issue .badge {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.game-detail-article-page {
+  color: var(--text-muted);
+  font-size: .917rem;
+}
+
+/* ============================================
+   Settings: sidebar navigation, one row shape
+   ============================================ */
+/* Sized for a Hyprland half-screen tile: never wider than the viewport and
+   never taller than what leaves the bar visible. */
+.ark-dialog-settings {
+  width: min(960px, 96vw);
+  max-width: 96vw;
+  height: min(720px, 92vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-layout {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  margin: 4px -24px 0;
+  padding: 0 24px;
+  border-top: 1px solid var(--line-3);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 150px;
+  flex-shrink: 0;
+  padding-top: 14px;
+  border-right: 1px solid var(--line-2);
+  padding-right: 12px;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.settings-nav-item:hover {
+  color: var(--text-primary);
+  background: var(--fill-1);
+}
+
+.settings-nav-item.active {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.settings-layout .settings-tab-body {
+  padding-top: 14px;
+  padding-right: 4px;
+}
+
+.settings-layout .settings-section {
+  gap: 0;
+}
+
+.settings-layout .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+.settings-nav-icon,
+.settings-title-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.settings-nav-item.active .settings-nav-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.settings-layout .settings-section-hint {
+  margin-bottom: 4px;
+}
+
+/* Label | body | action. The label column is fixed so values and hints
+   start on one line across every row of every section. */
+.settings-row {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  /* Label and the body's first line share a baseline; the action column
+     centres on the row instead. */
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.settings-section .settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-row.is-stacked {
+  grid-template-columns: 160px minmax(0, 1fr);
+}
+
+.settings-row.is-stacked .settings-row-action {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.settings-row-label {
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.settings-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row-value {
+  font-size: 1.042rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row-hint {
+  font-size: .958rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.settings-row-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  align-self: center;
+}
+
+.settings-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.settings-switch[data-disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.settings-layout .error {
+  margin: 8px 0 0;
+}
+
+/* ── Storage ─────────────────────────────────────────────────────────────── */
+.storage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.storage-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.storage-drive {
+  padding: 12px 14px;
+  background: var(--fill-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.storage-drive-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.storage-drive-path {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.storage-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--fill-2);
+}
+
+.storage-bar-seg {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.storage-bar-seg.is-foreign {
+  background: color-mix(in srgb, var(--om-foreground) 14%, transparent);
+}
+
+.storage-drive-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .958rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-drive-line b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* The legend dot is a pseudo-element, so the row's baseline is the text's. */
+.storage-cat-label::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--dot);
+  vertical-align: 0;
+}
+
+.storage-cat-size {
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-cat-items {
+  color: var(--text-secondary);
+}
+
+.storage-games-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.storage-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .917rem;
+  color: var(--text-muted);
+}
+
+/* Its own scroller: the categories above stay in view while the list of a
+   hundred games scrolls, and the bar says how long it is. */
+.storage-games {
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.storage-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.storage-game:last-child {
+  border-bottom: none;
+}
+
+.storage-game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.storage-game-title {
+  font-size: 1.083rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-game-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .917rem;
+  color: var(--text-secondary);
+}
+
+.storage-game-tag {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--fill-2);
+  color: var(--text-secondary);
+  font-size: .833rem;
+  letter-spacing: 0.3px;
+}
+
+.storage-game-size {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.042rem;
+  color: var(--text-primary);
+}
+
+.storage-game-breakdown {
+  font-size: .875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ========================================================================
+   Splash - the start screen on every launch (components/Splash.tsx)
+   ======================================================================== */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* The art's own backdrop, not the theme's: the picture is fixed. */
+  background: #07080b;
+  opacity: 1;
+  transition: opacity 0.45s ease;
+  user-select: none;
+  cursor: default;
+}
+
+.splash.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash-art {
+  max-width: min(92vw, 1100px);
+  max-height: 82vh;
+  object-fit: contain;
+  animation: splashIn 0.6s ease-out both;
+}
+
+@keyframes splashIn {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-art { animation: none; }
+}

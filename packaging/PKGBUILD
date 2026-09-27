@@ -1,0 +1,47 @@
+# Maintainer: Renan Tonheiro <renan.tonheiro@gmail.com>
+# Build from a local checkout:  cd packaging && makepkg -si
+pkgname=exorchy
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Omarchy-native launcher for the eXoDOS collection (DOS games via DOSBox Staging)"
+arch=('x86_64')
+url="https://github.com/renan/exorchy"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'openssl' 'xdg-utils' 'hicolor-icon-theme')
+makedepends=('rust' 'cargo' 'pnpm' 'nodejs' 'pkgconf')
+optdepends=('dosbox-staging: use a system emulator instead of the downloaded pack')
+options=('!lto')
+source=()
+sha256sums=()
+
+_srcdir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+build() {
+  cd "$_srcdir"
+  pnpm install --frozen-lockfile
+  pnpm build
+  cd src-tauri
+  cargo build --release --locked
+}
+
+check() {
+  cd "$_srcdir/src-tauri"
+  cargo test --release --locked --lib
+}
+
+package() {
+  cd "$_srcdir"
+  install -Dm755 src-tauri/target/release/exorchy "$pkgdir/usr/bin/exorchy"
+  # Bundled resources: Tauri resolves resource_dir() to /usr/lib/<binary>/ on Linux.
+  install -d "$pkgdir/usr/lib/exorchy"
+  cp -r metadata "$pkgdir/usr/lib/exorchy/metadata"
+  cp -r torrents "$pkgdir/usr/lib/exorchy/torrents"
+  install -Dm644 manifest.json "$pkgdir/usr/lib/exorchy/manifest.json"
+  cp -r src-tauri/resources/previews "$pkgdir/usr/lib/exorchy/previews"
+  install -Dm644 packaging/exorchy.desktop "$pkgdir/usr/share/applications/exorchy.desktop"
+  for s in 32 128 256 512; do
+    install -Dm644 "src-tauri/icons/${s}x${s}.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/exorchy.png"
+  done
+  install -Dm644 src/assets/exorchy.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/exorchy.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

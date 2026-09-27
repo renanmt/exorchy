@@ -1,0 +1,26 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Generated DB (uncompressed - only .db.gz ships) + SQLite WAL artifacts
+metadata/*.db
+metadata/*.db-shm
+metadata/*.db-wal
+
+# Local dev data (emulator tarballs, thumbnails)
+.dev-data/
+
+.vscode/
+.idea/
+*.swp
+*~
+.claude/
+scripts/__pycache__/
+work/
+tmp/
+# Staged from pdfjs-dist by scripts/copy-pdfjs-wasm.mjs
+public/pdfjs/
+
+# Raw artwork and scratch files
+tmp/

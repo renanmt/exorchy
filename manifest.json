@@ -1,0 +1,373 @@
+{
+  "schema_version": 2,
+  "generated_at": "2026-09-27T00:00:00Z",
+  "manifest_url": "",
+  "collections": {
+    "eXoDOS": {
+      "torrent_infohash": "99b685d95a496e771e0ebd9d0a547257e222dd1c",
+      "game_count": 7604,
+      "content_packs": {
+        "posters": {
+          "display_name": "Box Art",
+          "description": "HD game box-art thumbnails for the whole catalogue",
+          "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v4/posters-eXoDOS-v5.tar.gz",
+          "sha256": "7399983a4ff412a6b8b0444944346b24ba17b8901ba577bab0fa4b76ab23d1d8",
+          "size_bytes": 396948419,
+          "version": 5,
+          "install_path": "content/posters/eXoDOS",
+          "supersedes": [],
+          "min_compatible_version": 3
+        },
+        "metadata": {
+          "display_name": "Game Metadata",
+          "description": "Screenshots, fanart, and additional box-art variants for the whole catalogue (sourced from the eXoDOS torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/XODOSMetadata.zip",
+          "size_bytes": 4900000000,
+          "version": 1,
+          "install_path": "content/metadata/eXoDOS",
+          "supersedes": []
+        },
+        "dosbox-staging": {
+          "display_name": "DOSBox Staging 0.83.0",
+          "description": "The emulator that runs every DOS and Windows 3.x game. Official Linux x86_64 release from dosbox-staging.org (GPL-2.0), unpacked in place.",
+          "url": "https://github.com/dosbox-staging/dosbox-staging/releases/download/v0.83.0/dosbox-staging-linux-x86_64-v0.83.0.tar.xz",
+          "sha256": "d3a94f7f1c3e68a47ec88d61145506c7904452adb0c9c5928cb8cfe2331d6c5c",
+          "size_bytes": 29377664,
+          "version": 830,
+          "install_path": "content/emulators/dosbox-staging",
+          "supersedes": [],
+          "min_compatible_version": 830,
+          "platforms": {
+            "linux-x86_64": {
+              "url": "https://github.com/dosbox-staging/dosbox-staging/releases/download/v0.83.0/dosbox-staging-linux-x86_64-v0.83.0.tar.xz",
+              "sha256": "d3a94f7f1c3e68a47ec88d61145506c7904452adb0c9c5928cb8cfe2331d6c5c",
+              "size_bytes": 29377664
+            }
+          }
+        }
+      }
+    },
+    "eXoDOS_GLP": {
+      "torrent_infohash": "903d04310ce42f6e287932b3293366f54e910021",
+      "game_count": 660,
+      "content_packs": {
+        "metadata": {
+          "display_name": "Game Metadata (German)",
+          "description": "German screenshots and box-art variants for the GLP collection (sourced from the GLP torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/eXoDOS_GLP_Metadata.zip",
+          "size_bytes": 25411286691,
+          "version": 1,
+          "install_path": "content/metadata/eXoDOS_GLP",
+          "supersedes": []
+        }
+      }
+    },
+    "eXoDOS_PLP": {
+      "torrent_infohash": "2a452d7fe40dc728b202622fa4735bd89de49548",
+      "game_count": 0,
+      "content_packs": {
+        "metadata": {
+          "display_name": "Game Metadata (Polish)",
+          "description": "Polish screenshots and box-art variants for the PLP collection (sourced from the PLP torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/eXoDOS_PLP_Metadata.zip",
+          "size_bytes": 843638998,
+          "version": 1,
+          "install_path": "content/metadata/eXoDOS_PLP",
+          "supersedes": []
+        }
+      }
+    },
+    "eXoDOS_SLP": {
+      "torrent_infohash": "37b37fd60c04402976ed552fd4416f81a0cae889",
+      "game_count": 0,
+      "content_packs": {
+        "metadata": {
+          "display_name": "Game Metadata (Spanish)",
+          "description": "Spanish screenshots and box-art variants for the SLP collection (sourced from the SLP torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/eXoDOS_SLP_Metadata.zip",
+          "size_bytes": 4104388102,
+          "version": 1,
+          "install_path": "content/metadata/eXoDOS_SLP",
+          "supersedes": []
+        }
+      }
+    },
+    "eXoWin3x": {
+      "torrent_infohash": "9c63aeb02edfdc26bf9e0d399064c7f8902af2c9",
+      "game_count": 1138,
+      "content_packs": {
+        "posters": {
+          "display_name": "Box Art",
+          "description": "HD box art for the Windows 3.x collection",
+          "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v4/posters-eXoWin3x-v1.tar.gz",
+          "sha256": "21c68369e4affb28f3409361f4c868a0ef1fcdb70d402b0075232c90eace3443",
+          "size_bytes": 66784296,
+          "version": 1,
+          "install_path": "content/posters/eXoWin3x",
+          "supersedes": []
+        },
+        "metadata": {
+          "display_name": "Game Metadata",
+          "description": "Box art, screenshots and manuals for the Windows 3.x collection (sourced from the eXoWin3x torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/XOWin3xMetadata.zip",
+          "size_bytes": 2367017468,
+          "version": 1,
+          "install_path": "content/metadata/eXoWin3x",
+          "supersedes": []
+        }
+      }
+    },
+    "eXoWin9x": {
+      "torrent_infohash": "dd8a867f62a6c9cc939d51c742143de2ac98c9f2",
+      "game_count": 662,
+      "content_packs": {
+        "dosbox-x": {
+          "display_name": "DOSBox-X Emulator",
+          "description": "Runs most Windows 9x games. Downloads automatically with your first Windows 9x game.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/dosbox-x",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v6/dosbox-x-macos-arm64-v1.tar.gz",
+              "sha256": "dfe624f270e2ad58da3be3e58798edf197e1be4de203e3f4ae954a72809fdba4",
+              "size_bytes": 22464605
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v6/dosbox-x-linux-x86_64-v1.tar.gz",
+              "sha256": "9a3b2bbfab5dd0f93062903f9cd274286007003069c8ae77c894c6a9b0601fe8",
+              "size_bytes": 43371906
+            }
+          }
+        },
+        "86box": {
+          "display_name": "86Box Emulator",
+          "description": "Runs the few Windows 9x games that need full PC hardware emulation. Downloads automatically with your first such game.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/86box",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v6/86box-macos-universal-v1.tar.gz",
+              "sha256": "79a58db4b319adbd321761f2be5b6430b7fdc52d9bfcbab6dc3a6e36a994463c",
+              "size_bytes": 123782441
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v6/86box-linux-x86_64-v1.tar.gz",
+              "sha256": "ef1e4a4c87e0aa2a092e8440e7279ca63c8dece50c5a87b4f559cdda55bddd31",
+              "size_bytes": 92738583
+            }
+          }
+        },
+        "posters": {
+          "display_name": "Box Art",
+          "description": "HD box art for the Windows 9x collection",
+          "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v5/posters-eXoWin9x-v1.tar.gz",
+          "sha256": "1f9244321a98b2c96cd8faf25bf62c6dcbb16888ec831000d1d0e18eba321578",
+          "size_bytes": 39508524,
+          "version": 1,
+          "install_path": "content/posters/eXoWin9x",
+          "supersedes": []
+        },
+        "metadata": {
+          "display_name": "Game Metadata",
+          "description": "Box art, screenshots, manuals and videos for the Windows 9x collection (sourced from the eXoWin9x torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/XOWin9xMetadata.zip",
+          "size_bytes": 4589061615,
+          "version": 1,
+          "install_path": "content/metadata/eXoWin9x",
+          "supersedes": []
+        }
+      }
+    },
+    "eXoScummVM": {
+      "torrent_infohash": "8d490e5c405dc30161c16bd907372ac01523f5c7",
+      "game_count": 832,
+      "content_packs": {
+        "posters": {
+          "display_name": "Box Art",
+          "description": "HD box art for the ScummVM collection",
+          "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/posters-eXoScummVM-v1.tar.gz",
+          "sha256": "283288b889edf30004d8fdc2f3b2aea6c04003ceaa08417eb5100991c43c130c",
+          "size_bytes": 46357010,
+          "version": 1,
+          "install_path": "content/posters/eXoScummVM",
+          "supersedes": []
+        },
+        "metadata": {
+          "display_name": "Metadata Pack",
+          "description": "Box art, screenshots, manuals and theme music for the ScummVM collection (sourced from the eXoScummVM torrent)",
+          "url": "",
+          "sha256": "",
+          "torrent_file_path": "Content/XOScummVMMetadata.zip",
+          "size_bytes": 4186832178,
+          "version": 1,
+          "install_path": "content/metadata/eXoScummVM",
+          "supersedes": []
+        },
+        "scummvm-2.5.0": {
+          "display_name": "ScummVM 2.5.0",
+          "description": "The ScummVM build eXo pins these games to. Downloads automatically with your first game that needs 2.5.0.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/scummvm-2.5.0",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.5.0-macos-universal-v1.tar.gz",
+              "sha256": "ba071cb367b64dda980361ccedf7bb32bddc28eb8625aee5f42d711252ef66b8",
+              "size_bytes": 94047435
+            },
+            "darwin-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.5.0-macos-universal-v1.tar.gz",
+              "sha256": "ba071cb367b64dda980361ccedf7bb32bddc28eb8625aee5f42d711252ef66b8",
+              "size_bytes": 94047435
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.5.0-linux-x86_64-v1.tar.gz",
+              "sha256": "18649d8b298fecc83631d74b2899304490ac138a6b182e8fb1ede97fe6066639",
+              "size_bytes": 109477207
+            },
+            "linux-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.5.0-linux-aarch64-v1.tar.gz",
+              "sha256": "a7f936027ecdd190fff48cded34beea20b375750950b635f4b4bf6b8ec61ae84",
+              "size_bytes": 108035392
+            }
+          }
+        },
+        "scummvm-2.8.0": {
+          "display_name": "ScummVM 2.8.0",
+          "description": "The ScummVM build eXo pins these games to. Downloads automatically with your first game that needs 2.8.0.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/scummvm-2.8.0",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.8.0-macos-universal-v1.tar.gz",
+              "sha256": "d3b434f909f8f4d7639f53c889c276a1823567b45edc47ee8d4da0e1dd1ea717",
+              "size_bytes": 128377535
+            },
+            "darwin-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.8.0-macos-universal-v1.tar.gz",
+              "sha256": "d3b434f909f8f4d7639f53c889c276a1823567b45edc47ee8d4da0e1dd1ea717",
+              "size_bytes": 128377535
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.8.0-linux-x86_64-v1.tar.gz",
+              "sha256": "080f54e40230837cc793b2a9befe21b863c1caa8fec494a6821e16a5c1d869f5",
+              "size_bytes": 141375131
+            },
+            "linux-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.8.0-linux-aarch64-v1.tar.gz",
+              "sha256": "79068466f48da8437c216adbada5f6f3e3ccdd8f9e6959dfba057085247be3f8",
+              "size_bytes": 139309323
+            }
+          }
+        },
+        "scummvm-2.9.0": {
+          "display_name": "ScummVM 2.9.0",
+          "description": "The ScummVM build eXo pins these games to. Downloads automatically with your first game that needs 2.9.0.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/scummvm-2.9.0",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.9.0-macos-universal-v1.tar.gz",
+              "sha256": "e257e2628b7bee54585f59517d632cfdf845037ede673f1ab7eed42dafbaef45",
+              "size_bytes": 143559285
+            },
+            "darwin-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.9.0-macos-universal-v1.tar.gz",
+              "sha256": "e257e2628b7bee54585f59517d632cfdf845037ede673f1ab7eed42dafbaef45",
+              "size_bytes": 143559285
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.9.0-linux-x86_64-v1.tar.gz",
+              "sha256": "ae952b8260064d8015b322bdeedf673916896f981402a8ef884f8b7b39c42006",
+              "size_bytes": 148755350
+            },
+            "linux-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2.9.0-linux-aarch64-v1.tar.gz",
+              "sha256": "fc87e1010a9a4805b3b56a64b940a3e1fef9401a2b5b4e4ce0ff4924a5ae0ebd",
+              "size_bytes": 146336251
+            }
+          }
+        },
+        "scummvm-2026.1.0": {
+          "display_name": "ScummVM 2026.1.0",
+          "description": "The ScummVM build eXo pins these games to. Downloads automatically with your first game that needs 2026.1.0.",
+          "url": "",
+          "sha256": "",
+          "size_bytes": 0,
+          "version": 1,
+          "install_path": "content/emulators/scummvm-2026.1.0",
+          "supersedes": [],
+          "platforms": {
+            "darwin-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2026.1.0-macos-universal-v1.tar.gz",
+              "sha256": "d545af6dfbaad87a3076a3599c574d8149686a0ddb6c73aa5d5e4747e3bdce8e",
+              "size_bytes": 158676014
+            },
+            "darwin-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2026.1.0-macos-universal-v1.tar.gz",
+              "sha256": "d545af6dfbaad87a3076a3599c574d8149686a0ddb6c73aa5d5e4747e3bdce8e",
+              "size_bytes": 158676014
+            },
+            "linux-x86_64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2026.1.0-linux-x86_64-v1.tar.gz",
+              "sha256": "6d998ada189e298b9aa9ac63da7aff9c88573f360718a21732f620dea13f40ff",
+              "size_bytes": 153260193
+            },
+            "linux-aarch64": {
+              "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v7/scummvm-2026.1.0-linux-aarch64-v1.tar.gz",
+              "sha256": "0b47df63ba19959bad73bc53b7ff5e8f001b7d18e37f90ef5e6e27eac529c2b5",
+              "size_bytes": 150672854
+            }
+          }
+        }
+      }
+    },
+    "eXoMedia": {
+      "torrent_infohash": "cb73d61e6b4ea5eaa793c64c1d80e6113e95de84",
+      "game_count": 0,
+      "content_packs": {
+        "posters": {
+          "display_name": "Cover Art",
+          "description": "HD covers for the magazines, books and catalogs in the reading room",
+          "url": "https://github.com/tvollstaedt/exodium/releases/download/content-v8/posters-eXoMedia-v1.tar.gz",
+          "sha256": "7f24baee5d813e70dcf0a6cffe0a6fafdc74c95eb304488ff8de2e27e89dedf3",
+          "size_bytes": 178472110,
+          "version": 1,
+          "install_path": "content/posters/eXoMedia",
+          "supersedes": []
+        }
+      }
+    }
+  }
+}
