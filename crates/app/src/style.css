@@ -90,7 +90,7 @@ entry.field, entry.search {
   caret-color: var(--accent);
 }
 entry.field:focus-within, entry.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-entry.search { min-width: 260px; }
+entry.search { min-width: 160px; }
 
 /* Toolbar (the app's own header; Hyprland draws no title bar) */
 .toolbar {
@@ -98,6 +98,7 @@ entry.search { min-width: 260px; }
   border-bottom: 1px solid var(--line-2);
   padding: 8px 14px;
 }
+.toolbar > * { margin: 0; }
 .toolbar .brand { font-weight: 700; color: var(--text-strong); font-size: 1.1em; }
 .toolbar .brand .x { color: var(--accent); }
 
@@ -183,6 +184,12 @@ button.shelf-btn {
 }
 button.shelf-btn:hover { background-color: var(--fill-2); color: var(--text-primary); }
 button.shelf-btn:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+button.shelf-btn label.shelf-count {
+  font-size: 0.78em; font-weight: 600; padding: 0 6px; border-radius: 999px;
+  background-color: var(--fill-3); color: var(--text-muted);
+}
+button.shelf-btn:checked label.shelf-count { background-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text-strong); }
+.shelf { margin-right: 8px; }
 dropdown.drop > button { background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: var(--radius); color: var(--text-primary); box-shadow: none; padding: 4px 10px; }
 dropdown.drop > button:hover { background-color: var(--fill-3); }
 .linked button.btn:checked { background-color: var(--accent-fill); color: var(--text-strong); }
@@ -247,7 +254,8 @@ button.menu-item:hover { background-color: var(--fill-3); }
 button.menu-item.danger { color: var(--danger); }
 
 /* ---- Detail panel ---- */
-.detail-panel { background-color: var(--bg-secondary); border-left: 1px solid var(--line-3); }
+.detail-panel { background-color: var(--bg-secondary); }
+overlaysplitview > sidebar { border-left: 1px solid var(--line-3); }
 .detail-head { padding: 12px 12px 8px 16px; }
 .detail-cover { background-color: var(--bg-primary); border-radius: var(--radius); }
 .detail-actions { margin-top: 4px; }

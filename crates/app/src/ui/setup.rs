@@ -146,8 +146,7 @@ impl SetupPage {
             .orientation(gtk::Orientation::Vertical)
             .spacing(16)
             .css_classes(["setup-card"])
-            .width_request(640)
-            .halign(gtk::Align::Center)
+            .hexpand(true)
             .valign(gtk::Align::Center)
             .build();
         let logo = gtk::Image::from_paintable(Some(&crate::ui::window::app_icon()));
@@ -157,8 +156,9 @@ impl SetupPage {
         card.append(&stack);
         card.append(&error);
 
-        let page = gtk::Box::builder().css_classes(["setup-page"]).hexpand(true).vexpand(true).build();
-        page.append(&card);
+        // Clamped to 640 px and scrolled: a small tile shows the whole card.
+        let clamp = adw::Clamp::builder().maximum_size(640).tightening_threshold(560).child(&card).margin_start(16).margin_end(16).margin_top(16).margin_bottom(16).build();
+        let page = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).css_classes(["setup-page"]).hexpand(true).vexpand(true).child(&clamp).build();
 
         // ── wiring ──
         let show_error = glib::clone!(#[weak] error, move |msg: &str| {

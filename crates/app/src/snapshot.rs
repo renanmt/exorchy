@@ -18,6 +18,13 @@ pub fn arm(window: &adw::ApplicationWindow) {
         _ => (spec.clone(), 3000),
     };
     let window = window.clone();
+    // EXORCHY_SNAPSHOT_SIZE=<w>x<h> sizes the window first (tile simulation).
+    if let Some((w, h)) = std::env::var("EXORCHY_SNAPSHOT_SIZE").ok().and_then(|v| {
+        let (w, h) = v.split_once('x')?;
+        Some((w.parse::<i32>().ok()?, h.parse::<i32>().ok()?))
+    }) {
+        window.set_default_size(w, h);
+    }
     // EXORCHY_SNAPSHOT_TAB=<browse|library|reading> switches the tab first.
     if let Ok(tab) = std::env::var("EXORCHY_SNAPSHOT_TAB") {
         glib::timeout_add_local_once(Duration::from_millis(delay_ms.saturating_sub(2500)), move || {
@@ -70,6 +77,12 @@ fn render(window: &adw::ApplicationWindow, path: &str) -> Result<(), String> {
 fn dump(w: &gtk::Widget, depth: usize) {
     let (_, nat_h, _, _) = w.measure(gtk::Orientation::Vertical, -1);
     let (_, nat_w, _, _) = w.measure(gtk::Orientation::Horizontal, -1);
+    if w.type_().name() == "AdwOverlaySplitView" {
+        log::info!("split collapsed={} show_sidebar={}", w.property::<bool>("collapsed"), w.property::<bool>("show-sidebar"));
+    }
+    if w.type_().name() == "AdwBreakpointBin" {
+        log::info!("breakpoint bin current={:?}", w.property::<Option<adw::Breakpoint>>("current-breakpoint").map(|b| b.condition().map(|c| c.to_str().to_string())));
+    }
     log::info!(
         "{}{} css={:?} alloc={}x{} nat={}x{} visible={}",
         "  ".repeat(depth),

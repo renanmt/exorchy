@@ -369,7 +369,7 @@ colour; each feature module keeps its rules in `styles/<module>.css`.
 
 ## Collections and what is enabled
 
-All eXo collections are bundled; only eXoDOS is on at first. The `collections`
+All eXo collections are bundled; the four game collections are on at first (language packs off). The `collections`
 config key is the enabled set and gates the torrent managers, the config
 extraction and every catalogue query (`db::queries::enabled_sql`), so a
 disabled pack is invisible. Settings → Collections flips them. Details and

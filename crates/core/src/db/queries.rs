@@ -185,8 +185,11 @@ pub fn set_enabled_collections(ids: &[String]) {
 }
 
 /// Load the enabled set from the `collections` config key (unset = eXoDOS).
+/// The enabled set of a fresh install: every game collection, no language pack.
+pub const DEFAULT_COLLECTIONS: &str = "eXoDOS,eXoWin3x,eXoWin9x,eXoScummVM";
+
 pub fn load_enabled_collections(conn: &Connection) {
-    let raw = get_config(conn, "collections").ok().flatten().unwrap_or_else(|| "eXoDOS".to_string());
+    let raw = get_config(conn, "collections").ok().flatten().unwrap_or_else(|| DEFAULT_COLLECTIONS.to_string());
     let ids: Vec<String> = raw.split(',').map(|s| s.to_string()).collect();
     set_enabled_collections(&ids);
 }

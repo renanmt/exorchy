@@ -3,8 +3,8 @@
 Omarchy-native launcher for the eXo collections, written in Rust: a GTK4 +
 libadwaita app (`crates/app`) over the backend derived from Exodium (MIT)
 (`crates/core`), with Exodium's full feature set: eXoDOS + language packs,
-eXoWin3x, eXoWin9x, eXoScummVM, previews/music, the Reading Room. Only eXoDOS
-is enabled by default; the rest are switches in Settings → Collections. The
+eXoWin3x, eXoWin9x, eXoScummVM, previews/music, the Reading Room. The four game
+collections are enabled by default; the language packs are switches in Settings → Collections. The
 app is called "eXorchy" (capital X) in every user-facing string; the binary,
 package, directories and identifiers stay lowercase `exorchy`; the
 GApplication id is `org.exorchy.eXorchy`.

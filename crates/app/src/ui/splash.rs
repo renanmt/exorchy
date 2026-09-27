@@ -28,7 +28,10 @@ impl Splash {
                 gtk::Picture::new()
             }
         };
-        picture.set_content_fit(gtk::ContentFit::Cover);
+        // Contain, not cover: in a narrow Hyprland tile the art scales down
+        // whole on its own dark backdrop instead of being cropped.
+        picture.set_content_fit(gtk::ContentFit::Contain);
+        picture.set_can_shrink(true);
         picture.set_hexpand(true);
         picture.set_vexpand(true);
         picture.add_css_class("splash");

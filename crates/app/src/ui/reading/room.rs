@@ -13,7 +13,7 @@ use exorchy_core::commands::{assets, content_packs, games};
 use exorchy_core::models::Issue;
 use gtk::gio;
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::subclass::prelude::*;
 
 use super::card::{self, Ctx, Flags, IssueCard, IssueRow};
@@ -150,7 +150,7 @@ impl Room {
         let widget = gtk::Box::builder().orientation(gtk::Orientation::Vertical).hexpand(true).vexpand(true).css_classes(["reading-room"]).build();
 
         // ── Row 1: chips, search, view ──
-        let row1 = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["filter-row"]).build();
+        let row1 = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row"]).build();
         let kinds = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         let mut kind_buttons = Vec::new();
         for k in Kind::ALL {
@@ -172,9 +172,6 @@ impl Room {
         let fav_button = chip("★ Favorites");
         fav_button.set_tooltip_text(Some("Only favourited issues"));
         row1.append(&fav_button);
-        let sp1 = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        sp1.set_hexpand(true);
-        row1.append(&sp1);
         let search = gtk::SearchEntry::builder().placeholder_text("Search issues…").css_classes(["search"]).build();
         row1.append(&search);
         let view_grid = gtk::ToggleButton::builder().icon_name("view-grid-symbolic").active(true).css_classes(["btn", "icon"]).tooltip_text("Grid").build();
@@ -187,7 +184,7 @@ impl Room {
         widget.append(&row1);
 
         // ── Row 2: publication, sort, count ──
-        let row2 = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["filter-row", "reading-row2"]).build();
+        let row2 = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row", "reading-row2"]).build();
         let pub_list = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(0).build();
         let pub_scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).max_content_height(460).propagate_natural_height(true).propagate_natural_width(true).child(&pub_list).build();
         let pub_popover = gtk::Popover::builder().child(&pub_scroller).css_classes(["context-menu", "pub-menu"]).has_arrow(false).build();
@@ -199,9 +196,6 @@ impl Room {
         row2.append(&sort_drop);
         let count = gtk::Label::builder().css_classes(["muted", "small", "results-count"]).build();
         row2.append(&count);
-        let sp2 = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        sp2.set_hexpand(true);
-        row2.append(&sp2);
         let offline_note = gtk::Label::builder()
             .label("Offline - the catalogue is here to browse; opening an issue needs a connection.")
             .css_classes(["reading-note"])
@@ -225,7 +219,7 @@ impl Room {
         widget.append(&pack_hint);
 
         // ── Content ──
-        let content = gtk::Stack::builder().vexpand(true).hexpand(true).build();
+        let content = gtk::Stack::builder().hhomogeneous(false).vhomogeneous(false).vexpand(true).hexpand(true).build();
         let loading = gtk::Label::builder().label("Loading the reading room…").css_classes(["muted"]).vexpand(true).build();
         content.add_named(&loading, Some("loading"));
         let error_label = gtk::Label::builder().wrap(true).css_classes(["danger"]).vexpand(true).build();
@@ -265,6 +259,8 @@ impl Room {
         let list_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
         list_page.append(&list_header);
         list_page.append(&list_scroller);
+        // Wider than a narrow tile: the table scrolls sideways as a whole.
+        let list_page = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Automatic).vscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).child(&list_page).build();
         content.add_named(&list_page, Some("list"));
         widget.append(&content);
 
@@ -354,7 +350,7 @@ impl Room {
             let flow = gtk::FlowBox::builder()
                 .selection_mode(gtk::SelectionMode::None)
                 .homogeneous(true)
-                .min_children_per_line(2)
+                .min_children_per_line(1)
                 .max_children_per_line(14)
                 .column_spacing(0)
                 .row_spacing(0)

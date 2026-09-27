@@ -18,7 +18,10 @@ use crate::ui::{actions, bus, covers, downloads, launch_notes};
 pub const PANEL_WIDTH: i32 = 560;
 
 pub struct DetailPanel {
-    pub widget: gtk::Revealer,
+    /// The panel itself; the library hosts it in its split view.
+    pub widget: gtk::Box,
+    open: Cell<bool>,
+    open_listeners: RefCell<Vec<OpenListener>>,
     window: gtk::Window,
     game: RefCell<Option<Game>>,
     variants: RefCell<Vec<Game>>,
@@ -53,10 +56,12 @@ pub struct DetailPanel {
 
 /// A panel-open/close observer (media, launch notes).
 type ShownListener = Rc<dyn Fn(Option<&Game>)>;
+/// An open/close observer (the split view that hosts the panel).
+type OpenListener = Rc<dyn Fn(bool)>;
 
 impl DetailPanel {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
-        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(PANEL_WIDTH).css_classes(["detail-panel"]).build();
+        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["detail-panel"]).build();
 
         let head = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["detail-head"]).build();
         let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Close (Esc)").build();
@@ -94,21 +99,16 @@ impl DetailPanel {
         body.append(&articles_slot);
         let gallery_head = gtk::Label::builder().label("Screenshots").xalign(0.0).css_classes(["title-3"]).visible(false).build();
         body.append(&gallery_head);
-        let gallery = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).column_spacing(6).row_spacing(6).min_children_per_line(3).max_children_per_line(6).homogeneous(true).build();
+        let gallery = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).column_spacing(6).row_spacing(6).min_children_per_line(2).max_children_per_line(6).homogeneous(true).build();
         body.append(&gallery);
 
         let scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).child(&body).build();
         root.append(&scroller);
 
-        let widget = gtk::Revealer::builder()
-            .transition_type(gtk::RevealerTransitionType::SlideLeft)
-            .transition_duration(200)
-            .reveal_child(false)
-            .child(&root)
-            .build();
-
         let panel = Rc::new(DetailPanel {
-            widget,
+            widget: root,
+            open: Cell::new(false),
+            open_listeners: RefCell::new(Vec::new()),
             window: window.clone(),
             game: RefCell::new(None),
             variants: RefCell::new(Vec::new()),
@@ -168,11 +168,29 @@ impl DetailPanel {
     }
 
     pub fn is_open(&self) -> bool {
-        self.widget.reveals_child()
+        self.open.get()
+    }
+
+    /// The host (the library's split view) shows or hides the panel on this.
+    pub fn on_open_changed(&self, f: impl Fn(bool) + 'static) {
+        self.open_listeners.borrow_mut().push(Rc::new(f));
+    }
+
+    fn set_open(&self, open: bool) {
+        if self.open.replace(open) == open {
+            return;
+        }
+        let cbs = self.open_listeners.borrow().clone();
+        for cb in cbs {
+            cb(open);
+        }
     }
 
     pub fn close(&self) {
-        self.widget.set_reveal_child(false);
+        if !self.open.get() {
+            return;
+        }
+        self.set_open(false);
         self.notify_shown(None);
     }
 
@@ -193,7 +211,7 @@ impl DetailPanel {
         let same = self.game.borrow().as_ref().and_then(|g| g.id) == game.id && game.id.is_some();
         // Reopening the same game after a close is an open too: the listeners
         // (media, launch notes) tore down on the close and must come back.
-        let reopened = !self.widget.reveals_child();
+        let reopened = !self.open.get();
         self.game.replace(Some(game.clone()));
         if !same {
             self.selected.set(game.id);
@@ -217,7 +235,7 @@ impl DetailPanel {
             }
         }
         self.render();
-        self.widget.set_reveal_child(true);
+        self.set_open(true);
         if !same || reopened {
             self.notify_shown(Some(&game));
         }

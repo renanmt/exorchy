@@ -221,6 +221,13 @@ impl Card {
         }
     }
 
+    /// Fetch the cover again (a poster pack was installed or removed).
+    pub fn reload_cover(self: &Rc<Self>) {
+        if self.game.borrow().is_some() {
+            self.load_cover();
+        }
+    }
+
     fn load_cover(self: &Rc<Self>) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);

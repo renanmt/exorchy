@@ -81,6 +81,11 @@ pub fn load_dirs() {
                 c.preview_dirs = previews;
                 c.poster_dirs = posters;
                 c.loaded = true;
+                if changed {
+                    // A poster pack landed (or went): cached misses for its
+                    // paths are stale, and so are the lower-tier hits.
+                    c.cache.clear();
+                }
                 changed
             });
             if changed {

@@ -4,8 +4,8 @@ Every eXo collection Exodium supports is built into eXorchy. Each one is a row
 in `COLLECTION_MAP` (`crates/core/src/commands/collections.rs`), its bundled
 files under `metadata/`, `torrents/` and `crates/core/resources/previews/<col>/`,
 its shelf art under `crates/app/assets/collections/<col>.jpg`, and a manifest
-entry in `manifest.json`. Only eXoDOS is enabled on a fresh install; the rest
-are switches in Settings → Collections.
+entry in `manifest.json`. eXoDOS, eXoWin3x, eXoWin9x and eXoScummVM are enabled on a fresh install;
+the language packs are switches in Settings → Collections.
 
 ## Enabling and hiding
 

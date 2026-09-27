@@ -741,9 +741,9 @@ pub async fn setup_fresh(
         let conn = db_state.lock()?;
         queries::set_config(&conn, "data_dir", &data_dir).map_err(|e| e.to_string())?;
         queries::set_config(&conn, "root_folder", DEFAULT_ROOT_FOLDER).map_err(|e| e.to_string())?;
-        // Only eXoDOS to begin with; every other pack is a switch in
-        // Settings → Collections, off until the user flips it.
-        queries::set_config(&conn, "collections", "eXoDOS").map_err(|e| e.to_string())?;
+        // The four game collections start enabled; the language packs are
+        // switches in Settings → Collections, off until the user flips them.
+        queries::set_config(&conn, "collections", queries::DEFAULT_COLLECTIONS).map_err(|e| e.to_string())?;
         queries::load_enabled_collections(&conn);
         let mode = if network_mode == OFFLINE_MODE { OFFLINE_MODE } else { "live" };
         queries::set_config(&conn, "network_mode", mode).map_err(|e| e.to_string())?;

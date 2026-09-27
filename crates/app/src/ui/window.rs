@@ -27,8 +27,6 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
         .title("eXorchy")
         .default_width(1280)
         .default_height(800)
-        .width_request(900)
-        .height_request(600)
         .decorated(false)
         .css_classes(["exorchy"])
         .build();

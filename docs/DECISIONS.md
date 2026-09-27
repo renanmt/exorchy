@@ -283,6 +283,20 @@ often and the web's unmuted default was a surprise in a shared room; a stored pr
 Cached videos and tracks are handed to GTK's GStreamer-backed `MediaFile` by file path, so the
 localhost media server the webview needed is not used.
 
+## 2026-09-27 - The four game collections are on by default; the layout adapts to the tile
+
+The user asked (2026-09-27) for eXoDOS, eXoWin3x, eXoWin9x and eXoScummVM to be enabled on a fresh
+install (`db::queries::DEFAULT_COLLECTIONS`); the German, Spanish and Polish language packs stay
+off until switched on. This supersedes the earlier "only eXoDOS" default; the enabled-set filter
+and the per-collection switches are unchanged.
+
+The same feedback covered Omarchy tiles: a half-width or quarter tile cut the detail panel off and
+the window refused to shrink. The library page is now an `adw::BreakpointBin` whose only demand is
+360×300: the detail panel is the end sidebar of an `adw::OverlaySplitView` (beside the grid on a
+wide window, an overlay with a scrim below 1100 sp), the filter rows are `adw::WrapBox`es, the brand
+hides below 760 sp, the setup card is clamped and scrolls, the splash scales whole (`Contain`) and
+the window carries no hard minimum size.
+
 ## 2026-09-27 - Headless snapshots use Broadway (or X11) when no frame is painted
 
 `EXORCHY_SNAPSHOT` needs a painted frame; with the monitors off (DPMS) a Wayland window never gets

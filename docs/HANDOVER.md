@@ -13,6 +13,7 @@
 | `cargo test --workspace` | core 244 passed (3 ignored) + import_smoke 2; app 56 passed (1 ignored visual harness) |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
 | `cargo build -p exorchy` | ok |
+| Responsive layout (Broadway/X11 snapshots at 520×600, 640×700, 960×768, 1280×800 via `EXORCHY_SNAPSHOT_SIZE`) | toolbar, shelf and filter rows wrap; brand hides below 760 sp; detail panel overlays below 1100 sp and sits beside the grid above; grid goes down to one column |
 | Snapshots (scratch offline profile, Broadway backend) | setup, Browse grid, list view, My Library shelves, detail panel (SimCity 2000 / Warcraft II with the ECE note and 44 press articles), Reading Room grid, Settings → Collections all render with the Omarchy `retro-82` palette |
 | Settings pages (test harness, X11) | all eight pages rendered by the settings port |
 | Reading Room reader + PDF viewer (X11) | offline fetch panel and a 6-page PDF at fit-width rendered by the reading port |

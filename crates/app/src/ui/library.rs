@@ -13,7 +13,7 @@ use exorchy_core::commands::{games, playlists, setup};
 use exorchy_core::models::Game;
 use gtk::gio;
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 
 use crate::app;
 use crate::ui::card::{Card, CARD_WIDTH};
@@ -54,7 +54,8 @@ thread_local! {
 }
 
 pub struct LibraryPage {
-    pub widget: gtk::Box,
+    /// An `adw::BreakpointBin`: the layout adapts to the tile it is given.
+    pub widget: gtk::Widget,
     filters: Rc<RefCell<Filters>>,
     store: gio::ListStore,
     grid: gtk::GridView,
@@ -68,7 +69,7 @@ pub struct LibraryPage {
     genre_drop: gtk::DropDown,
     genre_values: RefCell<Vec<String>>,
     sort_drop: gtk::DropDown,
-    shelf: gtk::Box,
+    shelf: adw::WrapBox,
     shelf_buttons: RefCell<Vec<(String, gtk::ToggleButton)>>,
     jump_bar: gtk::Box,
     section_keys: RefCell<Vec<String>>,
@@ -90,7 +91,9 @@ impl LibraryPage {
         let detail = DetailPanel::new(window);
 
         // ── toolbar ──
-        let toolbar = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["toolbar"]).build();
+        // The toolbar wraps like the filter row: its minimum width is one
+        // control, so the page fits any Hyprland tile.
+        let toolbar = adw::WrapBox::builder().child_spacing(8).line_spacing(6).align(0.5).css_classes(["toolbar"]).build();
         let brand = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(0).css_classes(["brand"]).build();
         brand.append(&gtk::Label::new(Some("e")));
         brand.append(&gtk::Label::builder().label("X").css_classes(["x"]).build());
@@ -104,10 +107,7 @@ impl LibraryPage {
             tab_buttons.push((id.to_string(), b));
         }
         toolbar.append(&tabs);
-        let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        spacer.set_hexpand(true);
-        toolbar.append(&spacer);
-        let search = gtk::SearchEntry::builder().placeholder_text("Search games…  (/)").css_classes(["search"]).build();
+        let search = gtk::SearchEntry::builder().placeholder_text("Search games…  (/)").css_classes(["search"]).hexpand(true).build();
         toolbar.append(&search);
         let activity = gtk::Label::builder().css_classes(["activity", "muted", "small"]).build();
         toolbar.append(&activity);
@@ -117,13 +117,10 @@ impl LibraryPage {
         let settings_button = gtk::Button::builder().icon_name("emblem-system-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Settings (Ctrl+,)").build();
         toolbar.append(&settings_button);
 
-        // ── filter row ──
-        let filter_row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["filter-row"]).build();
-        let shelf = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).build();
+        // ── filter row: wraps onto more lines in a narrow tile ──
+        let filter_row = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row"]).build();
+        let shelf = adw::WrapBox::builder().child_spacing(4).line_spacing(4).css_classes(["shelf"]).build();
         filter_row.append(&shelf);
-        let fspacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        fspacer.set_hexpand(true);
-        filter_row.append(&fspacer);
         let playlist_menu = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         filter_row.append(&playlist_menu);
         let genre_drop = gtk::DropDown::from_strings(&["All genres"]);
@@ -146,7 +143,7 @@ impl LibraryPage {
         let selection = gtk::NoSelection::new(Some(store.clone()));
         let grid = gtk::GridView::builder()
             .model(&selection)
-            .min_columns(2)
+            .min_columns(1)
             .max_columns(12)
             .single_click_activate(false)
             .css_classes(["game-grid"])
@@ -170,10 +167,13 @@ impl LibraryPage {
             .hexpand(true)
             .child(&list)
             .build();
+        // The table is wider than a narrow tile: header and rows scroll
+        // sideways together instead of forcing the window wider.
         let list_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
         list_page.append(&list_header());
         list_page.append(&list_scroller);
-        let view_stack = gtk::Stack::new();
+        let list_page = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Automatic).vscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).child(&list_page).build();
+        let view_stack = gtk::Stack::builder().hhomogeneous(false).vhomogeneous(false).build();
         view_stack.add_named(&scroller, Some("grid"));
         view_stack.add_named(&list_page, Some("list"));
         let status = gtk::Label::builder().css_classes(["muted", "small"]).xalign(0.0).margin_start(14).margin_bottom(6).build();
@@ -197,24 +197,52 @@ impl LibraryPage {
         let reading_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).vexpand(true).hexpand(true).build();
         reading_slot.append(&gtk::Label::builder().label("The Reading Room is being ported.").css_classes(["muted"]).vexpand(true).build());
 
-        let tab_stack = gtk::Stack::builder().transition_type(gtk::StackTransitionType::SlideLeftRight).vexpand(true).hexpand(true).build();
+        let tab_stack = gtk::Stack::builder().transition_type(gtk::StackTransitionType::SlideLeftRight).hhomogeneous(false).vhomogeneous(false).vexpand(true).hexpand(true).build();
         tab_stack.add_named(&browse_row, Some("browse"));
         tab_stack.add_named(&shelves_scroller, Some("library"));
         tab_stack.add_named(&reading_slot, Some("reading"));
 
-        let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        content.append(&tab_stack);
-        content.append(&detail.widget);
+        // The detail panel is the split view's end sidebar: beside the grid
+        // on a wide window, over it (with a scrim) when the window is narrow.
+        let split = adw::OverlaySplitView::builder()
+            .content(&tab_stack)
+            .sidebar(&detail.widget)
+            .sidebar_position(gtk::PackType::End)
+            .show_sidebar(false)
+            .min_sidebar_width(300.0)
+            .max_sidebar_width(600.0)
+            .sidebar_width_fraction(0.42)
+            .enable_hide_gesture(true)
+            .vexpand(true)
+            .build();
+        detail.on_open_changed(glib::clone!(#[weak] split, move |open| split.set_show_sidebar(open)));
+        split.connect_show_sidebar_notify(glib::clone!(#[weak] detail, move |s| {
+            if !s.shows_sidebar() && detail.is_open() {
+                detail.close();
+            }
+        }));
 
         // The now-playing bar (ui::media) mounts under the content.
         let bar_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
-        let widget = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        widget.append(&toolbar);
-        widget.append(&content);
-        widget.append(&bar_slot);
+        let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        column.append(&toolbar);
+        column.append(&split);
+        column.append(&bar_slot);
+
+        // Breakpoints: a narrow tile collapses the panel into an overlay and
+        // drops the brand; the layout never demands more than 360×300.
+        let widget = adw::BreakpointBin::builder().width_request(360).height_request(300).child(&column).build();
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1100.0, adw::LengthUnit::Sp));
+        narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+        widget.add_breakpoint(narrow);
+        let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
+        tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
+        tiny.add_setter(&brand, "visible", Some(&false.to_value()));
+        tiny.add_setter(&tabs, "margin-start", Some(&0i32.to_value()));
+        widget.add_breakpoint(tiny);
 
         let page = Rc::new(LibraryPage {
-            widget,
+            widget: widget.upcast(),
             filters: Rc::new(RefCell::new(Filters { sort_by: "title".into(), has_more: true, ..Default::default() })),
             store,
             grid,
@@ -410,9 +438,9 @@ impl LibraryPage {
             page.load_playlists();
             page.refresh_shelves();
         }));
-        covers::on_dirs_changed(glib::clone!(#[weak(rename_to = page)] self, move || {
-            page.rebind_cards();
-        }));
+        covers::on_dirs_changed(|| {
+            CARDS.with(|c| c.borrow().values().for_each(|card| card.reload_cover()));
+        });
         // Keyboard: "/" focuses search, Escape closes the panel.
         let keys = gtk::EventControllerKey::new();
         keys.connect_key_pressed(glib::clone!(#[weak(rename_to = page)] self, #[upgrade_or] glib::Propagation::Proceed, move |_, key, _, state| {
@@ -485,8 +513,7 @@ impl LibraryPage {
                     entries.extend(cols.iter().cloned());
                     let mut group: Option<gtk::ToggleButton> = None;
                     for (id, label, count) in entries {
-                        let text = if count > 0 { format!("{label}  {count}") } else { label.clone() };
-                        let b = gtk::ToggleButton::builder().label(&text).css_classes(["shelf-btn"]).build();
+                        let b = gtk::ToggleButton::builder().child(&shelf_chip(&label, count)).css_classes(["shelf-btn"]).build();
                         if let Some(g) = &group {
                             b.set_group(Some(g));
                         } else {
@@ -935,6 +962,17 @@ impl LibraryPage {
     }
 }
 
+/// A collection chip: the name with the game count in a small badge.
+fn shelf_chip(label: &str, count: i64) -> gtk::Box {
+    let b = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    b.append(&gtk::Label::new(Some(label)));
+    if count > 0 {
+        let n = if count >= 1000 { format!("{:.1}k", count as f64 / 1000.0) } else { count.to_string() };
+        b.append(&gtk::Label::builder().label(&n).css_classes(["shelf-count"]).tooltip_text(format!("{count} games")).build());
+    }
+    b
+}
+
 /// Section label per row, matching `get_section_keys` server-side.
 pub fn group_key(g: &Game, sort: &str) -> String {
     match sort {
@@ -980,7 +1018,7 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>) -> gtk::Box {
         .halign(gtk::Align::Start)
         .column_spacing(10)
         .row_spacing(10)
-        .min_children_per_line(2)
+        .min_children_per_line(1)
         .max_children_per_line(20)
         .build();
     for g in list {
