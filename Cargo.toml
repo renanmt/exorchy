@@ -1,0 +1,30 @@
+# eXorchy workspace: `crates/core` is the backend (catalogue, torrents,
+# launchers, theme bridge; no GUI dependency), `crates/app` the GTK4 app.
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/app"]
+
+[workspace.package]
+version = "0.2.0"
+authors = ["Renan Tonheiro"]
+license = "MIT"
+edition = "2021"
+repository = "https://github.com/renan/exorchy"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+tokio = { version = "1", features = ["fs", "sync", "rt-multi-thread", "time", "macros"] }
+
+# librqbit 9.0.0-rc.0 deadlocks the whole tokio runtime when a peer dies while
+# `update_only_files` runs (state lock vs. peer-table shard, taken in opposite
+# orders). The fork commit releases the state lock before the peer walk and
+# fixes the sparse-flag-inside-debug! bug (upstream ikatson/rqbit#681).
+[patch.crates-io]
+librqbit = { git = "https://github.com/tvollstaedt/rqbit.git", rev = "ad57d887715c35c39de1dafc0d27b0a0b6f8740d" }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true

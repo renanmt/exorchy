@@ -1,0 +1,29 @@
+[package]
+name = "exorchy"
+description = "eXorchy: Omarchy-native launcher for the eXo collections (GTK4)"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+default-run = "exorchy"
+
+[[bin]]
+name = "exorchy"
+path = "src/main.rs"
+
+[dependencies]
+exorchy-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+tokio.workspace = true
+
+# GTK 4.22 / libadwaita 1.9 are what Omarchy ships; the feature gates match.
+gtk = { package = "gtk4", version = "0.11", features = ["v4_22"] }
+# Cover art is decoded and scaled off the main thread (cover-crop to the
+# card size), so a 400 px poster costs the GPU what a card needs, not more.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+# The Reading Room's PDF reader and in-app manuals render pages with
+# poppler-glib (Omarchy ships it with the GTK stack).
+poppler-rs = "0.26"
+adw = { package = "libadwaita", version = "0.9", features = ["v1_9"] }
