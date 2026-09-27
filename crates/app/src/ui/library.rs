@@ -59,6 +59,7 @@ thread_local! {
 pub struct LibraryPage {
     /// An `adw::BreakpointBin`: the layout adapts to the tile it is given.
     pub widget: gtk::Widget,
+    split: adw::OverlaySplitView,
     filters: Rc<RefCell<Filters>>,
     store: gio::ListStore,
     grid: gtk::GridView,
@@ -248,6 +249,7 @@ impl LibraryPage {
 
         let page = Rc::new(LibraryPage {
             widget: widget.upcast(),
+            split: split.clone(),
             filters: Rc::new(RefCell::new(Filters { sort_by: "title".into(), has_more: true, ..Default::default() })),
             store,
             grid,
@@ -459,7 +461,7 @@ impl LibraryPage {
                 page.search.grab_focus();
                 return glib::Propagation::Stop;
             }
-            if key == gtk::gdk::Key::Escape && page.detail.is_open() {
+            if key == gtk::gdk::Key::Escape && (page.detail.is_open() || page.split.shows_sidebar()) {
                 page.detail.close();
                 return glib::Propagation::Stop;
             }

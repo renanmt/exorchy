@@ -44,6 +44,44 @@ pub fn arm(window: &adw::ApplicationWindow) {
             });
         });
     }
+    // EXORCHY_SNAPSHOT_SEQUENCE=<step,step,...> drives the open panel before the
+    // shot, one step every 400 ms: `uninstall`, `close`, `play`, `reopen`.
+    if let Ok(seq) = std::env::var("EXORCHY_SNAPSHOT_SEQUENCE") {
+        let steps: Vec<String> = seq.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        let base = delay_ms.saturating_sub(1500) + 400;
+        for (i, step) in steps.into_iter().enumerate() {
+            glib::timeout_add_local_once(Duration::from_millis(base + 250 * i as u64), move || {
+                let Some(lib) = crate::ui::window::library() else { return };
+                let panel = lib.detail();
+                let game = panel.selected_game();
+                log::info!("sequence step {step}: open={} game={:?}", panel.is_open(), game.as_ref().and_then(|g| g.id));
+                match step.as_str() {
+                    "close" => panel.close(),
+                    "uninstall" => {
+                        if let Some(g) = game {
+                            crate::ui::actions::uninstall(g.id.unwrap_or(0), g.title.clone(), std::rc::Rc::new(|_| {}), std::rc::Rc::new(|_| {}));
+                        }
+                    }
+                    "run" => {
+                        if let Some(id) = game.and_then(|g| g.id) {
+                            crate::ui::bus::mark_running(id, true);
+                        }
+                    }
+                    "exit" => {
+                        if let Some(id) = game.and_then(|g| g.id) {
+                            crate::ui::bus::mark_running(id, false);
+                        }
+                    }
+                    "reopen" => {
+                        if let Some(g) = game {
+                            panel.show(g);
+                        }
+                    }
+                    _ => log::warn!("unknown sequence step {step}"),
+                }
+            });
+        }
+    }
     glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
         if std::env::var_os("EXORCHY_DUMP_TREE").is_some() {
             dump(window.upcast_ref::<gtk::Widget>(), 0);

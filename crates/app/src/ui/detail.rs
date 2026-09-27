@@ -186,12 +186,18 @@ impl DetailPanel {
         }
     }
 
+    /// Hide the panel. Unconditional: the host is told to hide even when
+    /// the flag already says closed, so the ✕ can never be a no-op while
+    /// the sidebar is visible.
     pub fn close(&self) {
-        if !self.open.get() {
-            return;
+        let was_open = self.open.replace(false);
+        let cbs = self.open_listeners.borrow().clone();
+        for cb in cbs {
+            cb(false);
         }
-        self.set_open(false);
-        self.notify_shown(None);
+        if was_open {
+            self.notify_shown(None);
+        }
     }
 
     /// Called with the game when the panel opens on a (different) game and
@@ -582,7 +588,10 @@ impl DetailPanel {
                 Rc::new(move |s: &str| {
                     if let Some(p) = panel.upgrade() {
                         p.busy.replace(if s.is_empty() { None } else { Some(s.trim_end_matches("...").trim_end_matches('…').to_string()) });
-                        p.render_actions();
+                        // Deferred: the menu's popover may still be closing,
+                        // and rebuilding the bar under it would leave its grab.
+                        let p2 = p.clone();
+                        glib::idle_add_local_once(move || p2.render_actions());
                     }
                 })
             };
