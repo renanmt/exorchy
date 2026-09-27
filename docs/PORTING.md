@@ -21,7 +21,14 @@ crates/app/src/
   ui/bus.rs      library/collections/playlists/running change signals, offline flag, toast()/toast_with()
   ui/dialogs.rs  confirm(), error(), pick_folder()
   ui/util.rs     format_bytes(), esc(), collection_label(), platform_tag(), parse_lang_entries()
+  ui/settings.rs, reading.rs (+ pdf.rs), media.rs, playlists.rs, game_settings.rs,
+  onboarding.rs, launch_notes.rs   the feature modules being ported (see docs/HANDOVER.md)
 ```
+
+Everything else in the tree: `crates/core` is the backend (`exorchy_core`,
+`host.rs` is the shim the commands run on), `legacy/webui/src` the reference,
+`packaging/` the PKGBUILD and desktop file (`org.exorchy.eXorchy.desktop`,
+named after the GApplication id `APP_ID` in `main.rs`).
 
 ## Calling the backend
 
@@ -67,7 +74,7 @@ presented with `.present(Some(&parent_widget))`. No second toplevel windows
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-cargo build -p exorchy && cargo clippy -p exorchy -- -D warnings
+cargo build -p exorchy && cargo clippy -p exorchy -- -D warnings && cargo test -p exorchy
 S=/tmp/claude-1000/-home-renan-Projects-exorchy/01967169-baec-49c6-959b-94d8e247a281/scratchpad   # isolated profile (offline copy of the catalogue)
 XDG_DATA_HOME=$S/xdg/data XDG_STATE_HOME=$S/xdg/state XDG_CONFIG_HOME=$S/xdg/config XDG_CACHE_HOME=$S/xdg/cache \
   RUST_LOG=info EXORCHY_SNAPSHOT=$S/out.png:6000 timeout 40 ./target/debug/exorchy
@@ -76,6 +83,7 @@ XDG_DATA_HOME=$S/xdg/data XDG_STATE_HOME=$S/xdg/state XDG_CONFIG_HOME=$S/xdg/con
 The scratch profile is offline (no torrent session), so downloads are not
 offered there; the real profile is `~/.local/share/exorchy` (do not modify it).
 Look at the PNG (Read tool) to verify layouts. Do not use grim (it hangs on this compositor).
+`EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
 
 ## Rules
 

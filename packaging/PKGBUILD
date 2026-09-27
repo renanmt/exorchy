@@ -1,15 +1,20 @@
 # Maintainer: Renan Tonheiro <renan.tonheiro@gmail.com>
 # Build from a local checkout:  cd packaging && makepkg -si
 pkgname=exorchy
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
-pkgdesc="Omarchy-native launcher for the eXoDOS collection (DOS games via DOSBox Staging)"
+pkgdesc="eXorchy: Omarchy-native launcher for the eXo collections (eXoDOS, eXoWin3x, eXoWin9x, eXoScummVM)"
 arch=('x86_64')
 url="https://github.com/renan/exorchy"
 license=('MIT')
-depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'openssl' 'xdg-utils' 'hicolor-icon-theme')
-makedepends=('rust' 'cargo' 'pnpm' 'nodejs' 'pkgconf')
-optdepends=('dosbox-staging: use a system emulator instead of the downloaded pack')
+depends=('gtk4' 'libadwaita' 'poppler-glib' 'gstreamer' 'gst-plugins-base'
+         'openssl' 'xdg-utils' 'hicolor-icon-theme')
+makedepends=('rust' 'cargo' 'pkgconf')
+optdepends=('gst-plugins-good: preview videos and theme music'
+            'gst-libav: H.264 preview videos'
+            'dosbox-staging: use a system emulator instead of the downloaded pack')
+# The workspace profile sets its own thin LTO and strip; makepkg's flags would
+# override both.
 options=('!lto')
 source=()
 sha256sums=()
@@ -18,30 +23,40 @@ _srcdir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 build() {
   cd "$_srcdir"
-  pnpm install --frozen-lockfile
-  pnpm build
-  cd src-tauri
-  cargo build --release --locked
+  cargo build --release --locked -p exorchy
 }
 
 check() {
-  cd "$_srcdir/src-tauri"
-  cargo test --release --locked --lib
+  cd "$_srcdir"
+  cargo test --release --locked -p exorchy-core
 }
 
 package() {
   cd "$_srcdir"
-  install -Dm755 src-tauri/target/release/exorchy "$pkgdir/usr/bin/exorchy"
-  # Bundled resources: Tauri resolves resource_dir() to /usr/lib/<binary>/ on Linux.
+  install -Dm755 target/release/exorchy "$pkgdir/usr/bin/exorchy"
+
+  # Bundled resources: exorchy_core::resource_dir() looks in /usr/lib/exorchy
+  # (then ~/.local/lib/exorchy, then the source checkout).
   install -d "$pkgdir/usr/lib/exorchy"
   cp -r metadata "$pkgdir/usr/lib/exorchy/metadata"
+  # Only the gzipped catalogue ships; an uncompressed gen-db output is local.
+  rm -f "$pkgdir/usr/lib/exorchy/metadata/"*.db \
+        "$pkgdir/usr/lib/exorchy/metadata/"*.db-shm \
+        "$pkgdir/usr/lib/exorchy/metadata/"*.db-wal
   cp -r torrents "$pkgdir/usr/lib/exorchy/torrents"
   install -Dm644 manifest.json "$pkgdir/usr/lib/exorchy/manifest.json"
-  cp -r src-tauri/resources/previews "$pkgdir/usr/lib/exorchy/previews"
-  install -Dm644 packaging/exorchy.desktop "$pkgdir/usr/share/applications/exorchy.desktop"
+  cp -r crates/core/resources/previews "$pkgdir/usr/lib/exorchy/previews"
+
+  # Desktop integration: the desktop file is named after the GApplication id
+  # (= the Wayland app id Hyprland sees), so the launcher matches the window.
+  install -Dm644 packaging/org.exorchy.eXorchy.desktop \
+    "$pkgdir/usr/share/applications/org.exorchy.eXorchy.desktop"
   for s in 32 128 256 512; do
-    install -Dm644 "src-tauri/icons/${s}x${s}.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/exorchy.png"
+    install -Dm644 "packaging/icons/${s}x${s}.png" \
+      "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/exorchy.png"
   done
-  install -Dm644 src/assets/exorchy.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/exorchy.svg"
+  install -Dm644 crates/app/assets/exorchy.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/exorchy.svg"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 ACKNOWLEDGEMENTS.md "$pkgdir/usr/share/doc/$pkgname/ACKNOWLEDGEMENTS.md"
 }

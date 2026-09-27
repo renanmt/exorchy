@@ -1,12 +1,15 @@
-node_modules/
-dist/
-src-tauri/target/
-src-tauri/gen/schemas/
+target/
 
 # Generated DB (uncompressed - only .db.gz ships) + SQLite WAL artifacts
 metadata/*.db
 metadata/*.db-shm
 metadata/*.db-wal
+
+# The previous web UI, kept under legacy/ as the porting reference
+legacy/webui/node_modules/
+legacy/webui/dist/
+# Staged from pdfjs-dist by legacy/webui/scripts/copy-pdfjs-wasm.mjs
+legacy/webui/public/pdfjs/
 
 # Local dev data (emulator tarballs, thumbnails)
 .dev-data/
@@ -18,9 +21,5 @@ metadata/*.db-wal
 .claude/
 scripts/__pycache__/
 work/
-tmp/
-# Staged from pdfjs-dist by scripts/copy-pdfjs-wasm.mjs
-public/pdfjs/
-
-# Raw artwork and scratch files
+# Raw artwork, snapshots and scratch files
 tmp/

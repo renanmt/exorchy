@@ -173,3 +173,75 @@ the window's `CloseRequested`, walks `/proc` for `WebKitWebProces` descendants (
 between) and SIGKILLs them, so no teardown runs and no core is dumped. Gated on the proprietary
 driver being loaded; elsewhere the normal exit is clean. Switching to the software render path
 would avoid it too, at 10 fps.
+
+## 2026-09-27 - Native rewrite in Rust with GTK4 + libadwaita, replacing the webview
+
+The Tauri build worked, but it was a web page in a WebKitGTK window on a desktop where everything
+else is native. Three things tipped it: Omarchy users expect a native window (theme, font, Hyprland
+tiling, keyboard-first), the WebKitGTK + NVIDIA render path crashed on every close and needed the
+SIGKILL workaround above, and GTK 4.22's CSS supports custom properties and `color-mix()`, so the
+token layer (`--om-*` → semantic tokens) ports one to one and the "no colour literals" rule keeps
+holding. GTK4 and libadwaita are already installed on Omarchy (no WebKit, no node, no pnpm in the
+build), and the backend is kept whole: `crates/core` is Exodium's tested backend, `crates/app` the
+new shell. Cost: the UI is rewritten module by module against the web UI as reference
+(`docs/PORTING.md`); the web UI stays under `legacy/webui` until parity.
+
+Ruled out: C++/Qt as omakade did (would have meant rewriting the 26k-line tested backend or
+bridging it through FFI); iced or egui (no GStreamer video, no PDF rendering, no native
+accessibility, their own widget look instead of Omarchy's GTK look).
+
+## 2026-09-27 - A host shim instead of a full de-Tauri refactor
+
+The backend's 103 command functions take `State<'_, T>` and `AppHandle` arguments and emit events.
+`crates/core/src/host.rs` reimplements those four things (`AppHandle` with `manage`/`state`/
+`emit`/`subscribe`, `State<'a, T>` as an `Arc<T>` with a phantom lifetime, empty `Manager` /
+`Emitter` traits, `async_runtime` over one process-wide tokio runtime), so every command kept its
+signature and its tests. `AppHandle::state()` returns `State<'static, T>`, which a `State<'_, T>`
+parameter accepts. Ruled out: rewriting the commands as plain functions over a context struct
+(touches every call site and every test for no behaviour gain) and keeping a `tauri` dependency
+without the webview (still pulls the GTK3/WebKit stack in).
+
+## 2026-09-27 - Cover textures are pre-scaled to the card size
+
+`gtk::GridView` sizes its cells from each child's natural size, and a `gtk::Picture`'s natural
+size is its texture's, so a 400 px poster in a 180 px card made the grid grow and stutter. Covers
+are therefore decoded and cover-cropped to the exact card pixel size (or fit-scaled for the panel)
+with the `image` crate on tokio's blocking pool, then uploaded as a `gdk::Texture` and cached by
+(path, size). Side effect that matters: GPU memory holds a card's worth of pixels per cover, not a
+poster's. Ruled out: `Picture::set_can_shrink` alone (still uploads the full texture) and
+`content-fit` (fixes the layout, not the memory).
+
+## 2026-09-27 - The GridView is the ScrolledWindow's direct child
+
+GridView only virtualises when its scrollable parent gives it the viewport: wrapped in a
+`gtk::Stack` (or any box) inside the ScrolledWindow it was allocated its full natural height and
+instantiated every row, which is 11,000 cards. The Browse tab therefore puts the GridView (and the
+ListView) directly into their ScrolledWindows and switches the ScrolledWindows, not the views.
+Everything that must scroll with the grid (the collection shelf, the jump bar) is laid out around
+it, not inside the scroller.
+
+## 2026-09-27 - EXORCHY_SNAPSHOT replaces the headless Chromium smoke script
+
+The web UI's `scripts/ui-smoke.mjs` rendered pages in headless Chromium against mocked IPC. There
+is no browser now, and `grim` hangs on this compositor, so the app renders itself:
+`EXORCHY_SNAPSHOT=<png>[:<ms>]` snapshots the window with `gtk::WidgetPaintable` after the delay
+and quits; `EXORCHY_SNAPSHOT_GAME=<id>` opens a detail panel first; `EXORCHY_DUMP_TREE=1` prints
+the widget tree. It runs against the real backend on an isolated XDG profile
+(`docs/PORTING.md`), so it exercises the real startup order too.
+
+## 2026-09-27 - The web UI stays under `legacy/webui` until parity
+
+The SolidJS sources are the specification for the port: every feature, string, invariant and
+test (`stallDetector.test.ts`, `launchNotes.test.ts`, ...) lives there. They are moved out of the
+build (no `package.json` at the root, no node in the PKGBUILD) but kept in the tree so a module
+port can diff against them. They are deleted, in one commit, when the last feature module lands;
+nothing new is written there.
+
+## 2026-09-27 - The name is eXorchy
+
+Spelled "eXorchy" (capital X, as in eXoDOS and Exodium's "eXo" heritage) in every user-facing
+string: window title, desktop entry, README, About, backend messages. Identifiers stay lowercase
+`exorchy`: the binary, the pacman package, the crate names (`exorchy`, `exorchy-core`), the XDG
+directories, the resource dir, the icon name. The GApplication id is `org.exorchy.eXorchy`, which
+is also the Wayland app id and the desktop file name so the launcher and Hyprland match the
+window.
