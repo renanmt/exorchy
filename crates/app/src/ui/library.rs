@@ -578,7 +578,7 @@ impl LibraryPage {
             }
             if lists.is_empty() {
                 let new_btn = gtk::Button::builder().label("New playlist…").css_classes(["btn", "ghost"]).build();
-                new_btn.connect_clicked(|b| crate::ui::playlists::manage(b));
+                new_btn.connect_clicked(crate::ui::playlists::manage);
                 page.playlist_menu.append(&new_btn);
                 return;
             }
@@ -599,7 +599,7 @@ impl LibraryPage {
             }));
             page.playlist_menu.append(&drop);
             let manage = gtk::Button::builder().icon_name("document-edit-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Manage playlists").build();
-            manage.connect_clicked(|b| crate::ui::playlists::manage(b));
+            manage.connect_clicked(crate::ui::playlists::manage);
             page.playlist_menu.append(&manage);
         }));
     }

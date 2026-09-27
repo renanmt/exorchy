@@ -134,6 +134,12 @@ pub(crate) fn load_manifest() -> Result<Manifest, String> {
 #[cfg(test)]
 mod manifest_load_tests {
     #[test]
+    fn the_repo_manifest_is_found_from_a_source_checkout() {
+        let m = super::load_manifest().expect("manifest.json at the repo root");
+        assert!(m.collections.contains_key("eXoDOS"));
+    }
+
+    #[test]
     fn manifest_parses_with_packs() {
         let m = super::load_manifest().expect("load_manifest failed");
         let ex = m.collections.get("eXoDOS").expect("no eXoDOS collection");

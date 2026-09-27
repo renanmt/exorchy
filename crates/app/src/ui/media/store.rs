@@ -1685,9 +1685,7 @@ mod tests {
     #[test]
     fn playable_hint_follows_the_probe_then_the_cache_then_the_catalogue() {
         let mut m = Media::new();
-        let mut g = Game::default();
-        g.id = Some(7);
-        g.music_file = Some("x.mp3".into());
+        let mut g = Game { id: Some(7), music_file: Some("x.mp3".into()), ..Game::default() };
         assert!(m.playable_hint(&g));
         m.none.insert(7);
         assert!(!m.playable_hint(&g));
@@ -1704,11 +1702,7 @@ mod tests {
     fn list_neighbour_walks_past_rows_without_a_theme_and_never_wraps() {
         let mut m = Media::new();
         let row = |id: i64, music: Option<&str>| {
-            let mut g = Game::default();
-            g.id = Some(id);
-            g.title = format!("g{id}");
-            g.music_file = music.map(String::from);
-            g
+            Game { id: Some(id), title: format!("g{id}"), music_file: music.map(String::from), ..Game::default() }
         };
         let rows = vec![row(1, Some("a.mp3")), row(2, None), row(3, Some("c.ogg")), row(4, None)];
         m.list_source = Some(Rc::new(move || rows.clone()));

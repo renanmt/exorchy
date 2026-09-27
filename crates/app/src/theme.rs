@@ -261,9 +261,7 @@ mod tests {
 
     #[test]
     fn light_mode_swaps_the_scrim_and_a_bad_value_never_reaches_css() {
-        let mut p = Palette::default();
-        p.mode = "light".into();
-        p.red = "red; } * { color: red".into();
+        let p = Palette { mode: "light".into(), red: "red; } * { color: red".into(), ..Palette::default() };
         let theme = Theme { name: None, source: "fallback".into(), palette: p, font_base_size: 12, mono_font: None };
         let css = theme_css(&theme);
         assert!(css.contains("72%"));

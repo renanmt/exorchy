@@ -23,20 +23,6 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// A user-facing name for a collection id.
-pub fn collection_label(id: &str) -> &str {
-    match id {
-        "eXoDOS" => "eXoDOS",
-        "GLP" => "German language pack",
-        "SLP" => "Spanish language pack",
-        "PLP" => "Polish language pack",
-        "eXoWin3x" => "eXoWin3x",
-        "eXoWin9x" => "eXoWin9x",
-        "eXoScummVM" => "eXoScummVM",
-        other => other,
-    }
-}
-
 /// The short tag a card shows when the collection is not implied by a filter.
 pub fn platform_tag(source: Option<&str>) -> Option<&'static str> {
     match source? {

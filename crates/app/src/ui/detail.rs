@@ -47,8 +47,11 @@ pub struct DetailPanel {
     play_blocked: RefCell<Option<String>>,
     /// The block is temporary (a support or pack download): Play spins.
     play_pending: Cell<bool>,
-    shown_listeners: RefCell<Vec<Rc<dyn Fn(Option<&Game>)>>>,
+    shown_listeners: RefCell<Vec<ShownListener>>,
 }
+
+/// A panel-open/close observer (media, launch notes).
+type ShownListener = Rc<dyn Fn(Option<&Game>)>;
 
 impl DetailPanel {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
@@ -181,10 +184,6 @@ impl DetailPanel {
         }
     }
 
-    pub fn current(&self) -> Option<Game> {
-        self.game.borrow().clone()
-    }
-
     pub fn show(self: &Rc<Self>, game: Game) {
         let same = self.game.borrow().as_ref().and_then(|g| g.id) == game.id && game.id.is_some();
         // Reopening the same game after a close is an open too: the listeners
@@ -198,6 +197,13 @@ impl DetailPanel {
             self.load_cover(&game);
             self.load_variants(&game);
             self.load_metadata(&game);
+            // An installed game whose extras are still downloading after a
+            // restart gets its tracker back, so the phase stays visible.
+            if game.installed {
+                if let Some(id) = game.id {
+                    downloads::watch_extras_if_pending(id, Some(game.title.clone()));
+                }
+            }
         }
         self.render();
         self.widget.set_reveal_child(true);
@@ -413,7 +419,7 @@ impl DetailPanel {
         let Some(id) = row.id else { return };
 
         if let Some(b) = self.busy.borrow().clone() {
-            let l = gtk::Label::builder().label(&format!("{b}…")).css_classes(["muted"]).build();
+            let l = gtk::Label::builder().label(format!("{b}…")).css_classes(["muted"]).build();
             let sp = gtk::Spinner::builder().spinning(true).build();
             self.actions.append(&sp);
             self.actions.append(&l);
