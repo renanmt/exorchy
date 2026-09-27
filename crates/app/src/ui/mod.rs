@@ -25,6 +25,7 @@ pub mod game_settings;
 pub mod launch_notes;
 pub mod media;
 pub mod onboarding;
+pub mod pdf;
 pub mod playlists;
 pub mod reading;
 pub mod settings;
