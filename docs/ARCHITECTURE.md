@@ -370,8 +370,10 @@ colour; each feature module keeps its rules in `styles/<module>.css`.
   `crates/core/resources/previews`) to `/usr/lib/exorchy`; icons from
   `packaging/icons` (raster only, 32-512 px) into hicolor.
   `packaging/install-dev.sh` does the same under `~/.local`.
-  `packaging/aur/PKGBUILD` is the AUR package (release tarball); see
-  `docs/RELEASING.md`.
+  `packaging/aur/PKGBUILD` is the release package (tag tarball); pushing a
+  tag builds it in CI (`.github/workflows/release.yml`,
+  `packaging/release/build-package.sh`) and publishes it with
+  `packaging/release/install.sh` as a GitHub release. See `docs/RELEASING.md`.
 - Emulators spawn with the app's environment; `xdg-open` is used for the
   log folder and for documents when the in-app reader cannot show them.
 - `EXORCHY_SNAPSHOT=<png>[:<ms>]` renders the window to a PNG after the

@@ -100,20 +100,38 @@ full list of credits.
 
 ## Install
 
-Requirements: Omarchy, or any Arch with `gtk4`, `libadwaita`, `poppler-glib`
-and GStreamer. Preview videos and music need `gst-plugins-good` and
-`gst-libav` (the players hide themselves when GStreamer cannot decode).
+On Omarchy (or any up-to-date Arch, x86_64), one line installs the latest
+release, and running it again updates:
 
 ```bash
-# system-wide, from a checkout
-cd packaging && makepkg -si
-# or user-level under ~/.local (needs rustup)
-packaging/install-dev.sh
+curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash
+```
+
+The script downloads the prebuilt pacman package from the
+[latest release](https://github.com/renanmt/exorchy/releases/latest), checks
+its SHA-256 and installs it with `pacman`, which pulls in GTK, libadwaita,
+poppler and GStreamer from the Arch repositories. It asks for your password
+and for pacman's confirmation; nothing is installed outside the package.
+
+Prefer to do it by hand? Download `exorchy-x86_64.pkg.tar.zst` and its
+`.sha256` from the release page, then:
+
+```bash
+sha256sum -c exorchy-x86_64.pkg.tar.zst.sha256
+sudo pacman -U exorchy-x86_64.pkg.tar.zst
 ```
 
 Then launch **eXorchy** from the Omarchy launcher (Super+Space) or run
-`exorchy`. Optional: `omarchy pkg aur add dosbox-staging-bin` and enable
-"Prefer system dosbox-staging" in Settings → Emulators.
+`exorchy`. Preview videos and theme music need `gst-plugins-good` and
+`gst-libav` (the players hide themselves when GStreamer cannot decode).
+Optional: `omarchy pkg aur add dosbox-staging-bin` and enable "Prefer system
+dosbox-staging" in Settings → Emulators.
+
+To remove it: `sudo pacman -R exorchy`, or run the install line with
+`bash -s -- --uninstall`. Your settings, library and downloaded games stay.
+
+From a checkout instead: `cd packaging && makepkg -si` (system-wide) or
+`packaging/install-dev.sh` (under `~/.local`, needs rustup).
 
 ## Keyboard
 

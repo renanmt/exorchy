@@ -15,7 +15,7 @@ makedepends=('cargo' 'git' 'pkgconf')
 optdepends=('gst-plugins-good: preview videos and theme music'
             'gst-libav: H.264 preview videos'
             'dosbox-staging: use a system emulator instead of the downloaded pack')
-options=('!lto')
+options=('!lto' '!debug')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/renanmt/exorchy/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
