@@ -1,0 +1,92 @@
+/* reading: rules for ui/reading/* and ui/pdf.rs. Tokens only (see theme.rs). */
+
+/* ---- Room toolbar ---- */
+.reading-row2 { padding-top: 6px; padding-bottom: 6px; }
+.reading-note { color: var(--warning); font-size: 0.9em; }
+.results-count { margin-left: 4px; }
+menubutton.pub-button > button {
+  background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: var(--radius);
+  color: var(--text-primary); box-shadow: none; padding: 4px 10px; min-width: 160px;
+}
+menubutton.pub-button > button:hover { background-color: var(--fill-3); }
+popover.pub-menu > contents { padding: 6px; }
+label.menu-header { padding: 8px 12px 2px 12px; font-weight: 600; letter-spacing: 0.04em; }
+button.menu-item.active { background-color: var(--accent-fill); color: var(--text-strong); }
+
+/* ---- Poster pack hint ---- */
+.pack-hint {
+  margin: 8px 14px 0 14px; padding: 10px 14px;
+  background-color: var(--bg-card); border: 1px solid var(--line-3); border-radius: var(--radius-lg);
+}
+
+/* ---- Sectioned grid ---- */
+listview.reading-sections { background: none; }
+listview.reading-sections > row { padding: 0; background: none; }
+listview.reading-sections > row:hover { background: none; }
+.reading-section { padding-bottom: 6px; }
+.grid-separator {
+  padding: 12px 14px 4px 14px;
+  border-bottom: 1px solid var(--line-2);
+  margin: 0 8px 4px 8px;
+}
+.grid-separator-label { font-weight: 700; color: var(--text-strong); font-size: 1.05em; }
+.section-count { color: var(--text-muted); }
+flowbox.issue-flow { background: none; padding: 4px 8px; }
+flowbox.issue-flow > flowboxchild { padding: 0; background: none; }
+flowbox.issue-flow > flowboxchild:focus-visible { outline: none; }
+.issue-card .issue-size { margin-top: 2px; }
+.game-card-action.action-resume { color: var(--warning); }
+label.badge.badge-disk { background-color: color-mix(in srgb, var(--om-magenta) 35%, transparent); color: var(--text-strong); }
+label.badge.badge-ondisk { background-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--text-strong); }
+label.badge.badge-lang { background-color: var(--fill-3); color: var(--text-secondary); }
+.jump-bar.wide { min-width: 120px; }
+
+/* ---- List ---- */
+listview.issue-list { background: none; }
+listview.issue-list > row { padding: 0; }
+listview.issue-list > row:hover .issue-row { background-color: var(--fill-2); }
+.issue-list-header { padding: 4px 14px; }
+button.list-col {
+  background: none; border: none; box-shadow: none; padding: 2px 4px; min-height: 0;
+  color: var(--text-muted); font-size: 0.85em;
+}
+button.list-col:hover { color: var(--text-primary); }
+button.list-col:disabled { color: var(--text-muted); }
+.issue-row .row-cover { border-radius: 4px; background-color: var(--bg-secondary); }
+.issue-row .row-title { font-weight: 600; color: var(--text-strong); }
+button.fav-btn.row-fav { margin: 0; padding: 2px 6px; text-shadow: none; }
+
+/* ---- Empty state ---- */
+.lib-empty { padding: 40px; }
+
+/* ---- Detail panel: Covered in ---- */
+.detail-articles { margin-top: 8px; }
+button.article-row {
+  background-color: var(--fill-1); border: 1px solid var(--line-2); border-radius: var(--radius);
+  padding: 6px 10px; box-shadow: none; color: var(--text-primary);
+}
+button.article-row:hover { background-color: var(--fill-2); border-color: var(--line-4); }
+
+/* ---- Document viewer ---- */
+dialog.doc-dialog > sheet { background-color: var(--bg-primary); }
+.doc-viewer { background-color: var(--bg-primary); }
+.doc-header { padding: 10px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-primary); }
+.doc-title { font-weight: 700; color: var(--text-strong); font-size: 1.1em; }
+.doc-notice {
+  padding: 8px 14px; background-color: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--text-strong); border-bottom: 1px solid var(--line-2);
+}
+.doc-toolbar { padding: 6px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-secondary); }
+entry.doc-page-entry { min-width: 0; padding: 2px 6px; }
+entry.doc-search { min-width: 200px; }
+.doc-hitbar { padding: 4px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-secondary); }
+button.doc-hit { padding: 1px 8px; min-height: 0; }
+.doc-scroller { background-color: var(--bg-secondary); }
+.doc-scroller:focus-visible { outline: none; }
+.doc-page { background-color: var(--om-lighter-background); box-shadow: 0 2px 12px var(--shadow); border-radius: 2px; }
+.doc-image { background-color: var(--bg-secondary); }
+textview.doc-text, textview.doc-text text { background-color: var(--bg-secondary); color: var(--text-primary); }
+
+/* ---- Issue fetch panel ---- */
+.issue-fetch { padding: 24px; }
+.issue-fetch-cover { background-color: var(--bg-secondary); border-radius: var(--radius); }

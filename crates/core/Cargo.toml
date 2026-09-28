@@ -1,0 +1,73 @@
+[package]
+name = "exorchy-core"
+description = "eXorchy backend: catalogue, torrents, launchers, Omarchy theme bridge"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[lib]
+name = "exorchy_core"
+crate-type = ["rlib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+# Database (pinned to the versions the ported code was written against)
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# XML parsing (LaunchBox metadata; build-time generate_db + import backfill)
+quick-xml = { version = "0.36", features = ["serialize"] }
+
+# ZIP extraction (game archives, bundled configs, util.zip)
+zip = "2"
+# Pristine-file check on uninstall
+crc32fast = "1"
+# Gzip decompression (bundled metadata / db)
+flate2 = "1"
+# xz decompression (DOSBox Staging release tarball = emulator pack)
+xz2 = "0.1"
+walkdir = "2"
+thiserror = "2"
+anyhow = "1"
+tokio.workspace = true
+
+# Torrent parsing
+lava_torrent = "0.11"
+# Torrent downloading - see docs/DECISIONS.md (librqbit pin + fork patch)
+librqbit = "9.0.0-rc.0"
+
+# HTTP client (content packs, emulator packs)
+reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls"] }
+futures-util = "0.3"
+sha2 = "0.10"
+tar = "0.4"
+
+# Gallery thumbnail cache (metadata pack images)
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif"] }
+
+# Logging: tracing subscriber with a log bridge (librqbit emits tracing)
+log.workspace = true
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-log = "0.2"
+fs4 = "1.1.0"
+libc = "0.2.189"
+
+# Omarchy theme bridge: colors.toml parsing + inotify watch
+toml = "0.8"
+notify = "8"
+
+# Localhost media server (Range support) so preview video/music can be
+# streamed out of the GameData zips to any player; all three crates are
+# already in the tree via librqbit.
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs"] }
+
+[dev-dependencies]
+tempfile = "3"
+pretty_assertions = "1"
+tokio = { version = "1", features = ["fs", "sync", "macros", "rt", "test-util", "time"] }
+

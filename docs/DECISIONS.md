@@ -173,3 +173,265 @@ the window's `CloseRequested`, walks `/proc` for `WebKitWebProces` descendants (
 between) and SIGKILLs them, so no teardown runs and no core is dumped. Gated on the proprietary
 driver being loaded; elsewhere the normal exit is clean. Switching to the software render path
 would avoid it too, at 10 fps.
+
+## 2026-09-27 - Native rewrite in Rust with GTK4 + libadwaita, replacing the webview
+
+The Tauri build worked, but it was a web page in a WebKitGTK window on a desktop where everything
+else is native. Three things tipped it: Omarchy users expect a native window (theme, font, Hyprland
+tiling, keyboard-first), the WebKitGTK + NVIDIA render path crashed on every close and needed the
+SIGKILL workaround above, and GTK 4.22's CSS supports custom properties and `color-mix()`, so the
+token layer (`--om-*` → semantic tokens) ports one to one and the "no colour literals" rule keeps
+holding. GTK4 and libadwaita are already installed on Omarchy (no WebKit, no node, no pnpm in the
+build), and the backend is kept whole: `crates/core` is Exodium's tested backend, `crates/app` the
+new shell. Cost: the UI is rewritten module by module against the web UI as reference
+(`docs/PORTING.md`); the web UI stays under `legacy/webui` until parity.
+
+Ruled out: C++/Qt as omakade did (would have meant rewriting the 26k-line tested backend or
+bridging it through FFI); iced or egui (no GStreamer video, no PDF rendering, no native
+accessibility, their own widget look instead of Omarchy's GTK look).
+
+## 2026-09-27 - A host shim instead of a full de-Tauri refactor
+
+The backend's 103 command functions take `State<'_, T>` and `AppHandle` arguments and emit events.
+`crates/core/src/host.rs` reimplements those four things (`AppHandle` with `manage`/`state`/
+`emit`/`subscribe`, `State<'a, T>` as an `Arc<T>` with a phantom lifetime, empty `Manager` /
+`Emitter` traits, `async_runtime` over one process-wide tokio runtime), so every command kept its
+signature and its tests. `AppHandle::state()` returns `State<'static, T>`, which a `State<'_, T>`
+parameter accepts. Ruled out: rewriting the commands as plain functions over a context struct
+(touches every call site and every test for no behaviour gain) and keeping a `tauri` dependency
+without the webview (still pulls the GTK3/WebKit stack in).
+
+## 2026-09-27 - Cover textures are pre-scaled to the card size
+
+`gtk::GridView` sizes its cells from each child's natural size, and a `gtk::Picture`'s natural
+size is its texture's, so a 400 px poster in a 180 px card made the grid grow and stutter. Covers
+are therefore decoded and cover-cropped to the exact card pixel size (or fit-scaled for the panel)
+with the `image` crate on tokio's blocking pool, then uploaded as a `gdk::Texture` and cached by
+(path, size). Side effect that matters: GPU memory holds a card's worth of pixels per cover, not a
+poster's. Ruled out: `Picture::set_can_shrink` alone (still uploads the full texture) and
+`content-fit` (fixes the layout, not the memory).
+
+## 2026-09-27 - The GridView is the ScrolledWindow's direct child
+
+GridView only virtualises when its scrollable parent gives it the viewport: wrapped in a
+`gtk::Stack` (or any box) inside the ScrolledWindow it was allocated its full natural height and
+instantiated every row, which is 11,000 cards. The Browse tab therefore puts the GridView (and the
+ListView) directly into their ScrolledWindows and switches the ScrolledWindows, not the views.
+Everything that must scroll with the grid (the collection shelf, the jump bar) is laid out around
+it, not inside the scroller.
+
+## 2026-09-27 - EXORCHY_SNAPSHOT replaces the headless Chromium smoke script
+
+The web UI's `scripts/ui-smoke.mjs` rendered pages in headless Chromium against mocked IPC. There
+is no browser now, and `grim` hangs on this compositor, so the app renders itself:
+`EXORCHY_SNAPSHOT=<png>[:<ms>]` snapshots the window with `gtk::WidgetPaintable` after the delay
+and quits; `EXORCHY_SNAPSHOT_GAME=<id>` opens a detail panel first; `EXORCHY_DUMP_TREE=1` prints
+the widget tree. It runs against the real backend on an isolated XDG profile
+(`docs/PORTING.md`), so it exercises the real startup order too.
+
+## 2026-09-27 - The web UI stayed under `legacy/webui` until parity, then was deleted
+
+The SolidJS sources are the specification for the port: every feature, string, invariant and
+test (`stallDetector.test.ts`, `launchNotes.test.ts`, ...) lives there. They are moved out of the
+build (no `package.json` at the root, no node in the PKGBUILD) but kept in the tree so a module
+port can diff against them. They are deleted, in one commit, when the last feature module lands;
+nothing new is written there.
+
+## 2026-09-27 - The name is eXorchy
+
+Spelled "eXorchy" (capital X, as in eXoDOS and Exodium's "eXo" heritage) in every user-facing
+string: window title, desktop entry, README, About, backend messages. Identifiers stay lowercase
+`exorchy`: the binary, the pacman package, the crate names (`exorchy`, `exorchy-core`), the XDG
+directories, the resource dir, the icon name. The GApplication id is `org.exorchy.eXorchy`, which
+is also the Wayland app id and the desktop file name so the launcher and Hyprland match the
+window.
+
+## 2026-09-27 - Settings is a sidebar + stack dialog with full-width pages
+
+Eight sections do not fit libadwaita's view switcher, so `settings.rs` mirrors the web layout:
+an `adw::Dialog` with a `gtk::ListBox` nav and a `gtk::Stack` of pages. The pages are plain
+scrolled boxes of `adw::PreferencesGroup`s rather than `adw::PreferencesPage`, whose clamp caps
+content at ~600 px and would squash the storage list and the pack rows. The storage usage bar is a
+400-column homogeneous `gtk::Grid` so every segment colour stays a CSS token.
+
+## 2026-09-27 - The document viewer is continuous-scroll poppler on its own thread
+
+`pdf.rs` keeps the `poppler::Document` on one dedicated thread (mpsc requests, oneshot replies) and
+renders pages to cairo surfaces that become `gdk::MemoryTexture`s; the view is a continuous scroll
+of per-page placeholders (an `Overlay` per page so a HiDPI 2× bitmap lays out at logical size),
+with a 6-page LRU budget, nearest-first scheduling and a generation counter on zoom. Manuals use the
+same viewer; HTML manuals are shown as text (no webview in the GTK shell).
+
+## 2026-09-27 - The Reading Room grid is a ListView of sections, each a FlowBox
+
+`GtkGridView` has no section headers, and the reading room's sections (publication names) are what
+the jump bar targets. A `ListView` whose rows are section boxes holding a `FlowBox` of cards keeps
+virtualisation per section and gives real headers. The game grid keeps `GridView` (one flat list,
+jump bar scrolls to positions).
+
+## 2026-09-27 - Launch notes are dismissed per kind; reopening the same game re-notifies
+
+`dismissed_notes` (config, comma list) stores the note kind, as the web did, so a dismissed
+"tuned for ECE" note stays dismissed for every ECE game. `DetailPanel::show` fires `on_shown` again
+when the panel was closed in between even for the same game: the media and note listeners tear down
+on close and must come back.
+
+## 2026-09-27 - Previews start muted; cached media plays by path
+
+The hero video defaults to muted (`preview_muted` unset) because a tiling desktop opens the panel
+often and the web's unmuted default was a surprise in a shared room; a stored preference wins.
+Cached videos and tracks are handed to GTK's GStreamer-backed `MediaFile` by file path, so the
+localhost media server the webview needed is not used.
+
+## 2026-09-27 - The four game collections are on by default; the layout adapts to the tile
+
+The user asked (2026-09-27) for eXoDOS, eXoWin3x, eXoWin9x and eXoScummVM to be enabled on a fresh
+install (`db::queries::DEFAULT_COLLECTIONS`); the German, Spanish and Polish language packs stay
+off until switched on. This supersedes the earlier "only eXoDOS" default; the enabled-set filter
+and the per-collection switches are unchanged.
+
+The same feedback covered Omarchy tiles: a half-width or quarter tile cut the detail panel off and
+the window refused to shrink. The library page is now an `adw::BreakpointBin` whose only demand is
+360×300: the detail panel is the end sidebar of an `adw::OverlaySplitView` (beside the grid on a
+wide window, an overlay with a scrim below 1100 sp), the filter rows are `adw::WrapBox`es, the brand
+hides below 760 sp, the setup card is clamped and scrolls, the splash scales whole (`Contain`) and
+the window carries no hard minimum size.
+
+## 2026-09-27 - Headless snapshots use Broadway (or X11) when no frame is painted
+
+`EXORCHY_SNAPSHOT` needs a painted frame; with the monitors off (DPMS) a Wayland window never gets
+one and the render finds nothing. Running the same binary on `gtk4-broadwayd` (or XWayland) keeps
+the frame clock ticking without a display, so visual checks work unattended. The `PORTING.md`
+recipe says so; the app is single-instance, so a leftover instance must be killed first.
+
+## 2026-09-27 - Mount targets in confs and bats resolve case-insensitively (second field bug)
+
+After Dark 3.2 (eXoWin3x) exited 0.3 s after launch: its conf mounts `.\eXoWin3x\Adark3` and
+its CD image under it, but the archive unpacks the folder as `adark3`. The host-path rewriter
+only replaced a `.\` path when the target existed with that exact spelling, so the Windows
+path survived untouched and DOSBox Staging on ext4 found neither the drive nor the image
+("MOUNT: Image file not found"), then ran into the autoexec's `exit`. The first field bug
+(2026-09-27, above) fixed the same mismatch for the conf file's own path; `patch_dosbox_conf`
+and `rewrite_bat_host_paths` now fall back to `resolve_rel_ignoring_case` and write the on-disk
+spelling. Windows DOSBox never saw this because NTFS is case-insensitive.
+
+## 2026-09-28 - New key art, icon and an ASCII wordmark drawn in theme colours
+
+The user supplied new artwork in `media/` (splash, icon, logo PNG and `logo.txt`). The splash
+is `media/splash.png` re-encoded as `assets/splash.jpg`. The icon is `media/icon.png` with the
+black surround outside its rounded frame made transparent (flood fill from the corners), cut
+square and scaled to the `packaging/icons` sizes and `assets/exorchy.png` (256 px, the runtime
+copy). The old SVG is gone: a scalable icon would win the hicolor lookup over the new raster
+ones, so `install-dev.sh` deletes one a previous install left behind. The toolbar brand and the
+About header use `logo.txt` instead of the logo PNG, because the PNG's colours are fixed and the
+text art can follow the Omarchy palette: it is drawn as rectangles rather than typeset, since
+glyph metrics and line height would open gaps between the half blocks.
+
+
+## 2026-09-28 - About names the author; Thomas's credit row carries the invitation to support him
+
+Settings → About gains an Author row (Renan Tonheiro). Thomas Vollstädt's credit stays in
+About, as the hard rule requires: the Exodium row credits him as its creator and invites the
+user to visit his GitHub page, both to support his work and to get Exodium on other operating
+systems (eXorchy is Linux/Omarchy only). That row replaces the separate "Support Thomas" row
+(GitHub Sponsors, Ko-fi), which duplicated its link; README and ACKNOWLEDGEMENTS.md keep the
+sponsor links. The eXoDOS credit is unchanged.
+
+## 2026-09-28 - Settings stacks its rows in a narrow tile
+
+In a ~520 px Hyprland tile the Settings dialog is ~460 px wide, but its minimum was 509-581 px
+(190 px sidebar, a 170 px label column per row, button groups and the Storage breakdown lines
+that could not shrink), so the right edge was clipped and hints wrapped a character per line. A
+720 sp breakpoint on the dialog now turns the sidebar into icons (names in tooltips) and stacks
+every row: label, then value and hint, then the action, which is a `WrapBox`. Widgets opt in with
+`widgets::follow_narrow`; the state is per dialog (`begin_dialog`) because a closing dialog's
+breakpoint unapplies after the next one has opened.
+
+## 2026-09-28 - Settings is a page in place of the library, not a dialog
+
+The Settings dialog fought the tiling window manager: in a tile it was narrower than the window
+and clipped, and a floating sheet inside a tiled window is the pattern Omarchy avoids anyway. It
+is now a full-body page in the window's stack (`window::show_page` / `close_page`), opened from
+the gear button or Ctrl+,, closed with the back arrow or Esc; the library stays in the stack
+underneath, so filters, scroll position and the detail panel survive. Not a fourth tab: Settings
+is not browsed, and the tab row stays short in narrow tiles. Inside, an `AdwNavigationSplitView`
+shows the section list beside the section, collapsing below 720 sp to list → section with back
+arrows; this replaces the icon-only sidebar of the entry above, while rows still stack when
+narrow. The page is built on open and dropped on close, as the dialog was, so the pages' timers
+keep their "while Settings is open" lifetime (`Ctx::is_alive`, also cleared on unrealize).
+Confirmations stay `adw::AlertDialog`s. Content is clamped to 960 px so a full-screen page does
+not stretch rows across a wide monitor.
+
+## 2026-09-28 - The toolbar stacks in a narrow tile instead of dropping the logo
+
+Below 760 sp the toolbar used to hide the wordmark and wrap control by control, which left the
+gear alone on a line. It is now two groups, wordmark + tabs and search + connection badge +
+feature controls + gear, side by side when there is room and stacked (one `orientation`
+setter) in a narrow tile; the tabs wrap under the wordmark in the narrowest tiles. The
+connection badge became a button with an icon, visible when idle, that opens Transfers.
+
+## 2026-09-28 - Transfers page, and a per-torrent listing in the backend
+
+The badge only had session totals. `DownloadManager::session_torrents` reads librqbit's
+`ManagedTorrent::stats()` for every torrent in the shared session (rates, live peers, uploaded,
+progress of the selected files) and `games::get_session_torrents` labels each with the
+collection whose manager owns it; `stats()` runs on `spawn_blocking`. It copies each torrent's
+file-progress vector, so it is polled only while the page is open (1 s). There is no download
+queue to show for games (selected files all download at once), so "Queued" lists what really
+waits: preview and theme fetches beyond the three media slots. The page is a full-body page
+like Settings, reusing `window::show_page`. Rows are named from the bundled `.torrent` they came
+from (every eXoDOS torrent, the Media Pack too, is called "eXoDOS" inside), and each torrent's
+rates are derived from its uploaded / on-disk byte counters between polls: librqbit's
+per-torrent speed estimates read zero while the session total moves.
+
+## 2026-09-28 - Hidden titles and the adult filter are a query predicate, not a UI filter
+
+Hiding had to reach every list (Browse, search, shelves, genres, music shuffle) and counts, so
+it is `visible_sql` beside `enabled_sql` in `db::queries`, not a filter over fetched pages
+(which would break paging and section keys). Hidden titles live in a `hidden_games` table keyed
+by game id (catalog refreshes update rows in place and keep ids, like playlists); a hide covers
+the shortcode group. A hidden installed title still matches a name search so it can be played,
+as asked. Adult titles are eXo's `Adult` genre token; they are off by default, hidden even when
+installed, and their genre is not offered. My Library says how many installed games are
+hidden, with a link to Settings → Hidden titles. "Remove from Recently played" clears
+`last_played` for the whole group, or another variant would take the card's place.
+
+## 2026-09-28 - Adult means eXo's age rating "A - Adult" or the Adult genre (catalogue 17)
+
+The Adult genre tags only 23 titles, all eXoWin3x, while eXo's LaunchBox `<Rating>` rates 133
+more "A - Adult" (DOS, ScummVM, Win3x, Win9x) whose genres say nothing, so adult titles kept
+showing with the filter off. The importer now keeps `<Rating>` as `age_rating` (catalogue 17,
+new column migrated in place, refreshed at startup) and `adult_sql` checks either marker.
+"M - Mature" (violence, e.g. Doom) stays visible. `age_rating` is compared through `COALESCE`:
+a bare `= 'A - Adult'` is NULL for unrated rows and `NOT adult` would hide them all.
+
+## 2026-09-28 - The search box searches the tab it is on
+
+In My Library the shared search box used to refetch Browse, which is not on screen. There it now
+replaces the shelves with one "Installed" shelf from `search_library`: installed games whose
+title (any variant) matches, hidden ones included so they stay findable and playable. Not
+favourites or playlists: membership in eXo's curated playlists would pull in thousands of
+games that are not on disk. Browse and the Reading Room keep their own search. The search runs once typing pauses (entry `search-delay` 100 ms plus
+`SEARCH_PAUSE` 300 ms) and only on the tab in view; Browse and the Reading Room catch up in
+`set_tab` when shown (Browse only if its last fetch used another query). Before, every keystroke
+refetched Browse, refiltered the Reading Room and searched the shelves, all at once.
+
+## 2026-09-28 - Start tab and a user background image
+
+Settings → General → "Open in My Library" stores `start_tab` (`library` / `browse`); the
+library reads it first thing in its startup sequence so Browse does not flash. Settings →
+Appearance takes a background image: the file is copied into the data folder under a new name
+per choice (moving the original cannot lose it, and GTK's texture cache cannot serve the old
+one), shown by a `gtk::Picture` under the page stack at the chosen opacity over the theme's
+background colour. Only the full-width surfaces (toolbar, filter row, Settings, Transfers) turn
+translucent, through a `has-backdrop` window class; cards, panels, entries and dialogs stay
+solid so text keeps its contrast. The overlay measures the pages, not the picture, so a large
+image never forces the window's size.
+
+## 2026-09-28 - The detail panel's visibility is re-applied when the split view (un)collapses
+
+`AdwOverlaySplitView` restores its own `show-sidebar` when it crosses the 1100 sp breakpoint, so
+a window started in a narrow tile and then maximised showed an empty detail panel. On every
+`collapsed` change the library sets `show-sidebar` to "a game is open", on idle so it lands
+after the split view's own change.
+

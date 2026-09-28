@@ -1,0 +1,58 @@
+{
+  "activeLayerID": "543D0406-853F-4F7C-804C-8C37F6886279",
+  "colorSpace": "sRGB",
+  "documentID": "10E0D878-1802-4096-8D7A-02E785574A3C",
+  "format": "com.compositor.project",
+  "height": 1254,
+  "layers": [
+    {
+      "blendMode": "Normal",
+      "id": "543D0406-853F-4F7C-804C-8C37F6886279",
+      "imageFile": "543D0406-853F-4F7C-804C-8C37F6886279.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "ChatGPT Image Sep 27, 2026, 01_10_04 AM",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          0,
+          0
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          1254,
+          1254
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "A10F1904-78D7-49F0-AE99-816A061851BA",
+      "imageFile": "A10F1904-78D7-49F0-AE99-816A061851BA.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "logo",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          151,
+          769
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          952,
+          315
+        ]
+      }
+    }
+  ],
+  "resolution": 72,
+  "version": 7,
+  "width": 1254
+}

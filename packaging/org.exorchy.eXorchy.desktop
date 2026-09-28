@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=eXorchy
+GenericName=Retro game launcher
+Comment=Browse, download and play the eXo collections (eXoDOS, eXoWin3x, eXoWin9x, eXoScummVM)
+Exec=exorchy
+Icon=exorchy
+Terminal=false
+Categories=Game;Emulator;
+Keywords=DOS;eXoDOS;DOSBox;ScummVM;Windows;retro;games;
+StartupNotify=true
+StartupWMClass=org.exorchy.eXorchy

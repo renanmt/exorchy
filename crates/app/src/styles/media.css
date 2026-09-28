@@ -1,0 +1,118 @@
+/* media: rules for ui/media.rs. Tokens only (see theme.rs). */
+
+/* ── Preview under the cover ─────────────────────────────────────────── */
+.media-frame {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+}
+.media-picture { border-radius: var(--radius); }
+/* The controls sit on the frames: a scrim keeps them legible on any shot. */
+.media-controls {
+  background-color: var(--scrim);
+  border-radius: 999px;
+  padding: 2px;
+}
+button.btn.media-ctl {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--text-strong);
+  padding: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+button.btn.media-ctl:hover { background-color: var(--fill-3); }
+button.btn.media-replay {
+  background-color: var(--scrim);
+  border-color: var(--line-4);
+  color: var(--text-strong);
+  border-radius: 999px;
+  padding: 12px;
+}
+button.btn.media-replay:hover { background-color: var(--accent-fill); }
+/* The probe pill: each stage says what it is. */
+.media-status {
+  background-color: var(--fill-2);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+button.btn.media-retry { color: var(--warning); }
+.media-error { color: var(--danger); }
+
+/* The Theme row in the panel. */
+.theme-row {
+  border-top: 1px solid var(--line-2);
+  padding-top: 8px;
+  min-height: 28px;
+}
+.theme-name { color: var(--text-secondary); }
+
+/* The lightbox: the trailer large, on the darkest surface. */
+.media-lightbox { background-color: var(--bg-primary); }
+.media-lightbox-video { background-color: var(--bg-primary); }
+
+/* ── Now-playing bar ──────────────────────────────────────────────────── */
+.now-playing-bar {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--line-2);
+  padding: 6px 12px;
+  min-height: 44px;
+}
+button.player-cover {
+  background-color: var(--bg-card);
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  min-width: 40px;
+  min-height: 40px;
+  box-shadow: none;
+}
+button.player-cover:hover { background-color: var(--bg-hover); }
+.player-cover-placeholder { color: var(--text-muted); font-size: 1.5em; }
+.player-title { font-weight: 600; color: var(--text-primary); }
+.player-sub { color: var(--text-muted); font-size: 0.9em; }
+.player-sub.is-error { color: var(--danger); }
+.player-seek { color: var(--text-muted); font-size: 0.9em; }
+.player-time { font-variant-numeric: tabular-nums; }
+
+/* Transport: round ghost buttons, the main one on the accent. */
+button.btn.player-btn {
+  border-radius: 999px;
+  padding: 6px;
+  color: var(--text-secondary);
+  min-width: 0;
+  min-height: 0;
+}
+button.btn.player-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+button.btn.player-btn:disabled { opacity: 0.4; background-color: transparent; }
+button.btn.player-btn.main {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  padding: 8px;
+}
+button.btn.player-btn.main:hover { background-color: var(--accent-hover); color: var(--text-strong); }
+button.btn.player-btn.main:disabled { background-color: var(--accent-fill); }
+button.btn.player-btn.player-continuous.is-on { color: var(--accent); }
+button.btn.player-btn.player-close { color: var(--text-muted); }
+.player-volume { color: var(--text-muted); }
+
+/* Ranges (seek and volume): a hairline trough, the accent for the fill. */
+.now-playing-bar scale trough {
+  background-color: var(--fill-2);
+  border: 1px solid var(--line-2);
+  min-height: 4px;
+}
+.now-playing-bar scale highlight { background-color: var(--accent); border-color: transparent; }
+.now-playing-bar scale slider {
+  background-color: var(--text-strong);
+  border: 1px solid var(--line-4);
+  box-shadow: none;
+  min-width: 12px;
+  min-height: 12px;
+  margin: -5px;
+}
+.now-playing-bar scale:disabled highlight { background-color: var(--fill-3); }
+.now-playing-bar scale:disabled slider { background-color: var(--text-muted); }

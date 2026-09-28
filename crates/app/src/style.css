@@ -1,0 +1,273 @@
+/* eXorchy component rules. Tokens only: every colour is a var() the theme
+   layer (theme.rs) defines on :root from Omarchy's palette. Fallbacks here
+   are Tokyo Night so the app renders before the first theme is applied. */
+
+:root {
+  --om-accent: #7aa2f7;
+  --om-selection: #292e42;
+  --om-muted: #414868;
+  --om-background: #1a1b26;
+  --om-dark-background: #13141c;
+  --om-darker-background: #0e0e14;
+  --om-lighter-background: #24283b;
+  --om-foreground: #a9b1d6;
+  --om-dark-foreground: #565f89;
+  --om-light-foreground: #c0caf5;
+  --om-bright-foreground: #c0caf5;
+  --om-red: #f7768e;
+  --om-yellow: #e0af68;
+  --om-orange: #eb927b;
+  --om-green: #9ece6a;
+  --om-cyan: #7dcfff;
+  --om-blue: #7aa2f7;
+  --om-magenta: #ad8ee6;
+  --om-brown: #75493d;
+  --om-bright-red: #ff899d;
+  --om-bright-yellow: #faba4a;
+  --om-bright-green: #9fe044;
+  --om-bright-cyan: #b4f9f8;
+  --om-bright-blue: #8db0ff;
+  --om-bright-magenta: #c7a9ff;
+  --font-size-base: 12px;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+window.exorchy {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ---- Generic helpers ---- */
+.muted { color: var(--text-muted); }
+.secondary { color: var(--text-secondary); }
+.strong { color: var(--text-strong); }
+.accent { color: var(--accent); }
+.danger { color: var(--danger); }
+.success { color: var(--success); }
+.small { font-size: 0.9em; }
+.tiny { font-size: 0.8em; }
+.title-1 { font-size: 1.6em; font-weight: 700; color: var(--text-strong); }
+.title-2 { font-size: 1.25em; font-weight: 600; color: var(--text-strong); }
+.title-3 { font-size: 1.05em; font-weight: 600; color: var(--text-strong); }
+
+.hairline { background-color: var(--line-3); min-height: 1px; }
+
+/* Buttons: flat surfaces with hairlines, accent for the primary action. */
+button.btn {
+  background-color: var(--fill-2);
+  color: var(--text-primary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  box-shadow: none;
+  text-shadow: none;
+}
+button.btn:hover { background-color: var(--fill-3); border-color: var(--line-4); }
+button.btn:active { background-color: var(--fill-3); }
+button.btn:disabled { color: var(--text-muted); background-color: var(--fill-1); }
+button.btn.primary {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+  font-weight: 600;
+}
+button.btn.primary:hover { background-color: var(--accent-hover); }
+button.btn.primary:disabled { background-color: var(--accent-fill); color: var(--text-muted); }
+button.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+button.btn.danger:hover { background-color: var(--danger-glow); }
+button.btn.ghost { background-color: transparent; border-color: transparent; }
+button.btn.ghost:hover { background-color: var(--fill-2); }
+button.btn.icon { padding: 6px; min-width: 0; min-height: 0; }
+
+/* Entries */
+entry.field, entry.search {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius);
+  box-shadow: none;
+  caret-color: var(--accent);
+}
+entry.field:focus-within, entry.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+entry.search { min-width: 160px; }
+
+/* Toolbar (the app's own header; Hyprland draws no title bar) */
+.toolbar {
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--line-2);
+  padding: 8px 14px;
+}
+.toolbar > * { margin: 0; }
+button.activity-btn { color: var(--text-muted); padding: 4px 8px; }
+button.activity-btn:hover { color: var(--text-primary); }
+
+/* Tabs */
+button.tab {
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  box-shadow: none;
+}
+button.tab:hover { background-color: var(--fill-2); color: var(--text-primary); }
+button.tab.active { background-color: var(--accent-fill); color: var(--text-strong); }
+
+/* Panels and cards */
+.panel {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+}
+.panel-pad { padding: 16px; }
+
+/* Setup page */
+.setup-page { background-color: var(--bg-primary); }
+.setup-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+}
+.setup-card .subtitle { color: var(--text-secondary); }
+.setup-note { color: var(--text-muted); font-size: 0.9em; }
+button.mode-btn {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius-lg);
+  padding: 18px 16px;
+  color: var(--text-primary);
+  box-shadow: none;
+}
+button.mode-btn:hover { border-color: var(--accent); background-color: var(--fill-2); }
+button.mode-btn.selected { border-color: var(--accent); background-color: var(--accent-glow); }
+button.mode-btn .mode-title { font-weight: 600; color: var(--text-strong); }
+button.mode-btn .mode-desc { color: var(--text-secondary); font-size: 0.9em; }
+button.mode-btn .mode-icon { color: var(--accent); }
+.validation-ok { color: var(--success); }
+.validation-bad { color: var(--danger); }
+.path-preview { color: var(--text-muted); font-size: 0.9em; }
+
+/* Splash: its own dark backdrop, the artwork's colours are fixed. */
+.splash { background-color: #000000; }
+
+/* Toasts (adw) */
+toast { background-color: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--line-3); }
+
+/* Progress */
+progressbar trough { background-color: var(--fill-2); border-radius: 999px; min-height: 6px; }
+progressbar progress { background-color: var(--accent); border-radius: 999px; min-height: 6px; }
+
+/* Switches */
+switch { background-color: var(--fill-3); border: 1px solid var(--line-3); }
+switch:checked { background-color: var(--accent); border-color: transparent; }
+switch slider { background-color: var(--text-strong); box-shadow: none; }
+switch:checked slider { background-color: var(--on-accent); }
+
+/* Scrollbars stay slim */
+scrollbar slider { background-color: var(--line-4); border-radius: 999px; min-width: 6px; min-height: 6px; }
+scrollbar slider:hover { background-color: color-mix(in srgb, var(--om-foreground) 25%, transparent); }
+
+/* Selection */
+selection { background-color: var(--selection); color: var(--text-strong); }
+
+/* ---- Filter row / shelf ---- */
+.filter-row { padding: 8px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-primary); }
+button.shelf-btn {
+  background: none; border: 1px solid transparent; border-radius: var(--radius);
+  color: var(--text-secondary); padding: 5px 10px; box-shadow: none;
+}
+button.shelf-btn:hover { background-color: var(--fill-2); color: var(--text-primary); }
+button.shelf-btn:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+button.shelf-btn label.shelf-count {
+  font-size: 0.78em; font-weight: 600; padding: 0 6px; border-radius: 999px;
+  background-color: var(--fill-3); color: var(--text-muted);
+}
+button.shelf-btn:checked label.shelf-count { background-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text-strong); }
+.shelf { margin-right: 8px; }
+dropdown.drop > button { background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: var(--radius); color: var(--text-primary); box-shadow: none; padding: 4px 10px; }
+dropdown.drop > button:hover { background-color: var(--fill-3); }
+.linked button.btn:checked { background-color: var(--accent-fill); color: var(--text-strong); }
+
+/* ---- Grid and cards ---- */
+gridview.game-grid { background: none; padding: 8px; }
+gridview.game-grid > child { padding: 0; background: none; }
+gridview.game-grid > child:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
+.game-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+}
+.game-card:hover { background-color: var(--bg-hover); border-color: var(--line-4); }
+.game-card.installed { border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.game-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-fill); }
+.game-card.selected .game-card-title { color: var(--accent); }
+.game-card-art { background-color: var(--bg-secondary); }
+.game-card-art-empty { color: var(--text-muted); font-size: 0.9em; padding: 12px; }
+.game-card-body { padding: 8px 10px 10px 10px; }
+.game-card-title { font-weight: 600; color: var(--text-strong); }
+.game-card-meta { color: var(--text-secondary); font-size: 0.85em; }
+.game-card-action { font-size: 0.85em; margin-top: 2px; }
+.game-card-action.action-installed { color: var(--success); font-weight: 600; }
+.game-card-action.action-download { color: var(--accent); }
+.game-card-action.action-incomplete { color: var(--warning); }
+.game-card-action.action-offline { color: var(--text-muted); }
+.game-card-action.action-downloading { color: var(--info); }
+.game-card-download { background-color: var(--scrim); }
+.game-card-pct { color: var(--text-strong); font-weight: 700; font-size: 1.2em; margin-bottom: 8px; }
+button.fav-btn {
+  background: none; border: none; box-shadow: none; padding: 4px 8px; margin: 4px;
+  color: color-mix(in srgb, var(--om-bright-foreground) 45%, transparent);
+  text-shadow: 0 1px 2px var(--shadow);
+  font-size: 1.1em;
+}
+button.fav-btn:hover { color: var(--text-strong); background-color: var(--scrim); border-radius: 999px; }
+button.fav-btn.is-favorited { color: var(--warning); }
+label.badge {
+  font-size: 0.72em; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+  background-color: var(--fill-3); color: var(--text-secondary);
+}
+label.badge.badge-platform { background-color: var(--accent-fill); color: var(--text-strong); }
+label.badge.badge-lang-installed { background-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--text-strong); }
+label.badge.badge-lang-library { background-color: color-mix(in srgb, var(--warning) 30%, transparent); color: var(--text-strong); }
+
+/* ---- List view ---- */
+.list-header { padding: 6px 14px; border-bottom: 1px solid var(--line-3); color: var(--text-muted); font-size: 0.85em; }
+listview.game-list { background: none; }
+listview.game-list > row { padding: 0; }
+.game-row { padding: 6px 14px; border-bottom: 1px solid var(--line-1); }
+listview.game-list > row:hover .game-row { background-color: var(--fill-2); }
+
+/* ---- Jump bar ---- */
+.jump-bar { padding: 4px 2px; border-left: 1px solid var(--line-2); background-color: var(--bg-primary); }
+button.jump-btn { background: none; border: none; box-shadow: none; padding: 1px 6px; min-height: 0; font-size: 0.8em; color: var(--text-muted); }
+button.jump-btn:hover { color: var(--accent); background-color: var(--fill-2); }
+
+/* ---- Context menus ---- */
+popover.context-menu > contents { background-color: var(--bg-hover); border: 1px solid var(--line-4); border-radius: var(--radius); padding: 4px; box-shadow: 0 8px 24px var(--shadow); }
+button.menu-item { background: none; border: none; box-shadow: none; padding: 6px 12px; color: var(--text-primary); border-radius: 6px; }
+button.menu-item label { }
+button.menu-item:hover { background-color: var(--fill-3); }
+button.menu-item.danger { color: var(--danger); }
+
+/* ---- Detail panel ---- */
+.detail-panel { background-color: var(--bg-secondary); }
+overlaysplitview > sidebar { border-left: 1px solid var(--line-3); }
+.detail-head { padding: 12px 12px 8px 16px; }
+.detail-cover { background-color: var(--bg-primary); border-radius: var(--radius); }
+.detail-actions { margin-top: 4px; }
+.detail-description { line-height: 1.45; }
+.detail-info { margin-top: 6px; }
+button.chip { background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: 999px; padding: 2px 10px; color: var(--text-secondary); box-shadow: none; }
+button.chip:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+button.gallery-btn { padding: 0; border: 1px solid var(--line-3); border-radius: 6px; background: none; box-shadow: none; }
+.gallery-thumb { border-radius: 5px; }
+
+/* ---- My Library: "N installed games are hidden" ---- */
+.hidden-note {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 6px 6px 6px 14px;
+}

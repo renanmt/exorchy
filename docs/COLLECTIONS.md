@@ -1,10 +1,11 @@
-# Collections in Exorchy
+# Collections in eXorchy
 
-Every eXo collection Exodium supports is built into Exorchy. Each one is a row
-in `COLLECTION_MAP` (`src-tauri/src/commands/collections.rs`), its bundled
-files under `metadata/`, `torrents/` and `src-tauri/resources/previews/<col>/`,
-and a manifest entry in `manifest.json`. Only eXoDOS is enabled on a fresh
-install; the rest are switches in Settings → Collections.
+Every eXo collection Exodium supports is built into eXorchy. Each one is a row
+in `COLLECTION_MAP` (`crates/core/src/commands/collections.rs`), its bundled
+files under `metadata/`, `torrents/` and `crates/core/resources/previews/<col>/`,
+its shelf art under `crates/app/assets/collections/<col>.jpg`, and a manifest
+entry in `manifest.json`. eXoDOS, eXoWin3x, eXoWin9x and eXoScummVM are enabled on a fresh install;
+the language packs are switches in Settings → Collections.
 
 ## Enabling and hiding
 
@@ -20,18 +21,45 @@ The `collections` config key (comma list) is the enabled set. It decides:
   `fetch_recently_played`. A disabled language pack therefore contributes no
   chip, no variant and no page; a disabled Win9x pack no card. eXoDOS cannot
   be switched off (`set_enabled_collections` re-inserts it).
-- The set is loaded at startup (`lib.rs`), by `set_config("collections", …)`,
+- The set is loaded at startup (`bootstrap()`), by `set_config("collections", …)`,
   by `setup_fresh` (writes `eXoDOS`) and by `setup_from_local`, which enables
   every pack whose tree exists in the imported eXo folder
   (`collections_present_on_disk`).
 
-Frontend: `src/stores/collections.ts` owns the enabled list; toggling writes
-the key, re-initialises the download managers, reloads cover dirs and packs,
-rescans and refetches. The collection shelf in Browse shows enabled
-collections only and hides itself with a single one.
+UI: Settings → Collections (`crates/app/src/ui/settings.rs`) writes the key,
+re-initialises the download managers, then `bus::notify_collections_changed()`
+makes the library reload cover dirs and packs, rescan and refetch
+(`window::reinit_library()` when the enabled set changed). The collection
+shelf in Browse (`library.rs::load_collections`) shows enabled collections
+only and hides itself with a single one.
+
+### Hidden titles and adult titles
+
+A second per-user filter sits beside `enabled_sql`: `visible_sql(alias, search)`
+(`db::queries`). It drops
+
+- titles in `hidden_games` (the user's hide list, keyed by game id; hiding any
+  row hides its whole shortcode group, unhiding clears the group), except an
+  installed one when the query has a name search, so it stays findable and
+  playable;
+- adult titles while `show_adult` is off, which is the default; installed
+  ones too, and `get_genres` drops the `Adult` genre itself. eXo marks them
+  two ways (`adult_sql`): the LaunchBox age rating `A - Adult` (the
+  `age_rating` column, 136 titles in catalogue 17) and the genre token
+  `Adult` (a few, not always rated). `M - Mature` is not adult.
+
+It applies in `build_where_clause` (Browse, search, favourites, playlists),
+`fetch_installed_games`, `fetch_recently_played`, `search_library` (My
+Library's search: installed games only, hidden ones included) and the music
+shuffle candidates. `show_adult` is mirrored like the enabled set
+(`load_visibility`, called from `load_enabled_collections`).
+`count_hidden_installed` feeds My Library's "N installed games are hidden"
+note. UI: `ui/hidden.rs` (menus, Undo toast, the switch) and Settings →
+Hidden titles; changes go out on `bus::notify_visibility_changed()`. The
+collection chips' game counts are catalogue totals and still include them.
 
 Exodium appended newly shipped packs to the key on every catalogue refresh
-(`enable_new_collections`). Exorchy does not: a new pack must never switch
+(`enable_new_collections`). eXorchy does not: a new pack must never switch
 itself on.
 
 ## Per-collection notes (what differs from DOS)
@@ -40,12 +68,13 @@ itself on.
 |---|---|---|---|---|---|
 | launcher | `Launcher::DosBox` → `launchers/dosbox.rs` | `DosBox` (same pipeline, plus `[ide]` translation) | `Launcher::Win9x` → `commands/win9x.rs` | `Launcher::ScummVm` → `commands/scummvm.rs` | not a collection: `commands/reading.rs`, disk magazines run under DOSBox Staging |
 | emulator | DOSBox Staging pack or system binary (`emulators.rs`) | same | DOSBox-X / 86Box: PATH (with `cap_net_raw` preferred for DOSBox-X), else emulator packs `dosbox-x` / `86box` (Linux AppImages from the manifest), else Flatpak | per-version ScummVM packs (`scummvm-<v>`), PATH/Flatpak only when no pack exists for this platform | DOSBox Staging |
-| game path | `eXo/eXoDOS[/!lang]/<sc>` | `eXo/eXoWin3x/<sc>` | `eXo/eXoWin9x/<year>/<Title (Year)>` (title dir = shortcode) | `eXo/eXoScummVM/<Title (Platform)>` | `eXo/Magazines/...` |
+| game path | `eXo/eXoDOS[/!lang]/<sc>` | `eXo/eXoWin3x/<sc>` (catalogue spells it `eXoWin3X`; resolved case-insensitively) | `eXo/eXoWin9x/<year>/<Title (Year)>` (title dir = shortcode) | `eXo/eXoScummVM/<Title (Platform)>` | `eXo/Magazines/...` |
 | support payload | `util/util.zip` → `eXo/mt32` (`DOS_SUPPORT`) | same (MT-32 from the DOS pack) | `util/utilWin9x.zip` → parent VHDs + eXo's emulator builds (`WIN9X_SUPPORT`, +8 GiB preflight) | `util/utilSVM.zip` → MT-32 (`SCUMMVM_SUPPORT`) | none |
 | conf translation | host paths, MIDI keys, `[ide]` | same | `play.conf` verbatim plus host paths and zip-mount extraction (`<x>.exorchy_mount/`) | none (command line from `scummvm.txt`) | `run.bat` from a template |
 | saves | game dir, `!save/<sc>` backups | same | on the game's own VHD (D:) | `<game>/!saves` | n/a |
 | settings keys | `glshader`, `fullscreen`, `cycles`, `custom_conf` | same | `fullscreen`, `custom_conf` | `svm_*`, `fullscreen` | n/a |
 | variant index | `dosbox.txt` | `dosbox3x.txt` | `dosbox9x.txt` (launcher slug: x98 / 86box / 86boxME / NetHost / NetJoin / pcbox) | `dosboxsvm.txt` (build) | n/a |
+| Tier 0 covers | `previews/eXoDOS` | `previews/eXoWin3x` | `previews/eXoWin9x` | `previews/eXoScummVM` | `previews/eXoMedia` (`covers::MEDIA_SOURCE`) |
 
 The dispatch is `launchers::prepare(kind, ctx)`: DOSBox hands the spine a
 command to spawn; the Win9x and ScummVM launchers (ported whole from Exodium)
@@ -59,19 +88,27 @@ Settings → Network carries the switch. The Media Pack's magazines, books and
 catalogues live in their own torrent (`eXoDOS Media Pack.torrent`) and join
 the shared session on first use (`media_sources.rs`).
 
+In the UI nothing keys on a collection id: the detail panel asks
+`ui/util.rs::platform_tag` / `collection_label` and the launch notes module
+for what to show, and those read the row's `platform` / `torrent_source`
+through the same helpers the web UI used.
+
 ## Adding a collection eXo publishes later
 
 1. `CollectionDef` row (id, display name, files, `game_prefix`,
    `shortcode_segment`, `lang_dir` / `year_subdirs`, platform, launcher kind).
 2. Bundled files: `<name>.xml.gz`, `<name>_configs.zip`, variant index,
-   `.torrent`, Tier 0 previews, manifest entry. Exodium's
-   `scripts/gen_win3x_assets.py` / `gen_win9x_assets.py` /
+   `.torrent`, Tier 0 previews under `crates/core/resources/previews/<col>/`,
+   shelf art under `crates/app/assets/collections/`, manifest entry.
+   Exodium's `scripts/gen_win3x_assets.py` / `gen_win9x_assets.py` /
    `gen_scummvm_assets.py` show how each was derived from the torrent's own
    metadata zip.
-3. A `(index_file, family)` pair in `examples/generate_db.rs`; raise
-   `db::CATALOG_VERSION`; `pnpm gen-db`.
+3. A `(index_file, family)` pair in `crates/core/examples/generate_db.rs`;
+   raise `db::CATALOG_VERSION`;
+   `cargo run -p exorchy-core --release --example generate_db && gzip -kf metadata/exorchy.db`.
 4. A new emulator: a `launchers/<kind>.rs`, a `Launcher` variant, one match arm
    in `launchers::prepare`, a `SupportPack` if it has a util zip, resolvers in
    `emulators.rs` and emulator packs in the manifest.
-5. Frontend: a label/hint in the Settings → Collections list and, if the
-   panel needs it, a `launchNotes.ts` arm.
+5. UI: a label/hint in the Settings → Collections list
+   (`ui/settings.rs`), the shelf art, and, if the panel needs it, an arm in
+   `ui/launch_notes.rs`.
