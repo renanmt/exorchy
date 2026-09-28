@@ -39,6 +39,9 @@ struct XmlGame {
     play_mode: Option<String>,
     #[serde(default)]
     community_star_rating: Option<String>,
+    /// The age rating (`<Rating>`), not the star rating.
+    #[serde(default)]
+    rating: Option<String>,
     #[serde(default)]
     community_star_rating_total_votes: Option<String>,
     #[serde(default)]
@@ -210,6 +213,7 @@ fn xml_game_to_game(x: XmlGame, shortcode_segment: &str) -> Game {
         favorited: false,
         thumbnail_key: None, // populated by generate_db from normalized title
         music_file,
+        age_rating: blank_to_none(x.rating),
         requires_base: false,
         installed_with: None,
         manual_path: blank_to_none(x.manual_path),

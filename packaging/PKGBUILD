@@ -55,8 +55,6 @@ package() {
     install -Dm644 "packaging/icons/${s}x${s}.png" \
       "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/exorchy.png"
   done
-  install -Dm644 crates/app/assets/exorchy.svg \
-    "$pkgdir/usr/share/icons/hicolor/scalable/apps/exorchy.svg"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 ACKNOWLEDGEMENTS.md "$pkgdir/usr/share/doc/$pkgname/ACKNOWLEDGEMENTS.md"
 }

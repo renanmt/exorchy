@@ -22,6 +22,10 @@ use crate::ui::model::GameObject;
 use crate::ui::util::{esc, format_bytes};
 use crate::ui::{bus, covers, downloads};
 
+/// How long typing must pause before the search runs, on top of the search
+/// entry's own `search-delay` (100 ms): about 0.4 s after the last key.
+const SEARCH_PAUSE: Duration = Duration::from_millis(300);
+
 const PER_PAGE: usize = 100;
 
 pub const SORT_OPTIONS: [(&str, &str); 6] = [
@@ -44,6 +48,11 @@ struct Filters {
     has_more: bool,
     loading: bool,
     epoch: u64,
+    /// Bumped per keystroke; only the search after a pause runs.
+    search_epoch: u64,
+    /// The query Browse's grid was last fetched with, so a tab switch
+    /// catches it up only when the search changed meanwhile.
+    browse_query: String,
     total: usize,
     /// A refresh was asked for while a page fetch was in flight; it runs
     /// when that fetch lands instead of being dropped.
@@ -81,8 +90,10 @@ pub struct LibraryPage {
     detail: Rc<DetailPanel>,
     shelves: gtk::Box,
     reading_slot: gtk::Box,
-    /// `activity` shows the session's transfer rates.
+    /// `activity` shows the session's transfer rates, inside
+    /// `activity_button` (opens the Transfers page).
     pub activity: gtk::Label,
+    pub activity_button: gtk::Button,
     pub settings_button: gtk::Button,
     pub bar_slot: gtk::Box,
     pub toolbar_slot: gtk::Box,
@@ -97,31 +108,41 @@ impl LibraryPage {
         let detail = DetailPanel::new(window);
 
         // ── toolbar ──
-        // The toolbar wraps like the filter row: its minimum width is one
-        // control, so the page fits any Hyprland tile.
-        let toolbar = adw::WrapBox::builder().child_spacing(8).line_spacing(6).align(0.5).css_classes(["toolbar"]).build();
-        let brand = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(0).css_classes(["brand"]).build();
-        brand.append(&gtk::Label::new(Some("e")));
-        brand.append(&gtk::Label::builder().label("X").css_classes(["x"]).build());
-        brand.append(&gtk::Label::new(Some("orchy")));
-        toolbar.append(&brand);
-        let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).margin_start(12).build();
+        // Two groups: the wordmark and tabs, then search, the connection
+        // badge, feature controls and the gear. Side by side when there is
+        // room; in a narrow tile they stack (the `tiny` breakpoint), so the
+        // logo stays and the tools keep together on their own line.
+        let toolbar = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["toolbar"]).build();
+        let head = adw::WrapBox::builder().child_spacing(12).line_spacing(6).align(0.5).build();
+        let brand = crate::ui::logo::ascii(1.5);
+        brand.add_css_class("brand");
+        head.append(&brand);
+        let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).build();
         let mut tab_buttons = Vec::new();
         for (id, label) in [("browse", "Browse"), ("library", "My Library"), ("reading", "Reading Room")] {
             let b = gtk::Button::builder().label(label).css_classes(["tab"]).build();
             tabs.append(&b);
             tab_buttons.push((id.to_string(), b));
         }
-        toolbar.append(&tabs);
-        let search = gtk::SearchEntry::builder().placeholder_text("Search games…  (/)").css_classes(["search"]).hexpand(true).build();
-        toolbar.append(&search);
-        let activity = gtk::Label::builder().css_classes(["activity", "muted", "small"]).build();
-        toolbar.append(&activity);
+        head.append(&tabs);
+        toolbar.append(&head);
+        let tools = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).hexpand(true).build();
+        let search = gtk::SearchEntry::builder().placeholder_text("Search games…  (/)").search_delay(100).css_classes(["search"]).hexpand(true).build();
+        tools.append(&search);
+        // The connection badge: an icon always, the rates when there is
+        // traffic; a click opens the Transfers page.
+        let activity = gtk::Label::builder().ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["activity", "small"]).build();
+        let activity_inner = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
+        activity_inner.append(&gtk::Image::from_icon_name("network-transmit-receive-symbolic"));
+        activity_inner.append(&activity);
+        let activity_button = gtk::Button::builder().child(&activity_inner).css_classes(["btn", "ghost", "activity-btn"]).tooltip_text("Transfers").build();
+        tools.append(&activity_button);
         // Feature modules (music button, ...) mount their toolbar controls here.
         let toolbar_slot = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
-        toolbar.append(&toolbar_slot);
+        tools.append(&toolbar_slot);
         let settings_button = gtk::Button::builder().icon_name("emblem-system-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Settings (Ctrl+,)").build();
-        toolbar.append(&settings_button);
+        tools.append(&settings_button);
+        toolbar.append(&tools);
 
         // ── filter row: wraps onto more lines in a narrow tile ──
         let filter_row = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row"]).build();
@@ -227,6 +248,14 @@ impl LibraryPage {
                 detail.close();
             }
         }));
+        // Switching between beside and over (a resize across the breakpoint),
+        // the split view restores its own `show-sidebar`: widening a tile
+        // then showed an empty panel. The panel is shown only while a game is
+        // open; idle, so it wins over the split view's own change.
+        split.connect_collapsed_notify(glib::clone!(#[weak] detail, move |s| {
+            let s = s.clone();
+            glib::idle_add_local_once(move || s.set_show_sidebar(detail.is_open()));
+        }));
 
         // The now-playing bar (ui::media) mounts under the content.
         let bar_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
@@ -236,15 +265,15 @@ impl LibraryPage {
         column.append(&bar_slot);
 
         // Breakpoints: a narrow tile collapses the panel into an overlay and
-        // drops the brand; the layout never demands more than 360×300.
+        // stacks the toolbar; the layout never demands more than 360×300.
         let widget = adw::BreakpointBin::builder().width_request(360).height_request(300).child(&column).build();
         let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1100.0, adw::LengthUnit::Sp));
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
         widget.add_breakpoint(narrow);
         let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
-        tiny.add_setter(&brand, "visible", Some(&false.to_value()));
-        tiny.add_setter(&tabs, "margin-start", Some(&0i32.to_value()));
+        tiny.add_setter(&toolbar, "orientation", Some(&gtk::Orientation::Vertical.to_value()));
+        tiny.add_setter(&toolbar, "spacing", Some(&8i32.to_value()));
         widget.add_breakpoint(tiny);
 
         let page = Rc::new(LibraryPage {
@@ -272,6 +301,7 @@ impl LibraryPage {
             shelves,
             reading_slot,
             activity,
+            activity_button,
             settings_button,
             bar_slot,
             toolbar_slot,
@@ -361,12 +391,21 @@ impl LibraryPage {
             let id = id.clone();
             b.connect_clicked(glib::clone!(#[weak(rename_to = page)] self, move |_| page.set_tab(&id)));
         }
-        // Search (GTK debounces search-changed ~150 ms; a second beat keeps typing cheap).
+        // Search: one run after a pause in typing, on the tab in view; the
+        // other tabs catch up when shown (`set_tab`).
         self.search.connect_search_changed(glib::clone!(#[weak(rename_to = page)] self, move |e| {
             let q = e.text().to_string();
-            crate::ui::reading::set_query(&q);
-            page.filters.borrow_mut().query = q;
-            page.debounced_fetch();
+            let epoch = {
+                let mut f = page.filters.borrow_mut();
+                f.query = q;
+                f.search_epoch += 1;
+                f.search_epoch
+            };
+            glib::timeout_add_local_once(SEARCH_PAUSE, glib::clone!(#[weak] page, move || {
+                if page.filters.borrow().search_epoch == epoch {
+                    page.apply_search();
+                }
+            }));
         }));
         self.search.connect_stop_search(glib::clone!(#[weak(rename_to = page)] self, move |e| {
             e.set_text("");
@@ -446,6 +485,14 @@ impl LibraryPage {
         bus::on_collections_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.load_collections();
         }));
+        // A title hidden or unhidden, adult titles switched, Recently played
+        // trimmed: every list re-reads, the genre list too (Adult comes and goes).
+        bus::on_visibility_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
+            page.fetch();
+            page.load_genres();
+            page.refresh_shelves();
+            page.detail.refresh_actions();
+        }));
         bus::on_playlists_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.load_playlists();
             page.refresh_shelves();
@@ -485,8 +532,19 @@ impl LibraryPage {
                 b.remove_css_class("active");
             }
         }
-        if id == "library" {
-            self.refresh_shelves();
+        // Each tab catches up with a search typed while it was not shown.
+        match id {
+            "library" => self.refresh_shelves(),
+            "reading" => crate::ui::reading::set_query(&self.filters.borrow().query.clone()),
+            _ => {
+                let stale = {
+                    let f = self.filters.borrow();
+                    f.browse_query != f.query
+                };
+                if stale {
+                    self.fetch();
+                }
+            }
         }
     }
 
@@ -651,23 +709,20 @@ impl LibraryPage {
         (f.query.clone(), f.genre.clone(), f.sort_by.clone(), f.collection.clone(), f.playlist)
     }
 
-    fn debounced_fetch(self: &Rc<Self>) {
-        let epoch = {
-            let mut f = self.filters.borrow_mut();
-            f.epoch += 1;
-            f.epoch
-        };
-        glib::timeout_add_local_once(Duration::from_millis(220), glib::clone!(#[weak(rename_to = page)] self, move || {
-            if page.filters.borrow().epoch == epoch {
-                page.fetch();
-            }
-        }));
+    /// Run the current search on the tab in view.
+    fn apply_search(self: &Rc<Self>) {
+        match self.tab_stack.visible_child_name().as_deref() {
+            Some("library") => self.refresh_shelves(),
+            Some("reading") => crate::ui::reading::set_query(&self.filters.borrow().query.clone()),
+            _ => self.fetch(),
+        }
     }
 
     /// First page; resets the list and the section keys.
     pub fn fetch(self: &Rc<Self>) {
         let epoch = {
             let mut f = self.filters.borrow_mut();
+            f.browse_query = f.query.clone();
             f.epoch += 1;
             f.loading = true;
             f.page = 1;
@@ -926,6 +981,11 @@ impl LibraryPage {
         if self.tab_stack.visible_child_name().as_deref() != Some("library") {
             return;
         }
+        let query = self.filters.borrow().query.trim().to_string();
+        if !query.is_empty() {
+            self.show_library_search(query);
+            return;
+        }
         let core = app::core();
         app::spawn(
             async move {
@@ -935,6 +995,7 @@ impl LibraryPage {
                     .await
                     .map(|l| l.games)
                     .unwrap_or_default();
+                let hidden_installed = games::count_hidden_installed(core.state()).await.unwrap_or(0);
                 let lists = playlists::get_playlists(core.state()).await.unwrap_or_default();
                 let mut playlist_games = Vec::new();
                 for p in lists.into_iter().filter(|p| p.kind == "user") {
@@ -944,9 +1005,9 @@ impl LibraryPage {
                         .unwrap_or_default();
                     playlist_games.push((p.name, g));
                 }
-                (recent, installed, favorites, playlist_games)
+                (recent, installed, favorites, playlist_games, hidden_installed)
             },
-            glib::clone!(#[weak(rename_to = page)] self, move |(recent, installed, favorites, lists)| {
+            glib::clone!(#[weak(rename_to = page)] self, move |(recent, installed, favorites, lists, hidden_installed)| {
                 while let Some(c) = page.shelves.first_child() {
                     page.shelves.remove(&c);
                 }
@@ -958,17 +1019,20 @@ impl LibraryPage {
                         }
                     })
                 };
+                if hidden_installed > 0 {
+                    page.shelves.append(&hidden_note(&page.window, hidden_installed));
+                }
                 let mut any = false;
                 for (title, list) in [("Recently played", recent), ("Installed", installed), ("Favorites", favorites)] {
                     if !list.is_empty() {
                         any = true;
-                        page.shelves.append(&shelf(title, &list, on_detail.clone()));
+                        page.shelves.append(&shelf(title, &list, on_detail.clone(), title == "Recently played"));
                     }
                 }
                 for (name, list) in lists {
                     if !list.is_empty() {
                         any = true;
-                        page.shelves.append(&shelf(&format!("Playlist · {name}"), &list, on_detail.clone()));
+                        page.shelves.append(&shelf(&format!("Playlist · {name}"), &list, on_detail.clone(), false));
                     }
                 }
                 if !any {
@@ -977,6 +1041,42 @@ impl LibraryPage {
                     empty.append(&gtk::Label::builder().label("Download a game from Browse and it shows up here.").css_classes(["muted"]).build());
                     page.shelves.append(&empty);
                 }
+            }),
+        );
+    }
+
+    /// My Library while the search box has text: one shelf of the installed
+    /// games matching it (hidden ones included, so they stay playable).
+    fn show_library_search(self: &Rc<Self>, query: String) {
+        let core = app::core();
+        let q = query.clone();
+        app::spawn(
+            async move { games::search_library(core.state(), q).await.unwrap_or_default() },
+            glib::clone!(#[weak(rename_to = page)] self, move |found| {
+                // A later keystroke already asked for another search.
+                if page.filters.borrow().query.trim() != query {
+                    return;
+                }
+                while let Some(c) = page.shelves.first_child() {
+                    page.shelves.remove(&c);
+                }
+                if found.is_empty() {
+                    let empty = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).halign(gtk::Align::Center).margin_top(80).build();
+                    empty.append(&gtk::Label::builder().label(format!("No installed game matches “{query}”")).css_classes(["title-3"]).build());
+                    empty.append(&gtk::Label::builder().label("Browse searches the whole catalogue.").css_classes(["muted"]).build());
+                    page.shelves.append(&empty);
+                    return;
+                }
+                let on_detail: Rc<dyn Fn(Game)> = {
+                    let p = Rc::downgrade(&page);
+                    Rc::new(move |g| {
+                        if let Some(p) = p.upgrade() {
+                            p.detail.show(g);
+                        }
+                    })
+                };
+                let title = format!("Installed · {}", found.len());
+                page.shelves.append(&shelf(&title, &found, on_detail, false));
             }),
         );
     }
@@ -1032,7 +1132,19 @@ fn refresh_cards_for(id: i64) {
     });
 }
 
-fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>) -> gtk::Box {
+/// "N installed games are hidden", with the way to them.
+fn hidden_note(window: &gtk::Window, n: usize) -> gtk::Box {
+    let b = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["hidden-note"]).build();
+    let text = if n == 1 { "1 installed game is hidden".to_string() } else { format!("{n} installed games are hidden") };
+    b.append(&gtk::Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["muted"]).build());
+    let manage = gtk::Button::builder().label("Manage").css_classes(["btn", "ghost"]).build();
+    let w = window.clone();
+    manage.connect_clicked(move |_| crate::ui::settings::open(&w, "hidden"));
+    b.append(&manage);
+    b
+}
+
+fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>, recent: bool) -> gtk::Box {
     let b = gtk::Box::new(gtk::Orientation::Vertical, 8);
     let head = gtk::Label::builder().label(title).xalign(0.0).css_classes(["title-3"]).build();
     b.append(&head);
@@ -1047,6 +1159,7 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>) -> gtk::Box {
         .build();
     for g in list {
         let card = Card::new(on_detail.clone());
+        card.set_in_recent(recent);
         card.bind(g);
         card.widget.set_size_request(CARD_WIDTH, -1);
         card.widget.set_halign(gtk::Align::Start);
@@ -1159,6 +1272,7 @@ mod tests {
             manual_path: None,
             last_played: None,
             music_file: None,
+            age_rating: None,
             requires_base: false,
             installed_with: None,
         }

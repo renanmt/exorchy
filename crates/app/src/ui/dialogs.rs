@@ -11,6 +11,17 @@ pub fn pick_folder(parent: &impl IsA<gtk::Window>, title: &str, done: impl FnOnc
     });
 }
 
+/// Ask for an image file. `done(None)` on cancel.
+pub fn pick_image(parent: &impl IsA<gtk::Window>, title: &str, done: impl FnOnce(Option<std::path::PathBuf>) + 'static) {
+    let filter = gtk::FileFilter::new();
+    filter.set_name(Some("Images"));
+    filter.add_mime_type("image/*");
+    let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&filter);
+    let dialog = gtk::FileDialog::builder().title(title).modal(true).filters(&filters).default_filter(&filter).build();
+    dialog.open(Some(parent), gtk::gio::Cancellable::NONE, move |res| done(res.ok().and_then(|f| f.path())));
+}
+
 /// A yes/no question. `on_yes` runs only on the confirming response.
 pub fn confirm(
     parent: &impl IsA<gtk::Widget>,

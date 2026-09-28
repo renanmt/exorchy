@@ -282,6 +282,11 @@ impl DetailPanel {
         }));
     }
 
+    /// Rebuild the action bar (its menu reads state such as hidden titles).
+    pub fn refresh_actions(self: &Rc<Self>) {
+        self.render_actions();
+    }
+
     pub fn refresh_download(self: &Rc<Self>, id: i64) {
         let mine = self.variants.borrow().iter().any(|v| v.id == Some(id));
         if mine {
@@ -604,6 +609,14 @@ impl DetailPanel {
                 add("Game settings…", false, Box::new(move || actions::game_settings(&w, &r)));
                 let (w, r, s) = (self.window.clone(), row.clone(), status.clone());
                 add("↺ Reset game data", true, Box::new(move || actions::reset(&w, &r, s.clone())));
+            }
+            {
+                let title = game.title.clone();
+                if crate::ui::hidden::is_hidden(id) {
+                    add("Unhide title", false, Box::new(move || crate::ui::hidden::unhide(id, &title)));
+                } else {
+                    add("Hide title", false, Box::new(move || crate::ui::hidden::hide(id, &title)));
+                }
             }
             let (w, r, s) = (self.window.clone(), row.clone(), status.clone());
             add("Uninstall", true, Box::new(move || actions::uninstall_group(&w, &r, s.clone())));

@@ -314,3 +314,124 @@ path survived untouched and DOSBox Staging on ext4 found neither the drive nor t
 (2026-09-27, above) fixed the same mismatch for the conf file's own path; `patch_dosbox_conf`
 and `rewrite_bat_host_paths` now fall back to `resolve_rel_ignoring_case` and write the on-disk
 spelling. Windows DOSBox never saw this because NTFS is case-insensitive.
+
+## 2026-09-28 - New key art, icon and an ASCII wordmark drawn in theme colours
+
+The user supplied new artwork in `media/` (splash, icon, logo PNG and `logo.txt`). The splash
+is `media/splash.png` re-encoded as `assets/splash.jpg`. The icon is `media/icon.png` with the
+black surround outside its rounded frame made transparent (flood fill from the corners), cut
+square and scaled to the `packaging/icons` sizes and `assets/exorchy.png` (256 px, the runtime
+copy). The old SVG is gone: a scalable icon would win the hicolor lookup over the new raster
+ones, so `install-dev.sh` deletes one a previous install left behind. The toolbar brand and the
+About header use `logo.txt` instead of the logo PNG, because the PNG's colours are fixed and the
+text art can follow the Omarchy palette: it is drawn as rectangles rather than typeset, since
+glyph metrics and line height would open gaps between the half blocks.
+
+
+## 2026-09-28 - About names the author; Thomas's credit row carries the invitation to support him
+
+Settings → About gains an Author row (Renan Tonheiro). Thomas Vollstädt's credit stays in
+About, as the hard rule requires: the Exodium row credits him as its creator and invites the
+user to visit his GitHub page, both to support his work and to get Exodium on other operating
+systems (eXorchy is Linux/Omarchy only). That row replaces the separate "Support Thomas" row
+(GitHub Sponsors, Ko-fi), which duplicated its link; README and ACKNOWLEDGEMENTS.md keep the
+sponsor links. The eXoDOS credit is unchanged.
+
+## 2026-09-28 - Settings stacks its rows in a narrow tile
+
+In a ~520 px Hyprland tile the Settings dialog is ~460 px wide, but its minimum was 509-581 px
+(190 px sidebar, a 170 px label column per row, button groups and the Storage breakdown lines
+that could not shrink), so the right edge was clipped and hints wrapped a character per line. A
+720 sp breakpoint on the dialog now turns the sidebar into icons (names in tooltips) and stacks
+every row: label, then value and hint, then the action, which is a `WrapBox`. Widgets opt in with
+`widgets::follow_narrow`; the state is per dialog (`begin_dialog`) because a closing dialog's
+breakpoint unapplies after the next one has opened.
+
+## 2026-09-28 - Settings is a page in place of the library, not a dialog
+
+The Settings dialog fought the tiling window manager: in a tile it was narrower than the window
+and clipped, and a floating sheet inside a tiled window is the pattern Omarchy avoids anyway. It
+is now a full-body page in the window's stack (`window::show_page` / `close_page`), opened from
+the gear button or Ctrl+,, closed with the back arrow or Esc; the library stays in the stack
+underneath, so filters, scroll position and the detail panel survive. Not a fourth tab: Settings
+is not browsed, and the tab row stays short in narrow tiles. Inside, an `AdwNavigationSplitView`
+shows the section list beside the section, collapsing below 720 sp to list → section with back
+arrows; this replaces the icon-only sidebar of the entry above, while rows still stack when
+narrow. The page is built on open and dropped on close, as the dialog was, so the pages' timers
+keep their "while Settings is open" lifetime (`Ctx::is_alive`, also cleared on unrealize).
+Confirmations stay `adw::AlertDialog`s. Content is clamped to 960 px so a full-screen page does
+not stretch rows across a wide monitor.
+
+## 2026-09-28 - The toolbar stacks in a narrow tile instead of dropping the logo
+
+Below 760 sp the toolbar used to hide the wordmark and wrap control by control, which left the
+gear alone on a line. It is now two groups, wordmark + tabs and search + connection badge +
+feature controls + gear, side by side when there is room and stacked (one `orientation`
+setter) in a narrow tile; the tabs wrap under the wordmark in the narrowest tiles. The
+connection badge became a button with an icon, visible when idle, that opens Transfers.
+
+## 2026-09-28 - Transfers page, and a per-torrent listing in the backend
+
+The badge only had session totals. `DownloadManager::session_torrents` reads librqbit's
+`ManagedTorrent::stats()` for every torrent in the shared session (rates, live peers, uploaded,
+progress of the selected files) and `games::get_session_torrents` labels each with the
+collection whose manager owns it; `stats()` runs on `spawn_blocking`. It copies each torrent's
+file-progress vector, so it is polled only while the page is open (1 s). There is no download
+queue to show for games (selected files all download at once), so "Queued" lists what really
+waits: preview and theme fetches beyond the three media slots. The page is a full-body page
+like Settings, reusing `window::show_page`. Rows are named from the bundled `.torrent` they came
+from (every eXoDOS torrent, the Media Pack too, is called "eXoDOS" inside), and each torrent's
+rates are derived from its uploaded / on-disk byte counters between polls: librqbit's
+per-torrent speed estimates read zero while the session total moves.
+
+## 2026-09-28 - Hidden titles and the adult filter are a query predicate, not a UI filter
+
+Hiding had to reach every list (Browse, search, shelves, genres, music shuffle) and counts, so
+it is `visible_sql` beside `enabled_sql` in `db::queries`, not a filter over fetched pages
+(which would break paging and section keys). Hidden titles live in a `hidden_games` table keyed
+by game id (catalog refreshes update rows in place and keep ids, like playlists); a hide covers
+the shortcode group. A hidden installed title still matches a name search so it can be played,
+as asked. Adult titles are eXo's `Adult` genre token; they are off by default, hidden even when
+installed, and their genre is not offered. My Library says how many installed games are
+hidden, with a link to Settings → Hidden titles. "Remove from Recently played" clears
+`last_played` for the whole group, or another variant would take the card's place.
+
+## 2026-09-28 - Adult means eXo's age rating "A - Adult" or the Adult genre (catalogue 17)
+
+The Adult genre tags only 23 titles, all eXoWin3x, while eXo's LaunchBox `<Rating>` rates 133
+more "A - Adult" (DOS, ScummVM, Win3x, Win9x) whose genres say nothing, so adult titles kept
+showing with the filter off. The importer now keeps `<Rating>` as `age_rating` (catalogue 17,
+new column migrated in place, refreshed at startup) and `adult_sql` checks either marker.
+"M - Mature" (violence, e.g. Doom) stays visible. `age_rating` is compared through `COALESCE`:
+a bare `= 'A - Adult'` is NULL for unrated rows and `NOT adult` would hide them all.
+
+## 2026-09-28 - The search box searches the tab it is on
+
+In My Library the shared search box used to refetch Browse, which is not on screen. There it now
+replaces the shelves with one "Installed" shelf from `search_library`: installed games whose
+title (any variant) matches, hidden ones included so they stay findable and playable. Not
+favourites or playlists: membership in eXo's curated playlists would pull in thousands of
+games that are not on disk. Browse and the Reading Room keep their own search. The search runs once typing pauses (entry `search-delay` 100 ms plus
+`SEARCH_PAUSE` 300 ms) and only on the tab in view; Browse and the Reading Room catch up in
+`set_tab` when shown (Browse only if its last fetch used another query). Before, every keystroke
+refetched Browse, refiltered the Reading Room and searched the shelves, all at once.
+
+## 2026-09-28 - Start tab and a user background image
+
+Settings → General → "Open in My Library" stores `start_tab` (`library` / `browse`); the
+library reads it first thing in its startup sequence so Browse does not flash. Settings →
+Appearance takes a background image: the file is copied into the data folder under a new name
+per choice (moving the original cannot lose it, and GTK's texture cache cannot serve the old
+one), shown by a `gtk::Picture` under the page stack at the chosen opacity over the theme's
+background colour. Only the full-width surfaces (toolbar, filter row, Settings, Transfers) turn
+translucent, through a `has-backdrop` window class; cards, panels, entries and dialogs stay
+solid so text keeps its contrast. The overlay measures the pages, not the picture, so a large
+image never forces the window's size.
+
+## 2026-09-28 - The detail panel's visibility is re-applied when the split view (un)collapses
+
+`AdwOverlaySplitView` restores its own `show-sidebar` when it crosses the 1100 sp breakpoint, so
+a window started in a narrow tile and then maximised showed an empty detail panel. On every
+`collapsed` change the library sets `show-sidebar` to "a game is open", on idle so it lands
+after the split view's own change.
+

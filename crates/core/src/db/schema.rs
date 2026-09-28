@@ -41,7 +41,8 @@ pub fn create_tables(conn: &Connection) -> DbResult<()> {
             manual_path           TEXT,
             last_played           TEXT,
             rating_votes          INTEGER,
-            music_file            TEXT
+            music_file            TEXT,
+            age_rating            TEXT
         );
 
         CREATE TABLE IF NOT EXISTS playlists (
@@ -140,6 +141,13 @@ pub fn create_tables(conn: &Connection) -> DbResult<()> {
             -- under two kinds for a handful of games (Hints and Review on the
             -- same page), and without it one of the two is dropped.
             PRIMARY KEY (shortcode, entry_path, page, kind)
+        );
+
+        -- Titles the user hid (Settings → Hidden titles). Keyed by game id,
+        -- which catalog refreshes keep; hiding any row hides its whole group.
+        CREATE TABLE IF NOT EXISTS hidden_games (
+            game_id   INTEGER PRIMARY KEY,
+            hidden_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
         -- Per-user reading state. Keyed by issues.key so it survives the

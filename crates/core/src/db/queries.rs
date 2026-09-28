@@ -10,7 +10,7 @@ const GAME_COLUMNS: &str =
      status, region, max_players, language, shortcode, torrent_source,
      in_library, installed, game_torrent_index, gamedata_torrent_index, download_size,
      has_thumbnail, dosbox_variant, favorited, thumbnail_key, manual_path, last_played,
-     rating_votes, music_file";
+     rating_votes, music_file, age_rating";
 
 fn row_to_game(row: &Row) -> rusqlite::Result<Game> {
     Ok(Game {
@@ -52,6 +52,7 @@ fn row_to_game(row: &Row) -> rusqlite::Result<Game> {
         last_played: row.get(33)?,
         rating_votes: row.get(34)?,
         music_file: row.get(35)?,
+        age_rating: row.get(36)?,
         requires_base: false,
         installed_with: None,
     })
@@ -72,13 +73,13 @@ pub fn insert_games(conn: &Connection, games: &[Game]) -> DbResult<usize> {
             release_date, year, genre, series, play_mode,
             rating, description, notes, source, application_path,
             dosbox_conf, status, region, max_players, language, shortcode,
-            manual_path, rating_votes, music_file
+            manual_path, rating_votes, music_file, age_rating
         ) VALUES (
             ?1, ?2, ?3, ?4, ?5,
             ?6, ?7, ?8, ?9, ?10,
             ?11, ?12, ?13, ?14, ?15,
             ?16, ?17, ?18, ?19, ?20, ?21,
-            ?22, ?23, ?24
+            ?22, ?23, ?24, ?25
         )",
     )?;
 
@@ -109,6 +110,7 @@ pub fn insert_games(conn: &Connection, games: &[Game]) -> DbResult<usize> {
             game.manual_path,
             game.rating_votes,
             game.music_file,
+            game.age_rating,
         ])?;
         count += 1;
     }
@@ -184,7 +186,8 @@ pub fn set_enabled_collections(ids: &[String]) {
     }
 }
 
-/// Load the enabled set from the `collections` config key (unset = eXoDOS).
+/// Load the enabled set from the `collections` config key (unset = eXoDOS),
+/// and `show_adult` with it.
 /// The enabled set of a fresh install: every game collection, no language pack.
 pub const DEFAULT_COLLECTIONS: &str = "eXoDOS,eXoWin3x,eXoWin9x,eXoScummVM";
 
@@ -192,6 +195,8 @@ pub fn load_enabled_collections(conn: &Connection) {
     let raw = get_config(conn, "collections").ok().flatten().unwrap_or_else(|| DEFAULT_COLLECTIONS.to_string());
     let ids: Vec<String> = raw.split(',').map(|s| s.to_string()).collect();
     set_enabled_collections(&ids);
+    // The other per-user filter every catalogue query applies.
+    load_visibility(conn);
 }
 
 pub fn enabled_collections() -> Option<Vec<String>> {
@@ -212,6 +217,56 @@ pub(crate) fn enabled_sql(alias: &str) -> String {
                 .collect();
             format!("{alias}.torrent_source IN ({})", list.join(","))
         }
+    }
+}
+
+/// Whether adult titles (eXo's genre "Adult") are listed: Settings →
+/// Hidden titles. Mirrored from the `show_adult` config key like the enabled
+/// set; off until loaded, so no query shows them by accident.
+static SHOW_ADULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_show_adult(on: bool) {
+    SHOW_ADULT.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn show_adult() -> bool {
+    SHOW_ADULT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Load `show_adult` (unset = off).
+pub fn load_visibility(conn: &Connection) {
+    set_show_adult(get_config(conn, "show_adult").ok().flatten().as_deref() == Some("1"));
+}
+
+/// SQL predicate: `alias` is an adult title. eXo marks them two ways: the
+/// age rating "A - Adult" (most of them) and the genre token "Adult" (a
+/// few, not always rated). "M - Mature" is not adult.
+pub(crate) fn adult_sql(alias: &str) -> String {
+    format!("(COALESCE({alias}.age_rating, '') = 'A - Adult' OR (';' || COALESCE({alias}.genre, '') || ';') LIKE '%;Adult;%')")
+}
+
+/// SQL predicate: `alias`'s group has a row the user hid.
+fn hidden_sql(alias: &str) -> String {
+    format!(
+        "EXISTS (SELECT 1 FROM hidden_games h JOIN games hg ON hg.id = h.game_id \
+         WHERE hg.id = {alias}.id OR ({alias}.shortcode IS NOT NULL AND {}))",
+        same_group("hg", alias)
+    )
+}
+
+/// SQL predicate: `alias` may be listed. A hidden title never is, except an
+/// installed one found by a name search (`search`), so it stays playable;
+/// adult titles are not while they are switched off, installed or not.
+pub(crate) fn visible_sql(alias: &str, search: bool) -> String {
+    let hidden = if search {
+        format!("(NOT {} OR {alias}.installed = 1)", hidden_sql(alias))
+    } else {
+        format!("NOT {}", hidden_sql(alias))
+    };
+    if show_adult() {
+        hidden
+    } else {
+        format!("{hidden} AND NOT {}", adult_sql(alias))
     }
 }
 
@@ -291,7 +346,7 @@ fn build_where_clause(f: &GameFilter) -> (String, Vec<Box<dyn rusqlite::types::T
     }
 
     // A disabled pack must satisfy no filter and appear in no page.
-    let mut conditions = vec![primary_row_condition(), enabled_sql("g")];
+    let mut conditions = vec![primary_row_condition(), enabled_sql("g"), visible_sql("g", !f.query.is_empty())];
     if !variant_conds.is_empty() {
         variant_conds.push(enabled_sql("v"));
     }
@@ -536,6 +591,10 @@ pub fn get_genres(conn: &Connection, collection: &str) -> DbResult<Vec<String>> 
         .collect();
     genres.sort();
     genres.dedup();
+    // Switched off, the adult category is not even offered.
+    if !show_adult() {
+        genres.retain(|g| g != "Adult");
+    }
     Ok(genres)
 }
 
@@ -615,16 +674,55 @@ pub fn fetch_installed_rows(conn: &Connection) -> DbResult<Vec<Game>> {
     Ok(games)
 }
 
-pub fn fetch_installed_games(conn: &Connection) -> DbResult<Vec<Game>> {
-    let sql = format!(
-        "SELECT {} FROM games g WHERE g.installed = 1 AND {} AND (g.shortcode IS NULL OR g.id = (
+/// `games g WHERE …`: one installed row per group, EN preferred among the
+/// installed variants, in enabled collections; visibility not applied.
+fn installed_groups_from() -> String {
+    format!(
+        "games g WHERE g.installed = 1 AND {} AND (g.shortcode IS NULL OR g.id = (
             SELECT p.id FROM games p WHERE {} AND p.installed = 1 AND {}
-            ORDER BY CASE WHEN p.language = 'EN' THEN 0 ELSE 1 END, p.id LIMIT 1))
-         ORDER BY title, language",
-        GAME_COLUMNS,
+            ORDER BY CASE WHEN p.language = 'EN' THEN 0 ELSE 1 END, p.id LIMIT 1))",
         enabled_sql("g"),
         same_group("p", "g"),
         enabled_sql("p")
+    )
+}
+
+/// My Library's search: installed games whose title, in any variant,
+/// matches `query`. One card per group; a hidden installed game is
+/// included, as in Browse search.
+pub fn search_library(conn: &Connection, query: &str, limit: usize) -> DbResult<Vec<Game>> {
+    let sql = format!(
+        "SELECT {GAME_COLUMNS} FROM games g WHERE {} AND {} AND {} AND EXISTS (
+            SELECT 1 FROM games v WHERE (v.id = g.id OR (g.shortcode IS NOT NULL AND {}))
+            AND v.title LIKE ?1 AND v.installed = 1)
+         ORDER BY {TITLE_ORDER} LIMIT ?2",
+        primary_row_condition(),
+        enabled_sql("g"),
+        visible_sql("g", true),
+        same_group("v", "g"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut games = stmt
+        .query_map(params![format!("%{query}%"), limit as i64], row_to_game)?
+        .collect::<Result<Vec<_>, _>>()?;
+    attach_language_maps(conn, &mut games)?;
+    Ok(games)
+}
+
+/// Installed games the shelves do not list (hidden, or adult while those
+/// are off): the library's "N installed games are hidden" note.
+pub fn count_hidden_installed(conn: &Connection) -> DbResult<usize> {
+    let sql = format!("SELECT COUNT(*) FROM {} AND NOT ({})", installed_groups_from(), visible_sql("g", false));
+    let n: i64 = conn.query_row(&sql, [], |r| r.get(0))?;
+    Ok(n as usize)
+}
+
+pub fn fetch_installed_games(conn: &Connection) -> DbResult<Vec<Game>> {
+    let sql = format!(
+        "SELECT {} FROM {} AND {} ORDER BY title, language",
+        GAME_COLUMNS,
+        installed_groups_from(),
+        visible_sql("g", false)
     );
     let mut stmt = conn.prepare(&sql)?;
     let mut games: Vec<Game> = stmt
@@ -639,12 +737,13 @@ pub fn fetch_installed_games(conn: &Connection) -> DbResult<Vec<Game>> {
 /// recently played row represents the group.
 pub fn fetch_recently_played(conn: &Connection, limit: usize) -> DbResult<Vec<Game>> {
     let sql = format!(
-        "SELECT {} FROM games g WHERE g.last_played IS NOT NULL AND {} AND (g.shortcode IS NULL OR g.id = (
+        "SELECT {} FROM games g WHERE g.last_played IS NOT NULL AND {} AND {} AND (g.shortcode IS NULL OR g.id = (
             SELECT p.id FROM games p WHERE {} AND p.last_played IS NOT NULL AND {}
             ORDER BY p.last_played DESC, p.id LIMIT 1))
          ORDER BY last_played DESC LIMIT ?1",
         GAME_COLUMNS,
         enabled_sql("g"),
+        visible_sql("g", false),
         same_group("p", "g"),
         enabled_sql("p")
     );
@@ -654,6 +753,51 @@ pub fn fetch_recently_played(conn: &Connection, limit: usize) -> DbResult<Vec<Ga
         .collect::<Result<Vec<_>, _>>()?;
     attach_language_maps(conn, &mut games)?;
     Ok(games)
+}
+
+/// SQL: the ids of `?1`'s group (the row itself when it has no shortcode).
+fn group_ids_sql() -> String {
+    format!(
+        "SELECT hg.id FROM games hg, games g WHERE g.id = ?1 AND (hg.id = g.id OR (g.shortcode IS NOT NULL AND {}))",
+        same_group("hg", "g")
+    )
+}
+
+/// Take a game out of Recently played: every variant of its group, or the
+/// next-most-recent variant would take its place.
+pub fn clear_last_played(conn: &Connection, id: i64) -> DbResult<()> {
+    conn.execute(&format!("UPDATE games SET last_played = NULL WHERE id IN ({})", group_ids_sql()), params![id])?;
+    Ok(())
+}
+
+/// Hide a title (its whole group; the id stored is the one given).
+pub fn hide_game(conn: &Connection, id: i64) -> DbResult<()> {
+    conn.execute("INSERT OR IGNORE INTO hidden_games (game_id) VALUES (?1)", params![id])?;
+    Ok(())
+}
+
+/// Unhide a title: whichever rows of its group were hidden.
+pub fn unhide_game(conn: &Connection, id: i64) -> DbResult<()> {
+    conn.execute(&format!("DELETE FROM hidden_games WHERE game_id IN ({})", group_ids_sql()), params![id])?;
+    Ok(())
+}
+
+/// The hidden titles, newest first (Settings → Hidden titles).
+pub fn fetch_hidden_games(conn: &Connection) -> DbResult<Vec<Game>> {
+    let sql = format!(
+        "SELECT {GAME_COLUMNS} FROM games WHERE id IN (SELECT game_id FROM hidden_games) \
+         ORDER BY (SELECT hidden_at FROM hidden_games WHERE game_id = games.id) DESC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let games = stmt.query_map([], row_to_game)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(games)
+}
+
+/// Every row of every hidden group, so a card of any variant knows.
+pub fn hidden_ids(conn: &Connection) -> DbResult<Vec<i64>> {
+    let mut stmt = conn.prepare(&format!("SELECT g.id FROM games g WHERE {}", hidden_sql("g")))?;
+    let ids = stmt.query_map([], |r| r.get(0))?.collect::<Result<Vec<_>, _>>()?;
+    Ok(ids)
 }
 
 /// Set the last_played timestamp for a game to the current time.
@@ -891,6 +1035,64 @@ mod tests {
         assert_eq!(rows[0].available_languages.as_deref(), Some("EN:0,DE:2"));
     }
 
+    /// Hidden titles leave Browse and the shelves (a hidden installed one is
+    /// still found by name); adult titles (genre or age rating) and their genre stay out until
+    /// switched on; Recently played forgets a whole group. One test, because
+    /// `show_adult` is process-wide.
+    #[test]
+    fn hidden_and_adult_titles_leave_the_lists() {
+        let conn = open_test_db();
+        let mut alpha = make_game("Alpha");
+        alpha.shortcode = Some("ALPHA".to_string());
+        let mut alpha_de = make_game("Alpha DE");
+        alpha_de.language = "DE".to_string();
+        alpha_de.shortcode = Some("ALPHA".to_string());
+        let mut casino = make_game("Casino Nights");
+        casino.genre = Some("Adult;Cards / Tiles".to_string());
+        let mut palace = make_game("Pleasure Palace");
+        palace.genre = Some("Action".to_string());
+        palace.age_rating = Some("A - Adult".to_string());
+        let mut doom = make_game("Doom");
+        doom.age_rating = Some("M - Mature".to_string());
+        insert_games(&conn, &[alpha, alpha_de, make_game("Beta"), casino, palace, doom]).unwrap();
+        let id = |t: &str| conn.query_row("SELECT id FROM games WHERE title = ?1", [t], |r| r.get::<_, i64>(0)).unwrap();
+        let titles = |q: &str| {
+            let f = GameFilter { query: q, genre: "", sort_by: "title", collection: "", favorites_only: false, playlist_id: None, with_music: false };
+            fetch_games_filtered(&conn, 1, 50, &f).unwrap().into_iter().map(|g| g.title).collect::<Vec<_>>()
+        };
+
+        assert_eq!(titles(""), ["Alpha", "Beta", "Doom"], "adult titles (genre or age rating) are off by default; Mature is not adult");
+        assert!(!get_genres(&conn, "").unwrap().contains(&"Adult".to_string()));
+
+        hide_game(&conn, id("Alpha DE")).unwrap();
+        assert_eq!(titles(""), ["Beta", "Doom"], "hiding a variant hides the group");
+        assert!(titles("Alpha").is_empty(), "not installed: not found either");
+        conn.execute("UPDATE games SET installed = 1 WHERE title = 'Alpha'", []).unwrap();
+        assert_eq!(titles("Alpha"), ["Alpha"], "installed: found by name");
+        assert!(fetch_installed_games(&conn).unwrap().is_empty());
+        assert_eq!(count_hidden_installed(&conn).unwrap(), 1);
+        let found: Vec<String> = search_library(&conn, "alp", 10).unwrap().into_iter().map(|g| g.title).collect();
+        assert_eq!(found, ["Alpha"], "My Library's search finds the hidden installed game");
+        conn.execute("UPDATE games SET favorited = 1, last_played = datetime('now') WHERE title = 'Beta'", []).unwrap();
+        assert!(search_library(&conn, "beta", 10).unwrap().is_empty(), "favourite or played is not installed");
+        conn.execute("UPDATE games SET favorited = 0, last_played = NULL WHERE title = 'Beta'", []).unwrap();
+        unhide_game(&conn, id("Alpha")).unwrap();
+        assert_eq!(titles(""), ["Alpha", "Beta", "Doom"]);
+        assert_eq!(count_hidden_installed(&conn).unwrap(), 0);
+
+        conn.execute("UPDATE games SET last_played = datetime('now') WHERE shortcode = 'ALPHA'", []).unwrap();
+        assert_eq!(fetch_recently_played(&conn, 10).unwrap().len(), 1);
+        clear_last_played(&conn, id("Alpha")).unwrap();
+        assert!(fetch_recently_played(&conn, 10).unwrap().is_empty(), "the other variant does not step in");
+
+        set_show_adult(true);
+        let with_adult = titles("");
+        let genres = get_genres(&conn, "").unwrap();
+        set_show_adult(false);
+        assert_eq!(with_adult, ["Alpha", "Beta", "Casino Nights", "Doom", "Pleasure Palace"]);
+        assert!(genres.contains(&"Adult".to_string()));
+    }
+
     fn open_test_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         crate::db::init(&conn).unwrap();
@@ -937,6 +1139,7 @@ mod tests {
             manual_path: None,
             last_played: None,
             music_file: None,
+            age_rating: None,
             requires_base: false,
             installed_with: None,
         }

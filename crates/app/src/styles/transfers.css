@@ -1,0 +1,20 @@
+/* transfers: rules for ui/transfers.rs. Tokens only (see theme.rs). */
+.transfers-view { background-color: var(--bg-primary); }
+.transfers-view headerbar.transfers-header {
+  background-color: var(--bg-primary);
+  color: var(--text-strong);
+  box-shadow: none;
+  border-bottom: 1px solid var(--line-2);
+}
+.transfers-summary {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.transfers-rates { font-size: 1.6em; font-weight: 700; color: var(--text-strong); }
+.transfers-heading { color: var(--text-strong); font-weight: 600; text-transform: uppercase; font-size: 0.82em; letter-spacing: 0.06em; }
+list.transfers-list { background-color: var(--bg-card); border: 1px solid var(--line-2); border-radius: var(--radius); }
+list.transfers-list > row.transfer-row { padding: 10px 14px; border-bottom: 1px solid var(--line-1); background: none; }
+list.transfers-list > row.transfer-row:last-child { border-bottom: none; }
+.transfer-title { color: var(--text-primary); font-weight: 500; }

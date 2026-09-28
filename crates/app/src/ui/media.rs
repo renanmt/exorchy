@@ -22,6 +22,9 @@ mod bar;
 mod preview;
 mod store;
 
+/// For the Transfers page: the preview and theme fetches and their kind.
+pub use store::{fetches, Kind};
+
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 

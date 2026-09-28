@@ -764,9 +764,10 @@ pub async fn music_shuffle_candidates(
         let sql = format!(
             "SELECT id, title, torrent_source, thumbnail_key, music_file, gamedata_torrent_index \
              FROM games \
-             WHERE {} \
+             WHERE {} AND {} \
              ORDER BY RANDOM() LIMIT ?1",
-            queries::playable_music_sql("games")
+            queries::playable_music_sql("games"),
+            queries::visible_sql("games", false)
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let rows = stmt

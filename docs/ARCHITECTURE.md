@@ -54,7 +54,7 @@ exorchy/
 │   ├── src/ui/               window, splash, setup, library, card, detail, model, covers, downloads,
 │   │                         actions, bus, dialogs, util + the feature modules (settings, reading,
 │   │                         media, playlists, game_settings, onboarding)
-│   └── assets/               splash.jpg, exorchy.svg, collections/<col>.jpg (shelf art)
+│   └── assets/               splash.jpg, exorchy.png (icon), logo.txt (ASCII wordmark), collections/<col>.jpg
 ├── metadata/                 bundled XML (gz), configs zips, variant indexes, media index, exorchy.db.gz
 ├── torrents/                 every eXo .torrent (DOS packs, Win3x, Win9x, ScummVM, Media Pack)
 ├── manifest.json             content packs + emulator packs per collection
@@ -265,6 +265,12 @@ The splash (`ui/splash.rs`) shows `assets/splash.jpg` on its own dark
 backdrop for at least 1.6 s and until the app knows what to render, then
 fades; it is an overlay inside the window, never a second toplevel.
 
+The wordmark (`ui/logo.rs`) is `assets/logo.txt`, half-block ASCII art, drawn
+as pixel art: one `DrawingArea` per text row, each character two square
+pixels, coloured per row by `styles/logo.css` from the palette tokens. It is
+the library toolbar's brand (1.5 px per pixel) and the About page's header
+(4 px). The sources of the key art, icon and logo live in `media/`.
+
 Keyboard (an `EventControllerKey` on the window): `/` focuses search unless
 an entry has focus, Esc closes the detail panel, Ctrl+, opens Settings;
 arrows, Page Up/Down, Home/End and Enter are GridView's / ListView's own.
@@ -320,7 +326,10 @@ network choice).
 
 | Module | Integration point |
 |---|---|
-| `ui/settings.rs` | `settings::open(parent, section)` from the toolbar button and Ctrl+,; an `adw::PreferencesDialog` with General, Collections, Emulators, Appearance, Storage, Network, Packs, About |
+| `ui/settings.rs` | `settings::open(parent, section)` from the gear button and Ctrl+,: a full-body page in place of the library (`window::show_page`), back arrow or Esc returns. An `adw::NavigationSplitView` of General, Collections, Hidden titles, Emulators, Appearance, Storage, Network, Packs, About; below 720 sp it collapses to list → section with back arrows and every row stacks (`widgets::follow_narrow`); content is clamped to 960 px |
+| `ui/transfers.rs` | `transfers::open(parent)` from the toolbar's connection badge (`library.activity_button`): a full-body page like Settings. Downloading (games, content packs, Reading Room, preview/theme fetches), Queued (media fetches waiting for a slot), Torrents (`games::get_session_torrents`: every session torrent with its own rates, peers, upload); 1 s poll, rows updated in place |
+| `ui/backdrop.rs` | `backdrop::install(window)` gives `window.rs` the picture it layers under the page stack (the overlay measures the pages, not the picture). Settings → Appearance chooses / removes the image (copied into the data folder, config `background_image`) and sets its opacity (`background_opacity`, 5–100 %); the window then wears `has-backdrop` and `styles/backdrop.css` turns the full-width bars and pages translucent |
+| `ui/hidden.rs` | hidden-id set for the card and ⋯ menus (Hide / Unhide title, Remove from Recently played), Undo toast, the adult switch; `bus::notify_visibility_changed()` makes the library refetch Browse, genres and shelves (see COLLECTIONS.md) |
 | `ui/reading.rs` | `reading::build(window)` → `library.set_reading_widget()`; the Reading Room tab and the PDF reader (`ui/pdf.rs`, poppler) |
 | `ui/media.rs` | `media::install(window, library, bar_slot)`: fills `detail.media_slot` (preview video, theme music) and the now-playing bar under the library |
 | `ui/playlists.rs` | `playlists::pick_for_game(parent, game)` from the ⋯ menu; create / rename / delete |
@@ -359,7 +368,7 @@ colour; each feature module keeps its rules in `styles/<module>.css`.
 - `packaging/PKGBUILD` installs the binary to `/usr/bin/exorchy` and
   `metadata/`, `torrents/`, `manifest.json`, `previews/` (from
   `crates/core/resources/previews`) to `/usr/lib/exorchy`; icons from
-  `packaging/icons` and `crates/app/assets/exorchy.svg` into hicolor.
+  `packaging/icons` (raster only, 32-512 px) into hicolor.
   `packaging/install-dev.sh` does the same under `~/.local`.
 - Emulators spawn with the app's environment; `xdg-open` is used for the
   log folder and for documents when the in-app reader cannot show them.

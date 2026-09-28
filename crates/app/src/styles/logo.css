@@ -1,0 +1,18 @@
+/* The ASCII wordmark (ui/logo.rs): one colour per text row, blended from the
+   palette into the logo's gradient, pale cyan at the top down to a dark magenta. */
+/* Any row past the last rule keeps the gradient's end, not the text colour. */
+.ascii-logo drawingarea { color: color-mix(in srgb, var(--om-magenta) 45%, var(--om-darker-background)); }
+.ascii-logo .r0 { color: color-mix(in srgb, var(--om-bright-cyan) 40%, var(--om-bright-foreground)); }
+.ascii-logo .r1 { color: color-mix(in srgb, var(--om-bright-cyan) 70%, var(--om-bright-foreground)); }
+.ascii-logo .r2 { color: var(--om-bright-cyan); }
+.ascii-logo .r3 { color: color-mix(in srgb, var(--om-bright-cyan) 50%, var(--om-cyan)); }
+.ascii-logo .r4 { color: var(--om-cyan); }
+.ascii-logo .r5 { color: color-mix(in srgb, var(--om-cyan) 50%, var(--om-blue)); }
+.ascii-logo .r6 { color: var(--om-blue); }
+.ascii-logo .r7 { color: color-mix(in srgb, var(--om-blue) 50%, var(--om-magenta)); }
+.ascii-logo .r8 { color: color-mix(in srgb, var(--om-magenta) 85%, var(--om-darker-background)); }
+.ascii-logo .r9 { color: color-mix(in srgb, var(--om-magenta) 65%, var(--om-darker-background)); }
+.ascii-logo .r10 { color: color-mix(in srgb, var(--om-magenta) 45%, var(--om-darker-background)); }
+
+.about-logo { padding: 12px 0 4px 0; }
+.about-logo .tagline { color: var(--text-secondary); letter-spacing: 0.2em; }

@@ -1,9 +1,9 @@
-//! The Settings dialog: a sidebar of sections over a page stack, the web
-//! dialog's shape. Each section is a module under `settings/`; this root
-//! owns the dialog frame, the navigation and the pure logic the pages
-//! share (collection set normalisation, rate-limit parsing, labels).
+//! The Settings page: shown in place of the library (gear button, Ctrl+,),
+//! a list of sections beside a page stack. Each section is a module under
+//! `settings/`; this root owns the frame, the navigation and the pure logic
+//! the pages share (collection set normalisation, rate-limit parsing, labels).
 //!
-//! Sections: general, collections, emulators, appearance, storage,
+//! Sections: general, collections, hidden, emulators, appearance, storage,
 //! network, packs, about.
 
 mod about;
@@ -11,6 +11,7 @@ mod appearance;
 mod collections;
 mod emulators;
 mod general;
+mod hidden;
 mod network;
 pub mod packs;
 mod storage;
@@ -30,9 +31,10 @@ pub use widgets::Ctx;
 type Shown = HashMap<String, Rc<dyn Fn()>>;
 
 /// The sections in sidebar order: id, label, icon.
-const SECTIONS: [(&str, &str, &str); 8] = [
+const SECTIONS: [(&str, &str, &str); 9] = [
     ("general", "General", "preferences-system-symbolic"),
     ("collections", "Collections", "view-list-symbolic"),
+    ("hidden", "Hidden titles", "view-conceal-symbolic"),
     ("emulators", "Emulators", "applications-games-symbolic"),
     ("appearance", "Appearance", "preferences-desktop-appearance-symbolic"),
     ("storage", "Storage", "drive-harddisk-symbolic"),
@@ -56,37 +58,42 @@ pub const DOSBOX_JOB_KEY: &str = "eXoDOS:dosbox-staging";
 /// integer error rather than a speed-limit one.
 const MAX_KBPS: u32 = 4_000_000;
 
-/// Open Settings on `section` ("general", "collections", "emulators",
-/// "appearance", "storage", "network", "packs", "about").
+/// The window stack's name for the Settings page.
+const PAGE: &str = "settings";
+
+/// Open Settings on `section` ("general", "collections", "hidden", "emulators",
+/// "appearance", "storage", "network", "packs", "about") in place of the
+/// library: the gear button and Ctrl+,. Built fresh each time; closing
+/// returns to the library and drops the page.
 pub fn open(parent: &impl IsA<gtk::Widget>, section: &str) {
     let Some(window) = parent.root().and_then(|r| r.downcast::<gtk::Window>().ok()) else {
         log::warn!("settings: parent has no window yet");
         return;
     };
-    open_dialog(&window, section);
+    let view = build(&window, section, Rc::new(|| crate::ui::window::close_page(PAGE)));
+    crate::ui::window::show_page(PAGE, &view);
 }
 
 /// Developer aid for snapshots: `EXORCHY_SNAPSHOT_SETTINGS=<section>` opens
-/// the dialog on that section. The window calls it once the library page
+/// Settings on that section. The window calls it once the library page
 /// is shown.
 pub fn autoopen_for_snapshot(parent: &gtk::Window) {
     if let Ok(section) = std::env::var("EXORCHY_SNAPSHOT_SETTINGS") {
         let section = if section.is_empty() { "general".to_string() } else { section };
-        open_dialog(parent, &section);
+        open(parent, &section);
     }
 }
 
-/// Build and present the dialog; the handle is for the snapshot harness.
-fn open_dialog(window: &gtk::Window, section: &str) -> adw::Dialog {
+/// The Settings page: the section list and the section side by side, or,
+/// in a narrow tile, the list then the section with back arrows (an
+/// `AdwNavigationSplitView`). `on_close` leaves the page.
+fn build(window: &gtk::Window, section: &str, on_close: Rc<dyn Fn()>) -> gtk::Widget {
     packs::init_events();
 
-    let dialog = adw::Dialog::builder()
-        .title("Settings")
-        .content_width(1000)
-        .content_height(720)
-        .css_classes(["settings-dialog"])
-        .build();
     let alive = Rc::new(Cell::new(true));
+    // Rows stack in a narrow tile; a fresh page starts wide until the
+    // breakpoint says otherwise.
+    let view_id = widgets::begin_view();
 
     let stack = gtk::Stack::builder()
         .transition_type(gtk::StackTransitionType::Crossfade)
@@ -97,10 +104,13 @@ fn open_dialog(window: &gtk::Window, section: &str) -> adw::Dialog {
         .selection_mode(gtk::SelectionMode::Single)
         .css_classes(["settings-nav"])
         .valign(gtk::Align::Start)
+        .margin_start(8)
+        .margin_end(8)
+        .margin_top(4)
         .build();
     for (id, label, icon) in SECTIONS {
         let row = gtk::ListBoxRow::builder().css_classes(["settings-nav-item"]).build();
-        let inner = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(9).build();
+        let inner = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(12).build();
         inner.append(&gtk::Image::from_icon_name(icon));
         inner.append(&gtk::Label::builder().label(label).xalign(0.0).build());
         row.set_child(Some(&inner));
@@ -108,26 +118,99 @@ fn open_dialog(window: &gtk::Window, section: &str) -> adw::Dialog {
         nav.append(&row);
     }
 
+    // ── the split view: section list | section ──
+    let back = gtk::Button::builder()
+        .icon_name("go-previous-symbolic")
+        .css_classes(["btn", "icon", "ghost"])
+        .tooltip_text("Back to the library (Esc)")
+        .build();
+    let side_header = adw::HeaderBar::builder()
+        .show_start_title_buttons(false)
+        .show_end_title_buttons(false)
+        .css_classes(["settings-header"])
+        .build();
+    side_header.pack_start(&back);
+    let side_view = adw::ToolbarView::builder().css_classes(["settings-side"]).build();
+    side_view.add_top_bar(&side_header);
+    side_view.set_content(Some(&gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).child(&nav).build()));
+    let sidebar = adw::NavigationPage::builder().title("Settings").tag("sections").child(&side_view).build();
+
+    let content_header = adw::HeaderBar::builder()
+        .show_start_title_buttons(false)
+        .show_end_title_buttons(false)
+        .css_classes(["settings-header"])
+        .build();
+    let content_view = adw::ToolbarView::new();
+    content_view.add_top_bar(&content_header);
+    content_view.set_content(Some(&stack));
+    let content = adw::NavigationPage::builder().title("General").tag("section").child(&content_view).build();
+
+    let split = adw::NavigationSplitView::builder()
+        .sidebar(&sidebar)
+        .content(&content)
+        .min_sidebar_width(230.0)
+        .max_sidebar_width(280.0)
+        .show_content(true)
+        .build();
+    let view = adw::BreakpointBin::builder()
+        .width_request(360)
+        .height_request(300)
+        .css_classes(["settings-view"])
+        .child(&split)
+        .build();
+    let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 720.0, adw::LengthUnit::Sp));
+    narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+    narrow.connect_apply(move |_| widgets::set_narrow(view_id, true));
+    narrow.connect_unapply(move |_| widgets::set_narrow(view_id, false));
+    view.add_breakpoint(narrow);
+
     let ctx = {
-        let dialog_w = dialog.downgrade();
         let nav_w = nav.downgrade();
         let go: Rc<dyn Fn(&str)> = Rc::new(move |id: &str| {
             if let Some(nav) = nav_w.upgrade() {
                 select_section(&nav, id);
             }
         });
+        let open = alive.clone();
         let close: Rc<dyn Fn()> = Rc::new(move || {
-            if let Some(d) = dialog_w.upgrade() {
-                d.close();
+            if open.replace(false) {
+                on_close();
             }
         });
         Ctx::new(window.clone(), alive.clone(), go, close)
     };
+    // Timers stop however the page goes (closed, or the library rebuilt).
+    view.connect_unrealize({
+        let alive = alive.clone();
+        move |_| alive.set(false)
+    });
+    back.connect_clicked({
+        let ctx = ctx.clone();
+        move |_| ctx.close()
+    });
+    // Esc steps back: from a section to the list when collapsed, else out.
+    let keys = gtk::EventControllerKey::new();
+    keys.connect_key_pressed({
+        let (ctx, split) = (ctx.clone(), split.clone());
+        move |_, key, _, _| {
+            if key != gtk::gdk::Key::Escape {
+                return glib::Propagation::Proceed;
+            }
+            if split.is_collapsed() && split.shows_content() {
+                split.set_show_content(false);
+            } else {
+                ctx.close();
+            }
+            glib::Propagation::Stop
+        }
+    });
+    view.add_controller(keys);
 
     // Pages are data-driven widgets; some want to know when they come into view.
     let on_shown: Rc<RefCell<Shown>> = Rc::new(RefCell::new(HashMap::new()));
     stack.add_named(&general::build(&ctx), Some("general"));
     stack.add_named(&collections::build(&ctx), Some("collections"));
+    stack.add_named(&hidden::build(&ctx), Some("hidden"));
     stack.add_named(&emulators::build(&ctx), Some("emulators"));
     stack.add_named(&appearance::build(&ctx), Some("appearance"));
     {
@@ -139,37 +222,24 @@ fn open_dialog(window: &gtk::Window, section: &str) -> adw::Dialog {
     stack.add_named(&packs::build(&ctx), Some("packs"));
     stack.add_named(&about::build(&ctx), Some("about"));
 
-    nav.connect_row_selected(glib::clone!(#[weak] stack, #[strong] on_shown, move |_, row| {
+    nav.connect_row_selected(glib::clone!(#[weak] stack, #[weak] content, #[strong] on_shown, move |_, row| {
         let Some(row) = row else { return };
         let id = row.widget_name().to_string();
         stack.set_visible_child_name(&id);
+        if let Some((_, label, _)) = SECTIONS.iter().find(|(s, _, _)| *s == id) {
+            content.set_title(label);
+        }
         let cb = on_shown.borrow().get(&id).cloned();
         if let Some(cb) = cb {
             cb();
         }
     }));
-
-    let layout = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).build();
-    let side = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
-        .child(&nav)
-        .css_classes(["settings-side"])
-        .width_request(190)
-        .build();
-    layout.append(&side);
-    layout.append(&gtk::Separator::new(gtk::Orientation::Vertical));
-    layout.append(&stack);
-
-    let header = adw::HeaderBar::builder().css_classes(["settings-header"]).build();
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&header);
-    toolbar.set_content(Some(&layout));
-    dialog.set_child(Some(&toolbar));
-    dialog.connect_closed(move |_| alive.set(false));
+    // A tap opens the section, also the one already selected (after going
+    // back to the list in a narrow tile).
+    nav.connect_row_activated(glib::clone!(#[weak] split, move |_, _| split.set_show_content(true)));
 
     select_section(&nav, section);
-    dialog.present(Some(window));
-    dialog
+    view.upcast()
 }
 
 fn select_section(nav: &gtk::ListBox, id: &str) {
@@ -424,8 +494,8 @@ mod tests {
 }
 
 /// Visual harness: `EXORCHY_SETTINGS_SNAPSHOT_DIR=<dir> cargo test -p exorchy
-/// -- --ignored settings_snapshot` renders every section of the dialog over
-/// a plain window into `<dir>/settings-<section>.png`, using the profile the
+/// -- --ignored settings_snapshot` renders every section of the Settings page
+/// in a plain window into `<dir>/settings-<section>.png`, using the profile the
 /// XDG variables point at. Needs a display.
 #[cfg(test)]
 mod settings_snapshot {
@@ -521,7 +591,8 @@ mod settings_snapshot {
             pump(250);
         }
         for section in sections {
-            let dialog = open_dialog(window.upcast_ref(), &section);
+            let view = build(window.upcast_ref(), &section, Rc::new(|| {}));
+            window.set_content(Some(&view));
             pump(3000);
             let path = format!("{out}/settings-{section}.png");
             let mut result = render(window.upcast_ref(), &path);
@@ -534,10 +605,8 @@ mod settings_snapshot {
             }
             match result {
                 Ok(()) => println!("wrote {path}"),
-                Err(e) => println!("snapshot {section} failed: {e} (mapped={}, content mapped={:?}, dialog mapped={})", window.is_mapped(), window.content().map(|c| c.is_mapped()), dialog.is_mapped()),
+                Err(e) => println!("snapshot {section} failed: {e} (mapped={}, view mapped={})", window.is_mapped(), view.is_mapped()),
             }
-            dialog.force_close();
-            pump(400);
         }
     }
 }

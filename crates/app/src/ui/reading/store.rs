@@ -159,6 +159,24 @@ pub fn status(key: &str) -> Option<ReadingStatus> {
     with(|s| s.fetches.get(key).cloned())
 }
 
+/// Fetches in flight or queued, with the issue's title, by title: the
+/// Transfers page.
+pub fn active_fetches() -> Vec<(String, String, ReadingStatus)> {
+    with(|s| {
+        let mut v: Vec<_> = s
+            .fetches
+            .iter()
+            .filter(|(_, st)| st.phase == "fetching" || st.phase == PHASE_QUEUED)
+            .map(|(k, st)| {
+                let title = s.issues.iter().find(|i| &i.key == k).map(|i| i.title.clone()).unwrap_or_else(|| k.clone());
+                (k.clone(), title, st.clone())
+            })
+            .collect();
+        v.sort_by(|a, b| a.1.cmp(&b.1));
+        v
+    })
+}
+
 pub fn is_on_disk(key: &str) -> bool {
     with(|s| s.on_disk.contains(key))
 }

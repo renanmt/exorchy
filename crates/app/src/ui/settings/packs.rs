@@ -68,6 +68,17 @@ pub fn job(key: &str) -> Option<Job> {
     STORE.with(|s| s.borrow().jobs.get(key).cloned())
 }
 
+/// Every job the store tracks (in flight, or finished and about to be
+/// cleared) with its display name, by name: the Transfers page.
+pub fn jobs() -> Vec<(String, String, Job)> {
+    STORE.with(|s| {
+        let s = s.borrow();
+        let mut v: Vec<_> = s.jobs.iter().map(|(k, j)| (k.clone(), s.labels.get(k).cloned().unwrap_or_else(|| k.clone()), j.clone())).collect();
+        v.sort_by(|a, b| a.1.cmp(&b.1));
+        v
+    })
+}
+
 pub fn installed_gen() -> u64 {
     STORE.with(|s| s.borrow().installed_gen)
 }
@@ -134,7 +145,7 @@ pub fn init_events() {
 }
 
 /// Probe the backend for a job the store does not know (started before the
-/// dialog first opened) and follow it if one runs.
+/// page first opened) and follow it if one runs.
 pub fn adopt_running(collection: &str, pack_id: &str) {
     let k = key(collection, pack_id);
     if job(&k).is_some() || STORE.with(|s| s.borrow().polling.contains(&k)) {

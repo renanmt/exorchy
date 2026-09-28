@@ -14,7 +14,7 @@ crates/app/src/
   theme.rs       Omarchy palette → CSS custom properties (tokens), live
   style.css      base rules + styles/<module>.css (one sheet per feature module)
   snapshot.rs    EXORCHY_SNAPSHOT=<png>[:<ms>] renders the window to a PNG and quits
-  ui/window.rs   the window: splash, setup ↔ library, toasts, startup order, restart_to_setup(), reinit_library()
+  ui/window.rs   the window: splash, setup ↔ library, toasts, startup order, restart_to_setup(), reinit_library(), show_page()/close_page()
   ui/library.rs  Browse / My Library / Reading tabs, grid, filters, detail panel host; slots: toolbar_slot, bar_slot, set_reading_widget()
   ui/detail.rs   the detail panel; hooks: media_slot, on_shown(cb), current()
   ui/card.rs     a game card; ui/model.rs GameObject; ui/covers.rs cover loading
@@ -67,9 +67,11 @@ Put new rules in your module's sheet under `crates/app/src/styles/`.
 
 ## Dialogs
 
-Use libadwaita: `adw::Dialog` / `adw::AlertDialog` / `adw::PreferencesDialog`,
-presented with `.present(Some(&parent_widget))`. No second toplevel windows
-(Hyprland would tile them).
+Use libadwaita: `adw::Dialog` / `adw::AlertDialog`, presented with
+`.present(Some(&parent_widget))`, for short, centred things (confirmations,
+pickers). No second toplevel windows (Hyprland would tile them). A large
+screen of its own (Settings) is a full-body page instead: `window::show_page`
+puts it in place of the library and `window::close_page` goes back.
 
 ## Running and checking
 

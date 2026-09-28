@@ -13,12 +13,12 @@ use crate::ui::library::LibraryPage;
 use crate::ui::util::format_bytes;
 use crate::ui::{bus, covers, dialogs, downloads, setup::SetupPage, splash::Splash};
 
-const ICON_SVG: &[u8] = include_bytes!("../../assets/exorchy.svg");
+const ICON_PNG: &[u8] = include_bytes!("../../assets/exorchy.png");
 
 /// The app icon as a paintable (the packaged icon theme has it too, but a
 /// source checkout does not).
 pub fn app_icon() -> gtk::gdk::Texture {
-    gtk::gdk::Texture::from_bytes(&glib::Bytes::from_static(ICON_SVG)).expect("bundled icon")
+    gtk::gdk::Texture::from_bytes(&glib::Bytes::from_static(ICON_PNG)).expect("bundled icon")
 }
 
 pub fn build(application: &adw::Application, startup_error: Option<String>) -> adw::ApplicationWindow {
@@ -33,8 +33,13 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
 
     let stack = gtk::Stack::builder().transition_type(gtk::StackTransitionType::Crossfade).build();
     let splash = Rc::new(Splash::new());
+    // Layers: the user's background image (if any), the pages, the splash.
+    // The overlay measures the pages, not the picture, so an image never
+    // sets the window's size.
     let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&stack));
+    overlay.set_child(Some(&crate::ui::backdrop::install(&window)));
+    overlay.add_overlay(&stack);
+    overlay.set_measure_overlay(&stack, true);
     overlay.add_overlay(&splash.widget);
     let toasts = adw::ToastOverlay::new();
     toasts.set_child(Some(&overlay));
@@ -95,10 +100,13 @@ fn show_library(window: &adw::ApplicationWindow, stack: &gtk::Stack, _toasts: &a
     LIBRARY.with(|l| *l.borrow_mut() = Some(page.clone()));
     let w = window.clone();
     page.settings_button.connect_clicked(move |_| crate::ui::settings::open(&w, "general"));
+    let w = window.clone();
+    page.activity_button.connect_clicked(move |_| crate::ui::transfers::open(&w));
     page.set_reading_widget(&crate::ui::reading::build(window.upcast_ref()));
     crate::ui::media::install(window.upcast_ref(), &page, &page.bar_slot);
 
     downloads::init_dependency_downloads();
+    crate::ui::hidden::load();
     app::on_event("game-exited", |payload| {
         if let Some(id) = payload.get("id").and_then(|v| v.as_i64()) {
             bus::mark_running(id, false);
@@ -119,6 +127,11 @@ fn show_library(window: &adw::ApplicationWindow, stack: &gtk::Stack, _toasts: &a
     let p = page.clone();
     let window = window.clone();
     app::local(async move {
+        // First, so Browse does not flash: Settings → General → Open in My Library.
+        let c = core.clone();
+        if app::call(async move { games::get_config(c.state(), "start_tab".into()).await }).await.ok().flatten().as_deref() == Some("library") {
+            p.set_tab("library");
+        }
         let c = core.clone();
         let mode = app::call(async move { games::get_config(c.state(), "network_mode".into()).await }).await.ok().flatten();
         bus::set_offline(mode.as_deref() == Some("offline"));
@@ -169,6 +182,33 @@ pub fn reinit_library() {
     let shell = SHELL.with(|s| s.borrow().clone());
     let Some((window, stack, toasts)) = shell else { return };
     show_library(&window, &stack, &toasts);
+}
+
+/// A full-body page in place of the library (Settings): replaces an earlier
+/// page of that name and shows it.
+pub fn show_page(name: &str, page: &impl IsA<gtk::Widget>) {
+    let Some((_, stack, _)) = SHELL.with(|s| s.borrow().clone()) else { return };
+    if let Some(old) = stack.child_by_name(name) {
+        stack.remove(&old);
+    }
+    stack.add_named(page, Some(name));
+    stack.set_visible_child_name(name);
+}
+
+/// Back to the library from a `show_page` page, which is dropped once the
+/// crossfade is over (unless it was shown again meanwhile).
+pub fn close_page(name: &str) {
+    let Some((_, stack, _)) = SHELL.with(|s| s.borrow().clone()) else { return };
+    let Some(page) = stack.child_by_name(name) else { return };
+    if stack.child_by_name("library").is_some() {
+        stack.set_visible_child_name("library");
+    }
+    let wait = std::time::Duration::from_millis(stack.transition_duration() as u64 + 50);
+    glib::timeout_add_local_once(wait, move || {
+        if page.parent().as_ref() == Some(stack.upcast_ref()) && stack.visible_child().as_ref() != Some(&page) {
+            stack.remove(&page);
+        }
+    });
 }
 
 /// The library page, once shown.

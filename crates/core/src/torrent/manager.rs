@@ -189,6 +189,27 @@ pub struct SessionTransfer {
     pub peers: u32,
 }
 
+/// One torrent of the shared session: `session_torrents`.
+#[derive(Debug, Clone, Serialize)]
+pub struct TorrentTransfer {
+    /// The torrent's own name (eXo's collection torrents are named after it).
+    pub name: String,
+    pub info_hash: String,
+    /// librqbit's state: "initializing", "live", "paused" or "error".
+    pub state: String,
+    pub download_bps: u64,
+    pub upload_bps: u64,
+    /// Live peer connections on this torrent.
+    pub peers: u32,
+    /// Uploaded since the session started.
+    pub uploaded_bytes: u64,
+    /// Of the selected files: what is on disk, and the whole.
+    pub progress_bytes: u64,
+    pub total_bytes: u64,
+    pub finished: bool,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DownloadManagerStatus {
     pub active_downloads: Vec<DownloadProgress>,
@@ -379,6 +400,41 @@ impl DownloadManager {
             uploaded_bytes: snap.counters.uploaded_bytes,
             peers: snap.peers.live,
         }
+    }
+
+    /// Hex info-hash of this manager's torrent (matches `TorrentTransfer::info_hash`).
+    pub fn info_hash_hex(&self) -> Option<&str> {
+        self.info_hash_hex.as_deref()
+    }
+
+    /// Every torrent in the shared session with its own rates, for the
+    /// Transfers page. `stats()` copies each torrent's file-progress vector,
+    /// so this is for an open page's poll, not a hot path.
+    pub fn session_torrents(&self) -> Vec<TorrentTransfer> {
+        let handles: Vec<Arc<ManagedTorrent>> = self.session.with_torrents(|iter| iter.map(|(_, t)| Arc::clone(t)).collect());
+        handles
+            .iter()
+            .map(|t| {
+                let stats = t.stats();
+                let (download_bps, upload_bps, peers) = match &stats.live {
+                    Some(live) => (live.download_speed.as_bytes(), live.upload_speed.as_bytes(), live.snapshot.peer_stats.live),
+                    None => (0, 0, 0),
+                };
+                TorrentTransfer {
+                    name: t.name().unwrap_or_default(),
+                    info_hash: t.info_hash().as_string(),
+                    state: stats.state.to_string(),
+                    download_bps,
+                    upload_bps,
+                    peers,
+                    uploaded_bytes: stats.uploaded_bytes,
+                    progress_bytes: stats.progress_bytes,
+                    total_bytes: stats.total_bytes,
+                    finished: stats.finished,
+                    error: stats.error.clone(),
+                }
+            })
+            .collect()
     }
 
     /// Caps in KB/s, `None` = unlimited; session-wide. See `apply_session_limits`.

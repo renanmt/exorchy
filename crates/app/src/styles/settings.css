@@ -1,45 +1,45 @@
 /* settings: rules for ui/settings.rs and its pages. Tokens only (see theme.rs). */
 
-/* ---- The dialog frame ---- */
-dialog.settings-dialog sheet,
-.settings-dialog > sheet { background-color: var(--bg-primary); }
-.settings-dialog headerbar.settings-header {
+/* ---- The page frame ---- */
+.settings-view { background-color: var(--bg-primary); }
+.settings-view headerbar.settings-header {
   background-color: var(--bg-primary);
   color: var(--text-strong);
   box-shadow: none;
   border-bottom: 1px solid var(--line-2);
 }
-.settings-dialog .settings-side { background-color: var(--bg-secondary); }
-.settings-dialog preferencespage { background-color: var(--bg-primary); }
-.settings-dialog preferencespage > scrolledwindow > viewport > clamp > box { padding: 14px 24px 24px 24px; }
+.settings-view .settings-side { background-color: var(--bg-secondary); }
+.settings-view preferencespage { background-color: var(--bg-primary); }
+.settings-view preferencespage > scrolledwindow > viewport > clamp > box { padding: 14px 24px 24px 24px; }
 
 /* Sidebar navigation */
-listbox.settings-nav { background: none; padding: 8px; }
-listbox.settings-nav > row.settings-nav-item {
+list.settings-nav { background: none; padding: 8px; }
+list.settings-nav > row.settings-nav-item {
   border-radius: var(--radius);
-  padding: 7px 10px;
-  margin: 1px 0;
+  padding: 11px 14px;
+  margin: 2px 0;
+  font-size: 1.1em;
   color: var(--text-secondary);
   background: none;
 }
-listbox.settings-nav > row.settings-nav-item:hover { color: var(--text-primary); background-color: var(--fill-1); }
-listbox.settings-nav > row.settings-nav-item:selected { color: var(--text-strong); background-color: var(--accent-fill); }
-listbox.settings-nav > row.settings-nav-item image { color: var(--text-muted); -gtk-icon-size: 15px; }
-listbox.settings-nav > row.settings-nav-item:selected image { color: var(--accent); }
+list.settings-nav > row.settings-nav-item:hover { color: var(--text-primary); background-color: var(--fill-1); }
+list.settings-nav > row.settings-nav-item:selected { color: var(--text-strong); background-color: var(--accent-fill); }
+list.settings-nav > row.settings-nav-item image { color: var(--text-muted); -gtk-icon-size: 20px; }
+list.settings-nav > row.settings-nav-item:selected image { color: var(--accent); }
 
 /* ---- Groups (libadwaita's boxed list on our surfaces) ---- */
-.settings-dialog preferencesgroup > box > label.title { color: var(--text-strong); font-weight: 600; text-transform: uppercase; font-size: 0.82em; letter-spacing: 0.06em; }
-.settings-dialog preferencesgroup > box > label.description { color: var(--text-muted); font-size: 0.9em; }
-.settings-dialog preferencesgroup.danger-zone > box > label.title { color: var(--danger); }
-.settings-dialog preferencesgroup listbox.boxed-list {
+.settings-view preferencesgroup > box > label.title { color: var(--text-strong); font-weight: 600; text-transform: uppercase; font-size: 0.82em; letter-spacing: 0.06em; }
+.settings-view preferencesgroup > box > label.description { color: var(--text-muted); font-size: 0.9em; }
+.settings-view preferencesgroup.danger-zone > box > label.title { color: var(--danger); }
+.settings-view preferencesgroup listbox.boxed-list {
   background-color: var(--bg-card);
   border: 1px solid var(--line-2);
   border-radius: var(--radius-lg);
 }
-.settings-dialog preferencesgroup listbox.boxed-list > row { background: none; border-bottom: 1px solid var(--line-1); }
-.settings-dialog preferencesgroup listbox.boxed-list > row:last-child { border-bottom: none; }
-.settings-dialog preferencesgroup listbox.boxed-list > row.settings-row:hover { background-color: var(--fill-1); }
-.settings-dialog preferencesgroup listbox.boxed-list > row.settings-row:active { background-color: var(--fill-2); }
+.settings-view preferencesgroup listbox.boxed-list > row { background: none; border-bottom: 1px solid var(--line-1); }
+.settings-view preferencesgroup listbox.boxed-list > row:last-child { border-bottom: none; }
+.settings-view preferencesgroup listbox.boxed-list > row.settings-row:hover { background-color: var(--fill-1); }
+.settings-view preferencesgroup listbox.boxed-list > row.settings-row:active { background-color: var(--fill-2); }
 
 /* ---- Rows ---- */
 row.settings-row { padding: 10px 14px; }

@@ -1,6 +1,6 @@
 //! Storage: disk usage by what it is for, plus every installed game by
 //! size - the Steam storage manager's shape. A measurement survives
-//! switching sections and reopening the dialog; Refresh, every action here
+//! switching sections and reopening Settings; Refresh, every action here
 //! and a library change re-measure.
 
 use std::cell::{Cell, RefCell};
@@ -41,7 +41,7 @@ const CATEGORIES: [Meta; 11] = [
     Meta { id: Category::Other, css: "cat-other", name: "Other", hint: "Torrent placeholders and pieces shared with neighbouring games", unit: None },
 ];
 
-/// An open page's re-render, dropped once its dialog closed.
+/// An open page's re-render, dropped once Settings closed.
 type Renderer = (Rc<Cell<bool>>, Rc<dyn Fn()>);
 
 /// Resolution of the usage bar: columns of a homogeneous grid.
@@ -181,7 +181,7 @@ fn load() {
     });
 }
 
-/// Page state that is the dialog's, not the measurement's.
+/// Page state that belongs to the open Settings page, not the measurement.
 struct View {
     sort: Cell<Sort>,
     /// Two-click destructive actions: the first click arms the label.
@@ -266,7 +266,8 @@ fn render_page(ctx: &Ctx, page: &widgets::Page, groups: &Rc<RefCell<Vec<gtk::Wid
     let card = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(10).css_classes(["storage-drive"]).build();
     card.append(&head);
     card.append(&usage_bar(&o));
-    let line = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["storage-drive-line"]).build();
+    // Wraps in a narrow dialog instead of setting its minimum width.
+    let line = adw::WrapBox::builder().child_spacing(16).line_spacing(4).css_classes(["storage-drive-line"]).build();
     let seg = |markup: String| gtk::Label::builder().use_markup(true).label(&markup).xalign(0.0).build();
     line.append(&seg(format!("<b>{}</b> used by eXorchy", format_bytes(o.used_bytes))));
     line.append(&seg(format!("{} other files", format_bytes(o.other_bytes))));
@@ -458,7 +459,7 @@ fn game_row(ctx: &Ctx, view: &Rc<View>, g: GameStorage) -> gtk::ListBoxRow {
         if g.save_bytes > 0 {
             parts.push(format!("saves {}", format_bytes(g.save_bytes)));
         }
-        size.append(&gtk::Label::builder().label(parts.join(" · ")).xalign(1.0).css_classes(["settings-row-hint"]).build());
+        size.append(&gtk::Label::builder().label(parts.join(" · ")).xalign(1.0).wrap(true).css_classes(["settings-row-hint"]).build());
     }
     line.append(&size);
 
@@ -497,6 +498,12 @@ fn game_row(ctx: &Ctx, view: &Rc<View>, g: GameStorage) -> gtk::ListBoxRow {
         }
     });
     line.append(&btn.widget);
+    // A narrow dialog stacks title, size and button like the other rows.
+    widgets::follow_narrow(&line, move |line, narrow| {
+        line.set_orientation(if narrow { gtk::Orientation::Vertical } else { gtk::Orientation::Horizontal });
+        size.set_halign(if narrow { gtk::Align::Start } else { gtk::Align::End });
+        btn.widget.set_halign(if narrow { gtk::Align::Start } else { gtk::Align::Fill });
+    });
     row.set_child(Some(&line));
     row
 }

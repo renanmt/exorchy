@@ -1,4 +1,4 @@
-//! The pieces every settings page is made of: the dialog context, the
+//! The pieces every settings page is made of: the page context, the
 //! three-column setting row (label · value/hint · action), switch binding
 //! with rollback, small buttons and the mini progress bar.
 
@@ -9,11 +9,60 @@ use std::time::Duration;
 use adw::prelude::*;
 use gtk::glib;
 
+type Follower = Box<dyn Fn(bool) -> bool>;
+
+thread_local! {
+    /// Whether the Settings page is narrow, and the widgets that follow it (each
+    /// follower returns false once its widget is gone).
+    static NARROW: Cell<bool> = const { Cell::new(false) };
+    /// Which page the state belongs to: a closing page's breakpoint may
+    /// unapply after the next one opened and must not reset it.
+    static VIEW: Cell<u64> = const { Cell::new(0) };
+    static FOLLOWERS: RefCell<Vec<Follower>> = RefCell::new(Vec::new());
+}
+
+/// A new page starts wide with no followers; the id it gets back is what
+/// its breakpoint passes to `set_narrow`.
+pub fn begin_view() -> u64 {
+    FOLLOWERS.with(|f| f.borrow_mut().clear());
+    NARROW.with(|n| n.set(false));
+    VIEW.with(|d| {
+        d.set(d.get() + 1);
+        d.get()
+    })
+}
+
+/// A narrow page stacks every row (label over body over action) instead
+/// of squeezing the body to a few characters beside a 170 px label column.
+/// The page's breakpoint calls this; widgets built later follow the state.
+pub fn set_narrow(view: u64, narrow: bool) {
+    if VIEW.with(Cell::get) != view {
+        return;
+    }
+    NARROW.with(|n| n.set(narrow));
+    FOLLOWERS.with(|f| f.borrow_mut().retain(|follow| follow(narrow)));
+}
+
+/// Run `f` with the narrow state now and on every change while `widget` lives.
+pub fn follow_narrow<W: IsA<gtk::Widget>>(widget: &W, f: impl Fn(&W, bool) + 'static) {
+    f(widget, NARROW.with(Cell::get));
+    let weak = widget.downgrade();
+    FOLLOWERS.with(|l| {
+        l.borrow_mut().push(Box::new(move |narrow| match weak.upgrade() {
+            Some(w) => {
+                f(&w, narrow);
+                true
+            }
+            None => false,
+        }))
+    });
+}
+
 /// Row refreshers a page calls when the pack store changes.
 pub type Refreshers = Rc<RefCell<Vec<Rc<dyn Fn()>>>>;
 
-/// What a page needs from the dialog: the window (for pickers and confirm
-/// dialogs), whether the dialog is still open (timers stop on close), and
+/// What a page needs from Settings: the window (for pickers and confirm
+/// dialogs), whether Settings is still open (timers stop on close), and
 /// navigation between sections.
 #[derive(Clone)]
 pub struct Ctx {
@@ -32,7 +81,7 @@ impl Ctx {
         self.alive.get()
     }
 
-    /// Switch the dialog to another section.
+    /// Switch Settings to another section.
     pub fn go(&self, section: &str) {
         (self.go)(section);
     }
@@ -41,7 +90,7 @@ impl Ctx {
         (self.close)();
     }
 
-    /// Run `f` every `every` while the dialog is open and `f` returns true.
+    /// Run `f` every `every` while Settings is open and `f` returns true.
     pub fn poll(&self, every: Duration, f: impl Fn() -> bool + 'static) {
         let alive = self.alive.clone();
         glib::timeout_add_local(every, move || {
@@ -55,8 +104,9 @@ impl Ctx {
 }
 
 /// A scrolling page of preference groups, one group per section of the
-/// web page. Not an `adw::PreferencesPage`: its clamp caps the content at
-/// a reading width, and the dialog's rows want the room the web layout had.
+/// web page. Not an `adw::PreferencesPage`: its clamp is narrower than the
+/// room the settings rows want. Our own clamp (960 px) only stops a
+/// full-screen page stretching rows across a wide monitor.
 #[derive(Clone)]
 pub struct Page {
     pub widget: gtk::ScrolledWindow,
@@ -90,11 +140,12 @@ pub fn page(title: &str) -> Page {
         .css_classes(["settings-page"])
         .build();
     body.set_widget_name(title);
+    let clamp = adw::Clamp::builder().maximum_size(960).tightening_threshold(720).child(&body).build();
     let widget = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
         .hexpand(true)
         .vexpand(true)
-        .child(&body)
+        .child(&clamp)
         .build();
     Page { widget, body }
 }
@@ -116,7 +167,7 @@ pub struct Row {
     label: gtk::Label,
     value: gtk::Label,
     hint: gtk::Label,
-    action: gtk::Box,
+    action: adw::WrapBox,
     below: gtk::Box,
 }
 
@@ -169,9 +220,15 @@ impl Row {
         body.append(&hint);
         line.append(&body);
 
-        let action = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).valign(gtk::Align::Center).build();
+        // Wraps: a row with several buttons must not set the page's minimum width.
+        let action = adw::WrapBox::builder().child_spacing(8).line_spacing(6).valign(gtk::Align::Center).build();
         line.append(&action);
         outer.append(&line);
+        follow_narrow(&line, move |line, narrow| {
+            label_box.set_width_request(if narrow { -1 } else { 170 });
+            line.set_orientation(if narrow { gtk::Orientation::Vertical } else { gtk::Orientation::Horizontal });
+            line.set_spacing(if narrow { 6 } else { 16 });
+        });
         let below = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).visible(false).build();
         outer.append(&below);
         widget.set_child(Some(&outer));
@@ -301,7 +358,7 @@ pub fn switch_row(label: &str, hint: &str, active: bool) -> (Row, Switch) {
     (row, sw)
 }
 
-/// The dialog's small button.
+/// The settings pages' small button.
 pub fn button(label: &str) -> gtk::Button {
     gtk::Button::builder().label(label).css_classes(["btn", "small"]).valign(gtk::Align::Center).build()
 }

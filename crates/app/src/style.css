@@ -99,8 +99,8 @@ entry.search { min-width: 160px; }
   padding: 8px 14px;
 }
 .toolbar > * { margin: 0; }
-.toolbar .brand { font-weight: 700; color: var(--text-strong); font-size: 1.1em; }
-.toolbar .brand .x { color: var(--accent); }
+button.activity-btn { color: var(--text-muted); padding: 4px 8px; }
+button.activity-btn:hover { color: var(--text-primary); }
 
 /* Tabs */
 button.tab {
@@ -171,10 +171,6 @@ scrollbar slider:hover { background-color: color-mix(in srgb, var(--om-foregroun
 
 /* Selection */
 selection { background-color: var(--selection); color: var(--text-strong); }
-
-/* ---- Toolbar brand ---- */
-.brand label { font-weight: 700; font-size: 1.15em; color: var(--text-strong); }
-.brand label.x { color: var(--accent); }
 
 /* ---- Filter row / shelf ---- */
 .filter-row { padding: 8px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-primary); }
@@ -267,3 +263,11 @@ button.chip { background-color: var(--fill-2); border: 1px solid var(--line-3); 
 button.chip:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 button.gallery-btn { padding: 0; border: 1px solid var(--line-3); border-radius: 6px; background: none; box-shadow: none; }
 .gallery-thumb { border-radius: 5px; }
+
+/* ---- My Library: "N installed games are hidden" ---- */
+.hidden-note {
+  background-color: var(--bg-card);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 6px 6px 6px 14px;
+}

@@ -21,6 +21,7 @@ struct Bus {
     /// The enabled collections, display order, kept by the settings page.
     collections_changed: Vec<Cb<()>>,
     playlists_changed: Vec<Cb<()>>,
+    visibility_changed: Vec<Cb<()>>,
 }
 
 thread_local! {
@@ -32,6 +33,7 @@ thread_local! {
         toasts: None,
         collections_changed: Vec::new(),
         playlists_changed: Vec::new(),
+        visibility_changed: Vec::new(),
     });
 }
 
@@ -54,6 +56,19 @@ pub fn on_collections_changed(f: impl Fn(&()) + 'static) {
 
 pub fn notify_collections_changed() {
     let cbs: Vec<Cb<()>> = BUS.with(|b| b.borrow().collections_changed.clone());
+    for cb in cbs {
+        cb(&());
+    }
+}
+
+/// What the catalogue lists changed: a title hidden or unhidden, adult
+/// titles switched, a game taken off Recently played.
+pub fn on_visibility_changed(f: impl Fn(&()) + 'static) {
+    BUS.with(|b| b.borrow_mut().visibility_changed.push(Rc::new(f)));
+}
+
+pub fn notify_visibility_changed() {
+    let cbs: Vec<Cb<()>> = BUS.with(|b| b.borrow().visibility_changed.clone());
     for cb in cbs {
         cb(&());
     }

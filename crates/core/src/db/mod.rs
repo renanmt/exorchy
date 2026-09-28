@@ -21,7 +21,7 @@ pub type DbResult<T> = Result<T, DbError>;
 /// Version of the bundled catalog. Raise BEFORE `pnpm run gen-db` (the
 /// artefact stamps itself); an installed DB behind it is refreshed at
 /// startup by `refresh_catalog`, user state preserved. History in git.
-pub const CATALOG_VERSION: i64 = 16;
+pub const CATALOG_VERSION: i64 = 17;
 
 /// Open (or create) the Exorchy database at the given path.
 pub fn open(path: &Path) -> DbResult<Connection> {
@@ -342,6 +342,11 @@ fn migrate(conn: &Connection) -> DbResult<()> {
     // the bundled catalog, which refresh_catalog copies column-wise.
     if !game_cols.iter().any(|c| c == "music_file") {
         conn.execute_batch("ALTER TABLE games ADD COLUMN music_file TEXT")?;
+    }
+    // eXo's age rating (LaunchBox `Rating`): "A - Adult" marks adult titles
+    // the genre does not. Filled by the bundled catalog like music_file.
+    if !game_cols.iter().any(|c| c == "age_rating") {
+        conn.execute_batch("ALTER TABLE games ADD COLUMN age_rating TEXT")?;
     }
 
     // Playlist support (curated eXo playlists + user playlists). The tables

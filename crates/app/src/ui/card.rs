@@ -44,6 +44,8 @@ pub struct Card {
     dl_pct: gtk::Label,
     /// Hide the platform badge when a collection filter implies it.
     hide_platform: Cell<bool>,
+    /// On the Recently played shelf: the menu can take it off.
+    in_recent: Cell<bool>,
     on_detail: Rc<dyn Fn(Game)>,
 }
 
@@ -141,6 +143,7 @@ impl Card {
             dl_bar,
             dl_pct,
             hide_platform: Cell::new(false),
+            in_recent: Cell::new(false),
             on_detail,
         });
 
@@ -167,6 +170,10 @@ impl Card {
             }
         }));
         card
+    }
+
+    pub fn set_in_recent(&self, v: bool) {
+        self.in_recent.set(v);
     }
 
     pub fn game_id(&self) -> Option<i64> {
@@ -394,6 +401,18 @@ impl Card {
             add("Game settings…", false, Box::new(move || actions::game_settings(&w, &g)));
             let (g, w) = (game.clone(), self.widget.clone());
             add("↺ Reset game data", true, Box::new(move || actions::reset(&w, &g, Rc::new(|_| {}))));
+        }
+        if self.in_recent.get() {
+            let title = game.title.clone();
+            add("Remove from Recently played", false, Box::new(move || crate::ui::hidden::remove_from_recent(id, &title)));
+        }
+        {
+            let title = game.title.clone();
+            if crate::ui::hidden::is_hidden(id) {
+                add("Unhide title", false, Box::new(move || crate::ui::hidden::unhide(id, &title)));
+            } else {
+                add("Hide title", false, Box::new(move || crate::ui::hidden::hide(id, &title)));
+            }
         }
         if game.installed || game.in_library {
             let (g, w) = (game.clone(), self.widget.clone());

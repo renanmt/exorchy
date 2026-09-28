@@ -1,0 +1,172 @@
+{
+  "activeLayerID": "E4C8F624-C8DC-4E4A-8AD9-33FE280F2A3B",
+  "colorSpace": "sRGB",
+  "documentID": "6D6A073C-F6AF-4BDA-BE4B-D09FE52C2367",
+  "format": "com.compositor.project",
+  "height": 1024,
+  "layers": [
+    {
+      "blendMode": "Normal",
+      "id": "F00925A9-3AF9-47FF-ACB3-F4E14BB23FB1",
+      "imageFile": "F00925A9-3AF9-47FF-ACB3-F4E14BB23FB1.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "Layer 1",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          0,
+          0
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          1536,
+          1024
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "E4C8F624-C8DC-4E4A-8AD9-33FE280F2A3B",
+      "imageFile": "E4C8F624-C8DC-4E4A-8AD9-33FE280F2A3B.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "logo",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          188,
+          257
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          1160,
+          510
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "80013697-04C6-4A85-98FF-130A388FC151",
+      "imageFile": "80013697-04C6-4A85-98FF-130A388FC151.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "Layer 4",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          471,
+          490
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          18,
+          34
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "D610D789-E377-4268-8C4F-3AC5DF02F091",
+      "imageFile": "D610D789-E377-4268-8C4F-3AC5DF02F091.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "thousands of games. endless nostalgia",
+      "opacity": 1,
+      "text": {
+        "alignment": "Center",
+        "blue": 1,
+        "content": "thousands of games. endless nostalgia.",
+        "fontName": "JetBrainsMonoNF-Bold",
+        "fontSize": 40,
+        "green": 1,
+        "leading": 0,
+        "red": 1,
+        "tracking": 0
+      },
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          298,
+          816
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          940,
+          72
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "F7A62AFB-0314-4977-B35F-EBA63EBCB2A4",
+      "imageFile": "F7A62AFB-0314-4977-B35F-EBA63EBCB2A4.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "THE EXODOS LAUNCHER FOR OMARCHY",
+      "opacity": 1,
+      "text": {
+        "alignment": "Center",
+        "blue": 1,
+        "content": "THE EXODOS LAUNCHER FOR OMARCHY",
+        "fontName": "omarchy",
+        "fontSize": 40,
+        "green": 1,
+        "leading": 0,
+        "red": 1,
+        "tracking": 0
+      },
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          382,
+          695
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          772,
+          72
+        ]
+      }
+    },
+    {
+      "blendMode": "Normal",
+      "id": "45733D55-ED78-4942-8B97-2BF66566FD84",
+      "imageFile": "45733D55-ED78-4942-8B97-2BF66566FD84.png",
+      "isGroup": false,
+      "isVisible": true,
+      "name": "Layer 3",
+      "opacity": 1,
+      "transform": {
+        "flipX": false,
+        "flipY": false,
+        "origin": [
+          573,
+          49
+        ],
+        "rotation": 0,
+        "sampling": "High quality",
+        "size": [
+          563,
+          338
+        ]
+      }
+    }
+  ],
+  "resolution": 72,
+  "version": 7,
+  "width": 1536
+}

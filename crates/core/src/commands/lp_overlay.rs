@@ -337,6 +337,7 @@ mod tests {
             manual_path: None,
             last_played: None,
             music_file: None,
+            age_rating: None,
             requires_base: false,
             installed_with: None,
         }

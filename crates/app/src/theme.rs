@@ -15,12 +15,15 @@ use exorchy_core::omarchy::{self, Theme};
 
 /// Component rules; tokens only. One sheet per feature module so they can
 /// be written independently; all are loaded at the same priority.
-const STYLES: [&str; 5] = [
+const STYLES: [&str; 8] = [
     include_str!("style.css"),
     include_str!("styles/dialogs.css"),
     include_str!("styles/settings.css"),
     include_str!("styles/reading.css"),
     include_str!("styles/media.css"),
+    include_str!("styles/logo.css"),
+    include_str!("styles/transfers.css"),
+    include_str!("styles/backdrop.css"),
 ];
 
 thread_local! {

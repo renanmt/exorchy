@@ -1,4 +1,4 @@
-//! About: version, the log folder, credits (eXoDOS, Exodium by Thomas
+//! About: version, author, the log folder, credits (eXoDOS, Exodium by Thomas
 //! Vollstädt) and the factory reset.
 
 use adw::prelude::*;
@@ -12,8 +12,31 @@ use crate::ui::dialogs;
 pub fn build(ctx: &Ctx) -> gtk::Widget {
     let page = widgets::page("About");
 
+    let header = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(14).halign(gtk::Align::Center).css_classes(["about-logo"]).build();
+    // The large wordmark is ~300 px; a narrow page gets the smaller one.
+    let wide = crate::ui::logo::ascii(4.0);
+    let small = crate::ui::logo::ascii(2.5);
+    for logo in [&wide, &small] {
+        logo.set_halign(gtk::Align::Center);
+        header.append(logo);
+    }
+    widgets::follow_narrow(&header, move |_, narrow| {
+        wide.set_visible(!narrow);
+        small.set_visible(narrow);
+    });
+    header.append(
+        &gtk::Label::builder()
+            .label("THE EXODOS LAUNCHER FOR OMARCHY")
+            .wrap(true)
+            .justify(gtk::Justification::Center)
+            .css_classes(["tagline", "small"])
+            .build(),
+    );
+    page.add(&header);
+
     let app_group = widgets::group("eXorchy", None);
     app_group.add(&Row::new("Version").value(env!("CARGO_PKG_VERSION")).hint("An eXo launcher for Omarchy (Arch + Hyprland).").widget);
+    app_group.add(&Row::new("Author").value("Renan Tonheiro").hint("eXorchy, the Omarchy port of Exodium.").widget);
     let open_btn = widgets::button("Open");
     let log_row = Row::new("Log folder").hint("Share exorchy.log when a download stalls or the app misbehaves.").selectable().code().action(&open_btn);
     app_group.add(&log_row.widget);
@@ -50,14 +73,13 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     );
     credits.add(
         &Row::new("Exodium")
-            .hint("By Thomas Vollstädt, MIT licence. eXorchy is its Omarchy port.")
-            .action(&widgets::link("https://github.com/tvollstaedt/exodium", "github.com/tvollstaedt/exodium"))
+            .hint(
+                "Created by Thomas Vollstädt (MIT licence); eXorchy is its Omarchy port. Visit his GitHub page to support his work, \
+                 or to get Exodium for other operating systems.",
+            )
+            .action(&widgets::link("https://github.com/tvollstaedt/exodium", "GitHub"))
             .widget,
     );
-    let support = Row::new("Support Thomas").hint("If eXorchy is useful to you, the person to thank is upstream.");
-    support.add_action(&widgets::link("https://github.com/sponsors/tvollstaedt", "GitHub Sponsors"));
-    support.add_action(&widgets::link("https://ko-fi.com/tvollstaedt", "Ko-fi"));
-    credits.add(&support.widget);
     page.add(&credits);
 
     let danger = widgets::group("Danger zone", None);
@@ -115,7 +137,7 @@ fn confirm_reset(ctx: &Ctx) {
 }
 
 fn run_reset(ctx: &Ctx, delete_game_data: bool) {
-    // Close the dialog first, then overlay whatever was behind it.
+    // Leave Settings first, then show setup in place of the library.
     ctx.close();
     let core = app::core();
     let window = ctx.window.clone();

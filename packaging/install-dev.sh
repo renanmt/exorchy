@@ -15,7 +15,7 @@ BIN="$HOME/.local/bin"
 LIB="$HOME/.local/lib/exorchy"
 APPS="$HOME/.local/share/applications"
 ICONS="$HOME/.local/share/icons/hicolor"
-mkdir -p "$BIN" "$LIB" "$APPS" "$ICONS/scalable/apps"
+mkdir -p "$BIN" "$LIB" "$APPS"
 
 install -Dm755 target/release/exorchy "$BIN/exorchy"
 
@@ -33,7 +33,8 @@ install -Dm644 packaging/org.exorchy.eXorchy.desktop "$APPS/org.exorchy.eXorchy.
 for s in 32 128 256 512; do
   install -Dm644 "packaging/icons/${s}x${s}.png" "$ICONS/${s}x${s}/apps/exorchy.png"
 done
-install -Dm644 crates/app/assets/exorchy.svg "$ICONS/scalable/apps/exorchy.svg"
+# The icon is raster only now; a scalable one left by an older install would win.
+rm -f "$ICONS/scalable/apps/exorchy.svg"
 update-desktop-database "$APPS" 2>/dev/null || true
 gtk4-update-icon-cache -q "$ICONS" 2>/dev/null || gtk-update-icon-cache -q "$ICONS" 2>/dev/null || true
 

@@ -1,11 +1,20 @@
-//! Appearance: read-only. The palette follows Omarchy's current theme; the
-//! page says which one, the mode and the type settings it took.
+//! Appearance: the palette follows Omarchy's current theme (read-only: the
+//! page says which one, the mode and the type settings it took), and the
+//! user's own background image with its opacity (`ui::backdrop`).
+
+use std::cell::Cell;
+use std::rc::Rc;
+use std::time::Duration;
 
 use adw::prelude::*;
+use exorchy_core::commands::games;
+use gtk::glib;
 
 use super::widgets::{self, Ctx, Row};
+use crate::app;
+use crate::ui::{backdrop, dialogs};
 
-pub fn build(_ctx: &Ctx) -> gtk::Widget {
+pub fn build(ctx: &Ctx) -> gtk::Widget {
     let page = widgets::page("Appearance");
     let theme = crate::theme::current();
     let from_omarchy = theme.as_ref().map(|t| t.source == "omarchy").unwrap_or(false);
@@ -35,5 +44,104 @@ pub fn build(_ctx: &Ctx) -> gtk::Widget {
     type_group.add(&Row::new("Base size").value(&size).hint("Follows Omarchy's font size setting.").widget);
     page.add(&type_group);
 
+    page.add(&background_group(ctx));
     page.upcast()
+}
+
+/// Background image: choose / remove, and how strongly it shows.
+fn background_group(ctx: &Ctx) -> adw::PreferencesGroup {
+    let group = widgets::group(
+        "Background",
+        Some("An image of your own behind the library, blended over the theme's background. Cards and panels stay solid."),
+    );
+    let choose = widgets::button("Choose…");
+    let remove = widgets::button("Remove");
+    let image_row = Row::new("Image").value("None").action(&choose);
+    image_row.add_action(&remove);
+    group.add(&image_row.widget);
+
+    let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, 5.0, 100.0, 5.0);
+    scale.set_width_request(200);
+    scale.set_valign(gtk::Align::Center);
+    let opacity_row = Row::new("Opacity").value(&format!("{}%", backdrop::DEFAULT_OPACITY)).hint("Lower lets more of the theme through.").action(&scale);
+    group.add(&opacity_row.widget);
+
+    let set_image = {
+        let (row, remove, opacity) = (image_row.clone(), remove.clone(), opacity_row.clone());
+        Rc::new(move |path: Option<&str>| {
+            let name = path.and_then(|p| std::path::Path::new(p).file_name()).map(|n| n.to_string_lossy().into_owned());
+            row.set_value(name.as_deref().unwrap_or("None"));
+            remove.set_sensitive(name.is_some());
+            opacity.widget.set_sensitive(name.is_some());
+        })
+    };
+    set_image(None);
+
+    // Current values; the slider only reacts once they are in.
+    let ready = Rc::new(Cell::new(false));
+    {
+        let (set_image, scale, opacity_row, ready) = (set_image.clone(), scale.clone(), opacity_row.clone(), ready.clone());
+        let core = app::core();
+        app::spawn(
+            async move {
+                let image = games::get_config(core.state(), "background_image".into()).await.ok().flatten();
+                let opacity = games::get_config(core.state(), "background_opacity".into()).await.ok().flatten();
+                (image, opacity)
+            },
+            move |(image, opacity)| {
+                set_image(image.as_deref().filter(|p| !p.is_empty()));
+                let pct = backdrop::parse_opacity(opacity.as_deref());
+                scale.set_value(pct as f64);
+                opacity_row.set_value(&format!("{pct}%"));
+                ready.set(true);
+            },
+        );
+    }
+
+    // Live while dragging, saved once it settles.
+    let save_seq = Rc::new(Cell::new(0u64));
+    scale.connect_value_changed({
+        let opacity_row = opacity_row.clone();
+        move |s| {
+            if !ready.get() {
+                return;
+            }
+            let pct = s.value().round() as u32;
+            opacity_row.set_value(&format!("{pct}%"));
+            backdrop::set_opacity(pct);
+            let seq = save_seq.get() + 1;
+            save_seq.set(seq);
+            let save_seq = save_seq.clone();
+            glib::timeout_add_local_once(Duration::from_millis(400), move || {
+                if save_seq.get() == seq {
+                    backdrop::save_opacity(pct);
+                }
+            });
+        }
+    });
+
+    choose.connect_clicked({
+        let (window, row, set_image) = (ctx.window.clone(), image_row.clone(), set_image.clone());
+        move |_| {
+            let (row, set_image) = (row.clone(), set_image.clone());
+            dialogs::pick_image(&window, "Choose a background image", move |picked| {
+                let Some(path) = picked else { return };
+                backdrop::choose(path, move |res| match res {
+                    Ok(stored) => set_image(Some(&stored)),
+                    Err(e) => row.set_error(&e),
+                });
+            });
+        }
+    });
+    remove.connect_clicked({
+        let (row, set_image) = (image_row.clone(), set_image.clone());
+        move |_| {
+            let (row, set_image) = (row.clone(), set_image.clone());
+            backdrop::clear(move |res| match res {
+                Ok(()) => set_image(None),
+                Err(e) => row.set_error(&e),
+            });
+        }
+    });
+    group
 }

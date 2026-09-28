@@ -1460,6 +1460,15 @@ pub fn on_change(f: impl Fn(&Change) + 'static) {
     MEDIA.with(|m| m.borrow_mut().listeners.push(Rc::new(f)));
 }
 
+/// Preview and theme fetches: those holding a slot, then those waiting for
+/// one, as (kind, game id, status, queued). The Transfers page.
+pub fn fetches() -> Vec<(Kind, i64, Option<Status>, bool)> {
+    read(|m| {
+        let row = |&(kind, id): &Key, queued: bool| (kind, id, m.fetch_ref(kind).jobs.get(&id).cloned(), queued);
+        m.active.iter().map(|k| row(k, false)).chain(m.queue.iter().map(|k| row(k, true))).collect()
+    })
+}
+
 pub fn video_state(id: i64) -> Option<Status> {
     read(|m| m.video.jobs.get(&id).cloned())
 }

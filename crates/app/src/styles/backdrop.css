@@ -1,0 +1,17 @@
+/* backdrop: rules for ui/backdrop.rs. Tokens only (see theme.rs).
+   With a background image the full-width surfaces let it through; cards,
+   panels, entries and dialogs keep their solid colours. */
+window.exorchy.has-backdrop .toolbar,
+window.exorchy.has-backdrop .filter-row {
+  background-color: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+}
+window.exorchy.has-backdrop .settings-view,
+window.exorchy.has-backdrop .settings-view headerbar.settings-header,
+window.exorchy.has-backdrop .transfers-view,
+window.exorchy.has-backdrop .transfers-view headerbar.transfers-header {
+  background-color: color-mix(in srgb, var(--bg-primary) 60%, transparent);
+}
+window.exorchy.has-backdrop .settings-view .settings-side {
+  background-color: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+}
+window.exorchy.has-backdrop .setup-page { background-color: transparent; }

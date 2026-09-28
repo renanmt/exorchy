@@ -33,6 +33,31 @@ makes the library reload cover dirs and packs, rescan and refetch
 shelf in Browse (`library.rs::load_collections`) shows enabled collections
 only and hides itself with a single one.
 
+### Hidden titles and adult titles
+
+A second per-user filter sits beside `enabled_sql`: `visible_sql(alias, search)`
+(`db::queries`). It drops
+
+- titles in `hidden_games` (the user's hide list, keyed by game id; hiding any
+  row hides its whole shortcode group, unhiding clears the group), except an
+  installed one when the query has a name search, so it stays findable and
+  playable;
+- adult titles while `show_adult` is off, which is the default; installed
+  ones too, and `get_genres` drops the `Adult` genre itself. eXo marks them
+  two ways (`adult_sql`): the LaunchBox age rating `A - Adult` (the
+  `age_rating` column, 136 titles in catalogue 17) and the genre token
+  `Adult` (a few, not always rated). `M - Mature` is not adult.
+
+It applies in `build_where_clause` (Browse, search, favourites, playlists),
+`fetch_installed_games`, `fetch_recently_played`, `search_library` (My
+Library's search: installed games only, hidden ones included) and the music
+shuffle candidates. `show_adult` is mirrored like the enabled set
+(`load_visibility`, called from `load_enabled_collections`).
+`count_hidden_installed` feeds My Library's "N installed games are hidden"
+note. UI: `ui/hidden.rs` (menus, Undo toast, the switch) and Settings →
+Hidden titles; changes go out on `bus::notify_visibility_changed()`. The
+collection chips' game counts are catalogue totals and still include them.
+
 Exodium appended newly shipped packs to the key on every catalogue refresh
 (`enable_new_collections`). eXorchy does not: a new pack must never switch
 itself on.

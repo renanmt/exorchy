@@ -225,6 +225,59 @@ pub async fn toggle_favorite(state: State<'_, DbState>, id: i64) -> Result<bool,
     queries::toggle_favorite(&conn, id).map_err(|e| e.to_string())
 }
 
+/// Hide a title from Browse and the shelves (an installed one stays
+/// findable by name and playable).
+pub async fn hide_game(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.lock()?;
+    queries::hide_game(&conn, id).map_err(|e| e.to_string())
+}
+
+pub async fn unhide_game(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.lock()?;
+    queries::unhide_game(&conn, id).map_err(|e| e.to_string())
+}
+
+pub async fn get_hidden_games(state: State<'_, DbState>) -> Result<Vec<Game>, String> {
+    let conn = state.lock()?;
+    queries::fetch_hidden_games(&conn).map_err(|e| e.to_string())
+}
+
+pub async fn get_hidden_ids(state: State<'_, DbState>) -> Result<Vec<i64>, String> {
+    let conn = state.lock()?;
+    queries::hidden_ids(&conn).map_err(|e| e.to_string())
+}
+
+/// My Library's search: installed games only (hidden ones included).
+pub async fn search_library(state: State<'_, DbState>, query: String) -> Result<Vec<Game>, String> {
+    let conn = state.lock()?;
+    queries::search_library(&conn, query.trim(), 200).map_err(|e| e.to_string())
+}
+
+/// Installed games no shelf lists (hidden, or adult while those are off).
+pub async fn count_hidden_installed(state: State<'_, DbState>) -> Result<usize, String> {
+    let conn = state.lock()?;
+    queries::count_hidden_installed(&conn).map_err(|e| e.to_string())
+}
+
+/// Take a game out of Recently played (the play history, not the game).
+pub async fn remove_from_recently_played(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.lock()?;
+    queries::clear_last_played(&conn, id).map_err(|e| e.to_string())
+}
+
+pub async fn get_show_adult() -> Result<bool, String> {
+    Ok(queries::show_adult())
+}
+
+/// Switch adult titles on or off everywhere (stored, then mirrored for the
+/// catalogue queries).
+pub async fn set_show_adult(state: State<'_, DbState>, on: bool) -> Result<(), String> {
+    let conn = state.lock()?;
+    queries::set_config(&conn, "show_adult", if on { "1" } else { "0" }).map_err(|e| e.to_string())?;
+    queries::set_show_adult(on);
+    Ok(())
+}
+
 pub async fn get_game(state: State<'_, DbState>, id: i64) -> Result<Option<Game>, String> {
     let conn = state.lock()?;
     let game = queries::fetch_game_by_id(&conn, id).map_err(|e| e.to_string())?;
@@ -397,6 +450,70 @@ pub struct TransferStats {
     /// False when no torrent is live anywhere - the difference between "idle"
     /// and "nothing running", which the badge shows differently.
     pub active: bool,
+}
+
+/// One row of the Transfers page: a session torrent, the collection whose
+/// manager owns it (if one does), and a name to show. Every eXoDOS torrent,
+/// the Media Pack included, calls itself "eXoDOS" inside, so the name comes
+/// from the bundled `.torrent` it was added from.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TorrentRow {
+    pub source: Option<String>,
+    pub label: String,
+    #[serde(flatten)]
+    pub transfer: crate::torrent::manager::TorrentTransfer,
+}
+
+/// Info hash → display name for every bundled torrent: collections by their
+/// display name, media sources by file name. Read once; the files ship with
+/// the app.
+fn bundled_torrent_labels() -> &'static Vec<(String, String)> {
+    static LABELS: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
+    LABELS.get_or_init(|| {
+        let collections = crate::COLLECTION_MAP.iter().map(|c| (c.torrent_file, c.display_name.to_string()));
+        let media = crate::media_sources::MEDIA_SOURCES.iter().map(|m| (m.torrent_file, m.torrent_file.trim_end_matches(".torrent").to_string()));
+        collections
+            .chain(media)
+            .filter_map(|(file, label)| {
+                let path = crate::commands::paths::bundled_torrent_path(file).ok()?;
+                let hash = crate::torrent::TorrentIndex::infohash(&path).ok()?;
+                Some((hash, label))
+            })
+            .collect()
+    })
+}
+
+/// Every torrent in the shared session with its own counters, labelled. All
+/// managers share one session, so one manager lists them all.
+pub async fn get_session_torrents(torrent_state: State<'_, TorrentState>) -> Result<Vec<TorrentRow>, String> {
+    let managers: Vec<(String, _)> = { torrent_state.0.read().await.iter().map(|(k, m)| (k.clone(), m.clone())).collect() };
+    let Some((_, first)) = managers.first() else {
+        return Ok(Vec::new());
+    };
+    let first = first.clone();
+    // `stats()` takes librqbit's locks, and the labels read files the first
+    // time: both off the async workers.
+    let (transfers, labels) = tokio::task::spawn_blocking(move || (first.session_torrents(), bundled_torrent_labels()))
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut rows: Vec<TorrentRow> = transfers
+        .into_iter()
+        .map(|t| {
+            let source = managers
+                .iter()
+                .find(|(_, m)| m.info_hash_hex().is_some_and(|h| h.eq_ignore_ascii_case(&t.info_hash)))
+                .map(|(k, _)| k.clone());
+            let label = labels
+                .iter()
+                .find(|(h, _)| h.eq_ignore_ascii_case(&t.info_hash))
+                .map(|(_, l)| l.clone())
+                .or_else(|| source.clone())
+                .unwrap_or_else(|| if t.name.is_empty() { "Torrent".into() } else { t.name.clone() });
+            TorrentRow { source, label, transfer: t }
+        })
+        .collect();
+    rows.sort_by(|a, b| a.label.cmp(&b.label));
+    Ok(rows)
 }
 
 /// Session-wide transfer rates: one read, and a peer serving two collections
