@@ -446,3 +446,16 @@ does not exist, so every lookup falls through to the installed resources. The AU
 `packaging/aur/PKGBUILD` (GitHub release tarball, `cargo fetch --locked` in `prepare()`,
 `--frozen` build, core tests in `check()`); the steps are in `docs/RELEASING.md`.
 
+## 2026-09-28 - Distribution: a prebuilt pacman package on GitHub releases, installed by a script
+
+AUR registrations are closed, and a script that compiles from source would need Rust and minutes
+of building on every machine. Each tag instead builds the package from `packaging/aur/PKGBUILD`
+in a clean Arch container (GitHub Actions) and attaches it, its SHA-256 and `install.sh` to the
+release. The script only downloads, verifies and hands the file to `pacman -U`, so pacman
+resolves the dependencies from the Arch repos, tracks every file and removes it cleanly; the
+build is reproducible and not made on a personal machine. Assets keep stable names so
+`releases/latest/download/…` always resolves. Prompts read `/dev/tty` because a piped script's
+stdin is the script, and the body runs from `main "$@"` on its last line so a truncated
+download runs nothing. A pacman repository (updates through `pacman -Syu`) is the next step if
+wanted; the AUR package is ready for when registration reopens.
+
