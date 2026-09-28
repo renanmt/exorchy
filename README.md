@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="packaging/icons/256x256.png" width="128" alt="eXorchy icon: a beige PC with C:\>_ on screen, a floppy that says GOOD GAMES NEVER DIE, and the eXorchy wordmark" />
+</p>
+
 # eXorchy
 
 An [Omarchy](https://omarchy.org)-native launcher for the
@@ -49,10 +53,9 @@ full list of credits.
 
 ## What it does
 
-- Every eXo collection: eXoDOS, the German, Spanish and Polish language packs,
-  eXoWin3x, eXoWin9x, eXoScummVM, plus the Media Pack reading room. Only
-  eXoDOS is on at first; the others are switches in Settings → Collections
-  and stay invisible until enabled.
+- Every eXo collection: eXoDOS, eXoWin3x, eXoWin9x and eXoScummVM (on from
+  the start), the German, Spanish and Polish language packs (switches in
+  Settings → Collections), plus the Media Pack reading room.
 - Streams single games on demand from the eXo torrents (no full download);
   downloads resume after a restart, seeding is opt-in.
 - DOSBox Staging 0.83.0 downloaded automatically (29 MB) or your own
@@ -65,11 +68,35 @@ full list of credits.
   magazines rendered in-app (poppler).
 - Per-game settings, favourites, playlists, My Library, save-preserving
   uninstall, storage overview.
+- A Transfers page (click the connection badge): what is downloading, what
+  waits, and every torrent with its own speed, peers and upload.
+- Hide any title from the lists (an installed one stays searchable and
+  playable); adult titles are hidden until you switch them on in
+  Settings → Hidden titles.
+- Your own background image behind the library, with an opacity slider, and
+  an option to open straight into My Library.
 - A native GTK4 / libadwaita window: no web view, no title bar (Hyprland
   draws the borders and tiles it), a virtualised grid that stays smooth on
   11,000 games, keyboard-first navigation.
 - Omarchy theming: palette, light/dark mode, font and base size from the
   current theme, updated the moment you run `omarchy theme set`.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/browse.png" width="820" alt="Browse: the eXoDOS catalogue as a grid of box art over a custom background, with collection chips, playlist, genre and sort filters, and an A–Z jump bar" />
+</p>
+<p align="center"><em>Browse the whole catalogue, filtered by collection, genre or playlist.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/detail.png" width="820" alt="A search for Red Baron with its detail panel open: box art, year, publisher, a note about DOSBox ECE, the Download button and the description" />
+</p>
+<p align="center"><em>Search, then open a game: box art, details, notes and one-click download.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/library.png" width="820" alt="My Library: a note that one installed game is hidden, and the Recently played and Installed shelves with Duke Nukem 3D and After Dark" />
+</p>
+<p align="center"><em>My Library: recently played and installed games, ready to play.</em></p>
 
 ## Install
 
@@ -95,7 +122,7 @@ Then launch **eXorchy** from the Omarchy launcher (Super+Space) or run
 | `/` | focus the search field |
 | arrows, Page Up/Down, Home/End | move through the grid or list |
 | Enter (or double-click) | open the selected game in the detail panel |
-| Esc | close the detail panel |
+| Esc | close the detail panel; leave Settings or Transfers |
 | Ctrl+, | open Settings |
 
 ## Build from source
