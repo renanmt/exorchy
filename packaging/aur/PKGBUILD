@@ -1,45 +1,49 @@
 # Maintainer: Renan Tonheiro <renan.tonheiro@gmail.com>
-# Build from a local checkout:  cd packaging && makepkg -si
+# AUR package: copy this file into the AUR git repo, run updpkgsums and
+# makepkg --printsrcinfo > .SRCINFO (see docs/RELEASING.md). packaging/PKGBUILD
+# builds a local checkout instead.
 pkgname=exorchy
 pkgver=0.2.0
 pkgrel=1
-pkgdesc="eXorchy: Omarchy-native launcher for the eXo collections (eXoDOS, eXoWin3x, eXoWin9x, eXoScummVM)"
+pkgdesc="Omarchy-native launcher for the eXo collections (eXoDOS, eXoWin3x, eXoWin9x, eXoScummVM)"
 arch=('x86_64')
 url="https://github.com/renanmt/exorchy"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'poppler-glib' 'gstreamer' 'gst-plugins-base'
          'openssl' 'xdg-utils' 'hicolor-icon-theme')
-makedepends=('rust' 'cargo' 'pkgconf')
+makedepends=('cargo' 'git' 'pkgconf')
 optdepends=('gst-plugins-good: preview videos and theme music'
             'gst-libav: H.264 preview videos'
             'dosbox-staging: use a system emulator instead of the downloaded pack')
-# The workspace profile sets its own thin LTO and strip; makepkg's flags would
-# override both.
 options=('!lto')
-source=()
-sha256sums=()
+source=("$pkgname-$pkgver.tar.gz::https://github.com/renanmt/exorchy/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
 
-_srcdir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
 
 build() {
-  cd "$_srcdir"
-  cargo build --release --locked -p exorchy
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p exorchy
 }
 
 check() {
-  cd "$_srcdir"
-  cargo test --release --locked -p exorchy-core
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen --release -p exorchy-core
 }
 
 package() {
-  cd "$_srcdir"
+  cd "$pkgname-$pkgver"
   install -Dm755 target/release/exorchy "$pkgdir/usr/bin/exorchy"
 
-  # Bundled resources: exorchy_core::resource_dir() looks in /usr/lib/exorchy
-  # (then ~/.local/lib/exorchy, then the source checkout).
   install -d "$pkgdir/usr/lib/exorchy"
   cp -r metadata "$pkgdir/usr/lib/exorchy/metadata"
-  # Only the gzipped catalogue ships; an uncompressed gen-db output is local.
   rm -f "$pkgdir/usr/lib/exorchy/metadata/"*.db \
         "$pkgdir/usr/lib/exorchy/metadata/"*.db-shm \
         "$pkgdir/usr/lib/exorchy/metadata/"*.db-wal
@@ -47,8 +51,6 @@ package() {
   install -Dm644 manifest.json "$pkgdir/usr/lib/exorchy/manifest.json"
   cp -r crates/core/resources/previews "$pkgdir/usr/lib/exorchy/previews"
 
-  # Desktop integration: the desktop file is named after the GApplication id
-  # (= the Wayland app id Hyprland sees), so the launcher matches the window.
   install -Dm644 packaging/org.exorchy.eXorchy.desktop \
     "$pkgdir/usr/share/applications/org.exorchy.eXorchy.desktop"
   for s in 32 128 256 512; do

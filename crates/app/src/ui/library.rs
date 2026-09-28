@@ -1136,7 +1136,7 @@ fn refresh_cards_for(id: i64) {
 fn hidden_note(window: &gtk::Window, n: usize) -> gtk::Box {
     let b = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["hidden-note"]).build();
     let text = if n == 1 { "1 installed game is hidden".to_string() } else { format!("{n} installed games are hidden") };
-    b.append(&gtk::Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["muted"]).build());
+    b.append(&gtk::Label::builder().label(text).xalign(0.0).wrap(true).hexpand(true).css_classes(["muted"]).build());
     let manage = gtk::Button::builder().label("Manage").css_classes(["btn", "ghost"]).build();
     let w = window.clone();
     manage.connect_clicked(move |_| crate::ui::settings::open(&w, "hidden"));

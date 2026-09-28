@@ -168,11 +168,58 @@ pub struct GameFilter<'a> {
     pub with_music: bool,
 }
 
-/// The collections the user enabled (Settings → Collections), mirrored from
-/// the `collections` config key so every catalogue query can exclude the
-/// rest without re-reading config. `None` (never loaded, e.g. tests and
-/// generate_db) means no filter.
-static ENABLED_COLLECTIONS: std::sync::RwLock<Option<Vec<String>>> = std::sync::RwLock::new(None);
+/// The per-user catalogue filters every query applies: the collections the
+/// user enabled (Settings → Collections, `None` = never loaded, no filter,
+/// e.g. generate_db) and whether adult titles are listed (off until loaded).
+/// Mirrored from config so no query re-reads it. Process-wide in the app;
+/// per thread under `cargo test`, where each test runs on its own thread and
+/// one test's setting must not leak into another's queries.
+#[cfg(not(test))]
+mod filter_state {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::RwLock;
+
+    static ENABLED: RwLock<Option<Vec<String>>> = RwLock::new(None);
+    static SHOW_ADULT: AtomicBool = AtomicBool::new(false);
+
+    pub fn enabled() -> Option<Vec<String>> {
+        ENABLED.read().ok().and_then(|g| g.clone())
+    }
+    pub fn set_enabled(ids: Vec<String>) {
+        if let Ok(mut g) = ENABLED.write() {
+            *g = Some(ids);
+        }
+    }
+    pub fn show_adult() -> bool {
+        SHOW_ADULT.load(Ordering::Relaxed)
+    }
+    pub fn set_show_adult(on: bool) {
+        SHOW_ADULT.store(on, Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod filter_state {
+    use std::cell::{Cell, RefCell};
+
+    thread_local! {
+        static ENABLED: RefCell<Option<Vec<String>>> = const { RefCell::new(None) };
+        static SHOW_ADULT: Cell<bool> = const { Cell::new(false) };
+    }
+
+    pub fn enabled() -> Option<Vec<String>> {
+        ENABLED.with(|e| e.borrow().clone())
+    }
+    pub fn set_enabled(ids: Vec<String>) {
+        ENABLED.with(|e| *e.borrow_mut() = Some(ids));
+    }
+    pub fn show_adult() -> bool {
+        SHOW_ADULT.with(Cell::get)
+    }
+    pub fn set_show_adult(on: bool) {
+        SHOW_ADULT.with(|s| s.set(on));
+    }
+}
 
 /// Mirror the enabled set. An empty list would hide the whole catalogue, so
 /// it is read as "eXoDOS only" - that pack can never be switched off.
@@ -181,16 +228,14 @@ pub fn set_enabled_collections(ids: &[String]) {
     if !ids.iter().any(|s| s == "eXoDOS") {
         ids.insert(0, "eXoDOS".to_string());
     }
-    if let Ok(mut guard) = ENABLED_COLLECTIONS.write() {
-        *guard = Some(ids);
-    }
+    filter_state::set_enabled(ids);
 }
 
-/// Load the enabled set from the `collections` config key (unset = eXoDOS),
-/// and `show_adult` with it.
 /// The enabled set of a fresh install: every game collection, no language pack.
 pub const DEFAULT_COLLECTIONS: &str = "eXoDOS,eXoWin3x,eXoWin9x,eXoScummVM";
 
+/// Load the enabled set from the `collections` config key (unset = the
+/// default set), and `show_adult` with it.
 pub fn load_enabled_collections(conn: &Connection) {
     let raw = get_config(conn, "collections").ok().flatten().unwrap_or_else(|| DEFAULT_COLLECTIONS.to_string());
     let ids: Vec<String> = raw.split(',').map(|s| s.to_string()).collect();
@@ -200,7 +245,7 @@ pub fn load_enabled_collections(conn: &Connection) {
 }
 
 pub fn enabled_collections() -> Option<Vec<String>> {
-    ENABLED_COLLECTIONS.read().ok().and_then(|g| g.clone())
+    filter_state::enabled()
 }
 
 /// SQL predicate: `alias` belongs to an enabled collection. `1=1` when no
@@ -220,17 +265,13 @@ pub(crate) fn enabled_sql(alias: &str) -> String {
     }
 }
 
-/// Whether adult titles (eXo's genre "Adult") are listed: Settings →
-/// Hidden titles. Mirrored from the `show_adult` config key like the enabled
-/// set; off until loaded, so no query shows them by accident.
-static SHOW_ADULT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
+/// Whether adult titles are listed: Settings → Hidden titles (`show_adult`).
 pub fn set_show_adult(on: bool) {
-    SHOW_ADULT.store(on, std::sync::atomic::Ordering::Relaxed);
+    filter_state::set_show_adult(on);
 }
 
 pub fn show_adult() -> bool {
-    SHOW_ADULT.load(std::sync::atomic::Ordering::Relaxed)
+    filter_state::show_adult()
 }
 
 /// Load `show_adult` (unset = off).
@@ -1037,8 +1078,7 @@ mod tests {
 
     /// Hidden titles leave Browse and the shelves (a hidden installed one is
     /// still found by name); adult titles (genre or age rating) and their genre stay out until
-    /// switched on; Recently played forgets a whole group. One test, because
-    /// `show_adult` is process-wide.
+    /// switched on; Recently played forgets a whole group.
     #[test]
     fn hidden_and_adult_titles_leave_the_lists() {
         let conn = open_test_db();
@@ -1740,7 +1780,6 @@ mod tests {
         // An empty list cannot hide eXoDOS.
         set_enabled_collections(&[]);
         assert_eq!(count_games_filtered(&conn, &all).unwrap(), 1);
-        // Restore "no filter" for the other tests in this process.
-        if let Ok(mut g) = ENABLED_COLLECTIONS.write() { *g = None; }
+        // No restore needed: under test the enabled set is per thread.
     }
 }

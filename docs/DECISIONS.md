@@ -435,3 +435,14 @@ a window started in a narrow tile and then maximised showed an empty detail pane
 `collapsed` change the library sets `show-sidebar` to "a game is open", on idle so it lands
 after the split view's own change.
 
+## 2026-09-28 - The source checkout is used only by a binary running from it; AUR packaging
+
+`metadata/`, `torrents/` and `manifest.json` were looked up in the checkout the binary was
+built from (`CARGO_MANIFEST_DIR`) before `/usr/lib/exorchy`. A packaged binary keeps that path,
+and an AUR helper keeps its build tree in a cache, so an installed eXorchy would have read its
+resources from a stale build directory. `dev_project_root()` now answers the checkout only while
+the running executable sits inside it (`cargo run`, tests, generate_db); otherwise a path that
+does not exist, so every lookup falls through to the installed resources. The AUR package is
+`packaging/aur/PKGBUILD` (GitHub release tarball, `cargo fetch --locked` in `prepare()`,
+`--frozen` build, core tests in `check()`); the steps are in `docs/RELEASING.md`.
+

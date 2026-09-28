@@ -51,15 +51,28 @@ pub(crate) static RESOURCE_DIR: OnceLock<PathBuf> = OnceLock::new();
 /// from a command on shipped Windows builds.
 pub(crate) static LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-/// The repository root when running from a source checkout (`cargo run`):
-/// `metadata/`, `torrents/` and `manifest.json` are read from there before
-/// the installed resource dir is consulted.
+/// The repository root when running from a source checkout (`cargo run`,
+/// tests, generate_db): `metadata/`, `torrents/` and `manifest.json` are read
+/// from there before the installed resource dir is consulted.
+///
+/// Only while the running executable sits inside that checkout: a packaged
+/// binary was built somewhere (an AUR helper keeps its build tree in a cache)
+/// and that stale tree must never shadow `/usr/lib/exorchy`. Outside the
+/// checkout this returns a path that does not exist, so every dev lookup
+/// falls through. A checkout built with `CARGO_TARGET_DIR` elsewhere sets
+/// `EXORCHY_RESOURCE_DIR` instead.
 pub fn dev_project_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .map(Path::to_path_buf)
-        .unwrap_or_default()
+    static ROOT: OnceLock<PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(|p| p.parent()).map(Path::to_path_buf);
+        let canonical = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        let exe = std::env::current_exe().map(|e| canonical(&e));
+        match (root, exe) {
+            (Some(root), Ok(exe)) if exe.starts_with(canonical(&root)) => root,
+            _ => PathBuf::from("/nonexistent/exorchy-source-checkout"),
+        }
+    })
+    .clone()
 }
 
 /// Called once at startup with the app's resource directory.
