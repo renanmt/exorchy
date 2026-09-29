@@ -20,10 +20,13 @@ and runs `sudo pacman -U`; `--version vX.Y.Z`, `--download-only [DIR]` and
 
 ## Every release
 
-1. **Version.** Raise `version` in the root `Cargo.toml` and `pkgver` in
-   `packaging/aur/PKGBUILD` and `packaging/PKGBUILD` to the same number (a new
-   version starts at `pkgrel=1`). `cargo build` refreshes `Cargo.lock`.
-   Commit, open a PR, merge to `main`.
+1. **Version and changelog.** Raise `version` in the root `Cargo.toml` and
+   `pkgver` in `packaging/aur/PKGBUILD` and `packaging/PKGBUILD` to the same
+   number (a new version starts at `pkgrel=1`); `cargo build` refreshes
+   `Cargo.lock`. Add a `## [X.Y.Z] - YYYY-MM-DD` section at the top of
+   `CHANGELOG.md` (Added / Changed / Fixed, written for users): it becomes the
+   release notes, and the workflow refuses a tag without one. Preview it with
+   `packaging/release/changelog-section.sh X.Y.Z`. Commit, open a PR, merge.
 2. **Dry run (optional).** GitHub → Actions → Release → *Run workflow* on
    `main`: it builds exactly as a release would and keeps the three files as
    an artifact, without publishing anything.
@@ -36,8 +39,10 @@ and runs `sudo pacman -U`; `--version vX.Y.Z`, `--download-only [DIR]` and
    ```
 
    The workflow refuses a tag that does not match `Cargo.toml` and the
-   PKGBUILD. It takes about ten minutes; the release appears under
-   *Releases* with install notes and the generated changelog.
+   PKGBUILD, or that has no `CHANGELOG.md` section. It takes about ten
+   minutes; the release appears under *Releases* with that section as its
+   notes, followed by the install instructions. eXorchy's update banner links
+   there ("What's new").
 4. **Check.** On a machine with eXorchy installed, run the install line: it
    should update to the new version (`pacman -Q exorchy`).
 

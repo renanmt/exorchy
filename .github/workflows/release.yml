@@ -2,7 +2,8 @@
 # Arch container (release build + core tests, packaging/aur/PKGBUILD) and
 # publishes a GitHub release with the package, its checksum and install.sh.
 # "Run workflow" (manual) only builds and keeps the files as an artifact:
-# a dry run of a release. See docs/RELEASING.md.
+# a dry run of a release. The notes are the tag's CHANGELOG.md section.
+# See docs/RELEASING.md.
 name: Release
 
 on:
@@ -38,6 +39,13 @@ jobs:
           [ "v$ver" = "$GITHUB_REF_NAME" ] || { echo "::error::Cargo.toml version $ver does not match tag $GITHUB_REF_NAME"; exit 1; }
           [ "$pkgver" = "$ver" ] || { echo "::error::packaging/aur/PKGBUILD pkgver $pkgver does not match $ver"; exit 1; }
 
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # Fails (before the long build) when the version has no section.
+          packaging/release/changelog-section.sh "$GITHUB_REF_NAME" > changes.md
+          cat changes.md
+
       - name: Build the package (release build, core tests)
         run: packaging/release/build-package.sh dist
 
@@ -53,22 +61,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat > notes.md <<'NOTES'
+          ver="${GITHUB_REF_NAME#v}"
+          {
+            cat changes.md
+            cat <<'NOTES'
+
+          ---
+
           ## Install or update
 
-          On Arch / Omarchy:
+          Already have eXorchy 0.4 or later? Click **Update** in the banner, or in Settings → About.
+
+          Otherwise, on Arch / Omarchy:
 
           ```bash
           curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash
           ```
 
-          Or download `exorchy-x86_64.pkg.tar.zst`, check it against `exorchy-x86_64.pkg.tar.zst.sha256`, and run `sudo pacman -U exorchy-x86_64.pkg.tar.zst`.
-
-          Remove it with `sudo pacman -R exorchy` (your settings and games stay).
+          Or download `exorchy-x86_64.pkg.tar.zst`, check it with `sha256sum -c exorchy-x86_64.pkg.tar.zst.sha256`, and run `sudo pacman -U exorchy-x86_64.pkg.tar.zst`. Remove it with `sudo pacman -R exorchy` (your settings and games stay).
           NOTES
+            echo
+            echo "Every release: [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md)"
+          } > notes.md
           gh release create "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "eXorchy ${GITHUB_REF_NAME#v}" \
+            --title "eXorchy $ver" \
             --notes-file notes.md \
-            --generate-notes \
             --verify-tag

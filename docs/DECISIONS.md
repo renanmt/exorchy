@@ -492,3 +492,12 @@ quits right after opening the terminal. Only the pacman-installed `/usr/bin/exor
 Update; other copies get the notice and a hint, since the script would put a second install
 beside them. The tag goes into a shell command, so only `vN.N.N` with digits is accepted.
 
+## 2026-09-29 - Release notes come from a hand-written CHANGELOG.md
+
+GitHub's generated notes list pull-request titles, which here were branch names ("Merge pull
+request #6 from renanmt/fix-favorite-flicker"), and the app's "What's new" opens those notes.
+`CHANGELOG.md` (Keep a Changelog shape, written for users) now holds one section per version;
+the release workflow publishes the tag's section above the install instructions
+(`packaging/release/changelog-section.sh`) and fails before building when the section is
+missing, so a release cannot go out without notes.
+
