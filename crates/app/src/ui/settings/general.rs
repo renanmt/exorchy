@@ -27,6 +27,8 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     lib.add(&installed.widget);
     let (start_row, start_library) = widgets::switch_row("Open in My Library", "Start on your installed games instead of Browse.", false);
     lib.add(&start_row.widget);
+    let (updates_row, check_updates) = widgets::switch_row("Check for updates", "Look for a new eXorchy release on GitHub at start and every few hours.", true);
+    lib.add(&updates_row.widget);
     page.add(&lib);
 
     // ── Game defaults ──
@@ -56,14 +58,15 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
             };
             (
                 (get("data_dir").await, get("global_glshader").await, get("default_fullscreen").await, get("music_autoplay").await, get("music_continuous").await),
-                get("start_tab").await,
+                (get("start_tab").await, get("update_check").await),
             )
         },
         {
-            let (folder, crt, fullscreen, autoplay, continuous, start_library) =
-                (folder.clone(), crt.clone(), fullscreen.clone(), autoplay.clone(), continuous.clone(), start_library.clone());
-            move |((dir, shader, fs, ap, ct), start)| {
+            let (folder, crt, fullscreen, autoplay, continuous, start_library, check_updates) =
+                (folder.clone(), crt.clone(), fullscreen.clone(), autoplay.clone(), continuous.clone(), start_library.clone(), check_updates.clone());
+            move |((dir, shader, fs, ap, ct), (start, upd))| {
                 start_library.set_quiet(start.as_deref() == Some("library"));
+                check_updates.set_quiet(upd.as_deref() != Some("0"));
                 folder.set_value(dir.as_deref().filter(|d| !d.is_empty()).unwrap_or("Not set"));
                 crt.set_quiet(shader.is_none() || shader.as_deref() == Some("crt-auto"));
                 fullscreen.set_quiet(fs.as_deref() == Some("fullscreen"));
@@ -78,6 +81,7 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     bind_toggle(&autoplay, "music_autoplay", "1", "0");
     bind_toggle(&continuous, "music_continuous", "1", "0");
     bind_toggle(&start_library, "start_tab", "library", "browse");
+    bind_toggle(&check_updates, "update_check", "1", "0");
 
     scan.widget.connect_clicked({
         let (scan, installed) = (scan.clone(), installed.clone());

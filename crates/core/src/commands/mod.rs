@@ -15,6 +15,7 @@ pub mod playlists;
 pub mod setup;
 pub mod shell_open;
 pub mod updates;
+pub mod app_update;
 pub mod emulator_cmds;
 pub mod scummvm;
 pub mod win9x;

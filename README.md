@@ -75,6 +75,9 @@ full list of credits.
   Settings → Hidden titles.
 - Your own background image behind the library, with an opacity slider, and
   an option to open straight into My Library.
+- Tells you when a new release is out and updates itself: one click opens a
+  terminal that installs it (pacman asks for your password) and eXorchy
+  starts again.
 - A native GTK4 / libadwaita window: no web view, no title bar (Hyprland
   draws the borders and tiles it), a virtualised grid that stays smooth on
   11,000 games, keyboard-first navigation.

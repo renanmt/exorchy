@@ -14,6 +14,7 @@
 //! - `actions`   download / play / stop / uninstall / reset / favourite / open
 //! - `bus`       library-change bus, running set, offline flag, toasts
 //! - `settings`  the Settings page (in place of the library) and its sections
+//! - `updates`   new-release check, the update banner, the update itself
 //! - `transfers` the Transfers page: downloads, queue, session torrents (toolbar badge)
 //! - `reading`   the Reading Room (Media Pack) and the PDF reader
 //! - `media`     preview videos and theme music (now-playing bar)
@@ -46,6 +47,7 @@ pub mod logo;
 pub mod model;
 pub mod setup;
 pub mod transfers;
+pub mod updates;
 pub mod splash;
 pub mod util;
 pub mod window;

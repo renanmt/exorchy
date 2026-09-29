@@ -29,3 +29,8 @@ session did not touch):
 - preview video / theme music playback (this machine lacks `gst-plugins-good` / `gst-libav`);
 - the online-only dialogs (seeding consent, welcome modal, Win9x network prompt), content-pack installs;
 - `makepkg` and `packaging/install-dev.sh` end to end, `omarchy theme set` while the window is open.
+
+- `EXORCHY_PRETEND_VERSION=0.2.0` makes the update check compare against that
+  version, so the banner and the update flow can be seen against a real
+  release. The Update button itself only appears for the pacman-installed
+  `/usr/bin/exorchy`.

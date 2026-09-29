@@ -479,3 +479,16 @@ refreshes its grid flags and shelves as before, and the panel only repaints its 
 it shows that game. `library_changed` stays for what really changes a row's state (downloads,
 installs, uninstalls, playlists).
 
+## 2026-09-29 - Self-update: check GitHub releases, install in a terminal, restart
+
+eXorchy checks `releases/latest` of the GitHub repository shortly after start and every six
+hours (switchable, skipped offline) and shows a banner above the toolbar. Update does not
+install from inside the app: installing is `sudo pacman -U`, and Omarchy ships no graphical
+polkit agent to ask for the password, so the app opens Omarchy's floating terminal (the one its
+own Install menu uses; `xdg-terminal-exec` otherwise) running that exact release's `install.sh
+--version vX.Y.Z`, which downloads, verifies and installs, then waits for the old process to
+exit and starts eXorchy again through `uwsm-app` (whether or not the install succeeded). The app
+quits right after opening the terminal. Only the pacman-installed `/usr/bin/exorchy` offers
+Update; other copies get the notice and a hint, since the script would put a second install
+beside them. The tag goes into a shell command, so only `vN.N.N` with digits is accepted.
+

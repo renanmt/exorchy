@@ -104,6 +104,7 @@ fn show_library(window: &adw::ApplicationWindow, stack: &gtk::Stack, _toasts: &a
     page.activity_button.connect_clicked(move |_| crate::ui::transfers::open(&w));
     page.set_reading_widget(&crate::ui::reading::build(window.upcast_ref()));
     crate::ui::media::install(window.upcast_ref(), &page, &page.bar_slot);
+    crate::ui::updates::install(window.upcast_ref(), &page.banner_slot);
 
     downloads::init_dependency_downloads();
     crate::ui::hidden::load();

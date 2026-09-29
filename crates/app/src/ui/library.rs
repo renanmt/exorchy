@@ -96,6 +96,8 @@ pub struct LibraryPage {
     pub activity_button: gtk::Button,
     pub settings_button: gtk::Button,
     pub bar_slot: gtk::Box,
+    /// Full-width notices above the toolbar (the update banner).
+    pub banner_slot: gtk::Box,
     pub toolbar_slot: gtk::Box,
     playlist_menu: gtk::Box,
     window: gtk::Window,
@@ -259,7 +261,9 @@ impl LibraryPage {
 
         // The now-playing bar (ui::media) mounts under the content.
         let bar_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
+        let banner_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        column.append(&banner_slot);
         column.append(&toolbar);
         column.append(&split);
         column.append(&bar_slot);
@@ -304,6 +308,7 @@ impl LibraryPage {
             activity_button,
             settings_button,
             bar_slot,
+            banner_slot,
             toolbar_slot,
             playlist_menu,
             window: window.clone(),
