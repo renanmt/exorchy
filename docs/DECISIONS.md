@@ -470,3 +470,12 @@ boxed lists, popovers, dialogs, switches, toasts), so style.css sets those squar
 buttons stay round. The Settings boxed-list rules now match (`list`, not `listbox`: GtkListBox's
 CSS node is `list`), so the groups take the app's own flat, outlined look.
 
+## 2026-09-29 - A favourite is its own signal, not a library change
+
+Starring a game sent `bus::notify_library_changed`, whose listeners include the detail panel's
+full refresh (re-read the row, variants, metadata, cover, media): the panel flickered on every
+star (reported on Reddit). Stars now send `notify_favorite_changed(id, favorited)`: the library
+refreshes its grid flags and shelves as before, and the panel only repaints its action bar when
+it shows that game. `library_changed` stays for what really changes a row's state (downloads,
+installs, uninstalls, playlists).
+

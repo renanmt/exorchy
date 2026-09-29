@@ -474,6 +474,13 @@ impl LibraryPage {
             page.refresh_shelves();
             page.detail.refresh_by_id(*id);
         }));
+        // A star: the grid's flags and the Favorites shelf follow; the panel
+        // only repaints its own star (a full refresh flickered it).
+        bus::on_favorite_changed(glib::clone!(#[weak(rename_to = page)] self, move |(id, favorited)| {
+            page.refresh_loaded();
+            page.refresh_shelves();
+            page.detail.set_favorite(*id, *favorited);
+        }));
         bus::on_running_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.detail.refresh_running();
         }));

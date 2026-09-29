@@ -300,7 +300,7 @@ impl Card {
                         g.favorited = v;
                     }
                     card.set_favorited(v);
-                    bus::notify_library_changed(id);
+                    bus::notify_favorite_changed(id, v);
                 }
                 Err(_) => card.set_favorited(prev),
             }
