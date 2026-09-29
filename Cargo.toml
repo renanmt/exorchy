@@ -5,7 +5,7 @@ resolver = "2"
 members = ["crates/core", "crates/app"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Renan Tonheiro"]
 license = "MIT"
 edition = "2021"
