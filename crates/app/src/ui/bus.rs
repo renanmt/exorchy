@@ -22,6 +22,7 @@ struct Bus {
     collections_changed: Vec<Cb<()>>,
     playlists_changed: Vec<Cb<()>>,
     visibility_changed: Vec<Cb<()>>,
+    favorite_changed: Vec<Cb<(i64, bool)>>,
 }
 
 thread_local! {
@@ -34,6 +35,7 @@ thread_local! {
         collections_changed: Vec::new(),
         playlists_changed: Vec::new(),
         visibility_changed: Vec::new(),
+        favorite_changed: Vec::new(),
     });
 }
 
@@ -58,6 +60,20 @@ pub fn notify_collections_changed() {
     let cbs: Vec<Cb<()>> = BUS.with(|b| b.borrow().collections_changed.clone());
     for cb in cbs {
         cb(&());
+    }
+}
+
+/// A game was starred or unstarred: `(id, favorited)`. Lighter than
+/// `library_changed`: lists and shelves refresh, but the detail panel only
+/// repaints its star instead of re-reading the game (which flickered it).
+pub fn on_favorite_changed(f: impl Fn(&(i64, bool)) + 'static) {
+    BUS.with(|b| b.borrow_mut().favorite_changed.push(Rc::new(f)));
+}
+
+pub fn notify_favorite_changed(id: i64, favorited: bool) {
+    let cbs: Vec<Cb<(i64, bool)>> = BUS.with(|b| b.borrow().favorite_changed.clone());
+    for cb in cbs {
+        cb(&(id, favorited));
     }
 }
 

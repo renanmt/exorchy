@@ -282,6 +282,21 @@ impl DetailPanel {
         }));
     }
 
+    /// A game was starred or unstarred (here or on a card): if it is the one
+    /// shown, repaint the action bar's star; nothing else of the panel changes.
+    pub fn set_favorite(self: &Rc<Self>, id: i64, favorited: bool) {
+        let changed = match self.game.borrow_mut().as_mut() {
+            Some(g) if g.id == Some(id) && g.favorited != favorited => {
+                g.favorited = favorited;
+                true
+            }
+            _ => false,
+        };
+        if changed {
+            self.render_actions();
+        }
+    }
+
     /// Rebuild the action bar (its menu reads state such as hidden titles).
     pub fn refresh_actions(self: &Rc<Self>) {
         self.render_actions();
@@ -557,17 +572,14 @@ impl DetailPanel {
         let fav = btn(if game.favorited { "★" } else { "☆" }, &["icon"]);
         fav.set_tooltip_text(Some(if game.favorited { "Remove from favorites" } else { "Add to favorites" }));
         if let Some(gid) = game.id {
-            fav.connect_clicked(glib::clone!(#[weak(rename_to = panel)] self, move |_| {
-                actions::toggle_favorite(gid, glib::clone!(#[weak] panel, move |res| {
+            // The bus brings the new state back to this panel (`set_favorite`).
+            fav.connect_clicked(move |_| {
+                actions::toggle_favorite(gid, move |res| {
                     if let Ok(v) = res {
-                        if let Some(g) = panel.game.borrow_mut().as_mut() {
-                            g.favorited = v;
-                        }
-                        bus::notify_library_changed(gid);
-                        panel.render_actions();
+                        bus::notify_favorite_changed(gid, v);
                     }
-                }));
-            }));
+                });
+            });
         }
         self.actions.append(&fav);
 
