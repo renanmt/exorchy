@@ -459,3 +459,14 @@ stdin is the script, and the body runs from `main "$@"` on its last line so a tr
 download runs nothing. A pacman repository (updates through `pacman -Syu`) is the next step if
 wanted; the AUR package is ready for when registration reopens.
 
+## 2026-09-29 - Square corners and 2 px outlines, like Omarchy's windows
+
+Omarchy's Hyprland draws windows with rounding 0 and 2 px borders; eXorchy's 8 / 12 px radii
+and pill shapes looked foreign inside them. The radius tokens (`--radius`, `--radius-lg`, the
+new `--radius-pill`) are 0 and every hard-coded radius goes through them, so one token brings
+roundness back. Outlines (cards, panels, entries, buttons, lists) use `--border` (2 px); row
+dividers stay 1 px so lists do not get heavy. libadwaita rounds its own widgets (buttons,
+boxed lists, popovers, dialogs, switches, toasts), so style.css sets those square too; radio
+buttons stay round. The Settings boxed-list rules now match (`list`, not `listbox`: GtkListBox's
+CSS node is `list`), so the groups take the app's own flat, outlined look.
+

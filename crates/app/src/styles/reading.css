@@ -5,7 +5,7 @@
 .reading-note { color: var(--warning); font-size: 0.9em; }
 .results-count { margin-left: 4px; }
 menubutton.pub-button > button {
-  background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: var(--radius);
+  background-color: var(--fill-2); border: var(--border) solid var(--line-3); border-radius: var(--radius);
   color: var(--text-primary); box-shadow: none; padding: 4px 10px; min-width: 160px;
 }
 menubutton.pub-button > button:hover { background-color: var(--fill-3); }
@@ -16,7 +16,7 @@ button.menu-item.active { background-color: var(--accent-fill); color: var(--tex
 /* ---- Poster pack hint ---- */
 .pack-hint {
   margin: 8px 14px 0 14px; padding: 10px 14px;
-  background-color: var(--bg-card); border: 1px solid var(--line-3); border-radius: var(--radius-lg);
+  background-color: var(--bg-card); border: var(--border) solid var(--line-3); border-radius: var(--radius-lg);
 }
 
 /* ---- Sectioned grid ---- */
@@ -52,7 +52,7 @@ button.list-col {
 }
 button.list-col:hover { color: var(--text-primary); }
 button.list-col:disabled { color: var(--text-muted); }
-.issue-row .row-cover { border-radius: 4px; background-color: var(--bg-secondary); }
+.issue-row .row-cover { border-radius: var(--radius); background-color: var(--bg-secondary); }
 .issue-row .row-title { font-weight: 600; color: var(--text-strong); }
 button.fav-btn.row-fav { margin: 0; padding: 2px 6px; text-shadow: none; }
 
@@ -62,7 +62,7 @@ button.fav-btn.row-fav { margin: 0; padding: 2px 6px; text-shadow: none; }
 /* ---- Detail panel: Covered in ---- */
 .detail-articles { margin-top: 8px; }
 button.article-row {
-  background-color: var(--fill-1); border: 1px solid var(--line-2); border-radius: var(--radius);
+  background-color: var(--fill-1); border: var(--border) solid var(--line-2); border-radius: var(--radius);
   padding: 6px 10px; box-shadow: none; color: var(--text-primary);
 }
 button.article-row:hover { background-color: var(--fill-2); border-color: var(--line-4); }
@@ -83,7 +83,7 @@ entry.doc-search { min-width: 200px; }
 button.doc-hit { padding: 1px 8px; min-height: 0; }
 .doc-scroller { background-color: var(--bg-secondary); }
 .doc-scroller:focus-visible { outline: none; }
-.doc-page { background-color: var(--om-lighter-background); box-shadow: 0 2px 12px var(--shadow); border-radius: 2px; }
+.doc-page { background-color: var(--om-lighter-background); box-shadow: 0 2px 12px var(--shadow); border-radius: var(--radius); }
 .doc-image { background-color: var(--bg-secondary); }
 textview.doc-text, textview.doc-text text { background-color: var(--bg-secondary); color: var(--text-primary); }
 

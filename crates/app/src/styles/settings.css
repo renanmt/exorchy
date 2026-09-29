@@ -31,15 +31,15 @@ list.settings-nav > row.settings-nav-item:selected image { color: var(--accent);
 .settings-view preferencesgroup > box > label.title { color: var(--text-strong); font-weight: 600; text-transform: uppercase; font-size: 0.82em; letter-spacing: 0.06em; }
 .settings-view preferencesgroup > box > label.description { color: var(--text-muted); font-size: 0.9em; }
 .settings-view preferencesgroup.danger-zone > box > label.title { color: var(--danger); }
-.settings-view preferencesgroup listbox.boxed-list {
+.settings-view preferencesgroup list.boxed-list {
   background-color: var(--bg-card);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   border-radius: var(--radius-lg);
 }
-.settings-view preferencesgroup listbox.boxed-list > row { background: none; border-bottom: 1px solid var(--line-1); }
-.settings-view preferencesgroup listbox.boxed-list > row:last-child { border-bottom: none; }
-.settings-view preferencesgroup listbox.boxed-list > row.settings-row:hover { background-color: var(--fill-1); }
-.settings-view preferencesgroup listbox.boxed-list > row.settings-row:active { background-color: var(--fill-2); }
+.settings-view preferencesgroup list.boxed-list > row { background: none; border-bottom: 1px solid var(--line-1); }
+.settings-view preferencesgroup list.boxed-list > row:last-child { border-bottom: none; }
+.settings-view preferencesgroup list.boxed-list > row.settings-row:hover { background-color: var(--fill-1); }
+.settings-view preferencesgroup list.boxed-list > row.settings-row:active { background-color: var(--fill-2); }
 
 /* ---- Rows ---- */
 row.settings-row { padding: 10px 14px; }
@@ -64,11 +64,11 @@ progressbar.mini trough, progressbar.mini progress { min-height: 4px; }
 /* ---- Storage ---- */
 .storage-drive { padding: 6px 2px; }
 .storage-drive-line { color: var(--text-secondary); font-size: 0.9em; }
-grid.storage-bar { min-height: 10px; border-radius: 999px; background-color: var(--fill-2); }
+grid.storage-bar { min-height: 10px; border-radius: var(--radius-pill); background-color: var(--fill-2); }
 .storage-seg { min-height: 10px; }
 .storage-seg.is-foreign { background-color: var(--fill-3); }
 .storage-seg.is-free { background: none; }
-.storage-dot { min-width: 9px; min-height: 9px; border-radius: 999px; }
+.storage-dot { min-width: 9px; min-height: 9px; border-radius: var(--radius-pill); }
 
 /* One colour per category, from the palette. */
 .cat-games { background-color: var(--accent); }
@@ -83,4 +83,4 @@ grid.storage-bar { min-height: 10px; border-radius: 999px; background-color: var
 .cat-configs { background-color: var(--text-muted); }
 .cat-other { background-color: var(--om-muted); }
 
-row.storage-game .badge { font-size: 0.72em; font-weight: 600; padding: 1px 6px; border-radius: 999px; background-color: var(--fill-3); color: var(--text-secondary); }
+row.storage-game .badge { font-size: 0.72em; font-weight: 600; padding: 1px 6px; border-radius: var(--radius-pill); background-color: var(--fill-3); color: var(--text-secondary); }

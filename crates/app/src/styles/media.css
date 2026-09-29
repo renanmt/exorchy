@@ -3,14 +3,14 @@
 /* ── Preview under the cover ─────────────────────────────────────────── */
 .media-frame {
   background-color: var(--bg-secondary);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   border-radius: var(--radius);
 }
 .media-picture { border-radius: var(--radius); }
 /* The controls sit on the frames: a scrim keeps them legible on any shot. */
 .media-controls {
   background-color: var(--scrim);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px;
 }
 button.btn.media-ctl {
@@ -26,7 +26,7 @@ button.btn.media-replay {
   background-color: var(--scrim);
   border-color: var(--line-4);
   color: var(--text-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 12px;
 }
 button.btn.media-replay:hover { background-color: var(--accent-fill); }
@@ -34,7 +34,7 @@ button.btn.media-replay:hover { background-color: var(--accent-fill); }
 .media-status {
   background-color: var(--fill-2);
   color: var(--text-secondary);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 10px;
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
@@ -64,7 +64,7 @@ button.btn.media-retry { color: var(--warning); }
 button.player-cover {
   background-color: var(--bg-card);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 0;
   min-width: 40px;
   min-height: 40px;
@@ -80,7 +80,7 @@ button.player-cover:hover { background-color: var(--bg-hover); }
 
 /* Transport: round ghost buttons, the main one on the accent. */
 button.btn.player-btn {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 6px;
   color: var(--text-secondary);
   min-width: 0;
@@ -102,13 +102,13 @@ button.btn.player-btn.player-close { color: var(--text-muted); }
 /* Ranges (seek and volume): a hairline trough, the accent for the fill. */
 .now-playing-bar scale trough {
   background-color: var(--fill-2);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   min-height: 4px;
 }
 .now-playing-bar scale highlight { background-color: var(--accent); border-color: transparent; }
 .now-playing-bar scale slider {
   background-color: var(--text-strong);
-  border: 1px solid var(--line-4);
+  border: var(--border) solid var(--line-4);
   box-shadow: none;
   min-width: 12px;
   min-height: 12px;

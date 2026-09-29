@@ -29,8 +29,12 @@
   --om-bright-blue: #8db0ff;
   --om-bright-magenta: #c7a9ff;
   --font-size-base: 12px;
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* Square, like Omarchy's windows (Hyprland rounding 0, border 2 px). */
+  --radius: 0;
+  --radius-lg: 0;
+  --radius-pill: 0;
+  /* Outlines (cards, panels, entries, buttons); row dividers stay 1 px. */
+  --border: 2px;
 }
 
 window.exorchy {
@@ -57,7 +61,7 @@ window.exorchy {
 button.btn {
   background-color: var(--fill-2);
   color: var(--text-primary);
-  border: 1px solid var(--line-3);
+  border: var(--border) solid var(--line-3);
   border-radius: var(--radius);
   padding: 6px 12px;
   box-shadow: none;
@@ -84,7 +88,7 @@ button.btn.icon { padding: 6px; min-width: 0; min-height: 0; }
 entry.field, entry.search {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
-  border: 1px solid var(--line-3);
+  border: var(--border) solid var(--line-3);
   border-radius: var(--radius);
   box-shadow: none;
   caret-color: var(--accent);
@@ -117,7 +121,7 @@ button.tab.active { background-color: var(--accent-fill); color: var(--text-stro
 /* Panels and cards */
 .panel {
   background-color: var(--bg-card);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   border-radius: var(--radius-lg);
 }
 .panel-pad { padding: 16px; }
@@ -126,7 +130,7 @@ button.tab.active { background-color: var(--accent-fill); color: var(--text-stro
 .setup-page { background-color: var(--bg-primary); }
 .setup-card {
   background-color: var(--bg-card);
-  border: 1px solid var(--line-3);
+  border: var(--border) solid var(--line-3);
   border-radius: var(--radius-lg);
   padding: 28px 32px;
 }
@@ -134,7 +138,7 @@ button.tab.active { background-color: var(--accent-fill); color: var(--text-stro
 .setup-note { color: var(--text-muted); font-size: 0.9em; }
 button.mode-btn {
   background-color: var(--bg-secondary);
-  border: 1px solid var(--line-3);
+  border: var(--border) solid var(--line-3);
   border-radius: var(--radius-lg);
   padding: 18px 16px;
   color: var(--text-primary);
@@ -153,20 +157,20 @@ button.mode-btn .mode-icon { color: var(--accent); }
 .splash { background-color: #000000; }
 
 /* Toasts (adw) */
-toast { background-color: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--line-3); }
+toast { background-color: var(--bg-hover); color: var(--text-primary); border: var(--border) solid var(--line-3); }
 
 /* Progress */
-progressbar trough { background-color: var(--fill-2); border-radius: 999px; min-height: 6px; }
-progressbar progress { background-color: var(--accent); border-radius: 999px; min-height: 6px; }
+progressbar trough { background-color: var(--fill-2); border-radius: var(--radius-pill); min-height: 6px; }
+progressbar progress { background-color: var(--accent); border-radius: var(--radius-pill); min-height: 6px; }
 
 /* Switches */
-switch { background-color: var(--fill-3); border: 1px solid var(--line-3); }
+switch { background-color: var(--fill-3); border: var(--border) solid var(--line-3); }
 switch:checked { background-color: var(--accent); border-color: transparent; }
 switch slider { background-color: var(--text-strong); box-shadow: none; }
 switch:checked slider { background-color: var(--on-accent); }
 
 /* Scrollbars stay slim */
-scrollbar slider { background-color: var(--line-4); border-radius: 999px; min-width: 6px; min-height: 6px; }
+scrollbar slider { background-color: var(--line-4); border-radius: var(--radius-pill); min-width: 6px; min-height: 6px; }
 scrollbar slider:hover { background-color: color-mix(in srgb, var(--om-foreground) 25%, transparent); }
 
 /* Selection */
@@ -175,18 +179,18 @@ selection { background-color: var(--selection); color: var(--text-strong); }
 /* ---- Filter row / shelf ---- */
 .filter-row { padding: 8px 14px; border-bottom: 1px solid var(--line-2); background-color: var(--bg-primary); }
 button.shelf-btn {
-  background: none; border: 1px solid transparent; border-radius: var(--radius);
+  background: none; border: var(--border) solid transparent; border-radius: var(--radius);
   color: var(--text-secondary); padding: 5px 10px; box-shadow: none;
 }
 button.shelf-btn:hover { background-color: var(--fill-2); color: var(--text-primary); }
 button.shelf-btn:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 button.shelf-btn label.shelf-count {
-  font-size: 0.78em; font-weight: 600; padding: 0 6px; border-radius: 999px;
+  font-size: 0.78em; font-weight: 600; padding: 0 6px; border-radius: var(--radius-pill);
   background-color: var(--fill-3); color: var(--text-muted);
 }
 button.shelf-btn:checked label.shelf-count { background-color: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text-strong); }
 .shelf { margin-right: 8px; }
-dropdown.drop > button { background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: var(--radius); color: var(--text-primary); box-shadow: none; padding: 4px 10px; }
+dropdown.drop > button { background-color: var(--fill-2); border: var(--border) solid var(--line-3); border-radius: var(--radius); color: var(--text-primary); box-shadow: none; padding: 4px 10px; }
 dropdown.drop > button:hover { background-color: var(--fill-3); }
 .linked button.btn:checked { background-color: var(--accent-fill); color: var(--text-strong); }
 
@@ -196,7 +200,7 @@ gridview.game-grid > child { padding: 0; background: none; }
 gridview.game-grid > child:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
 .game-card {
   background-color: var(--bg-card);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   border-radius: var(--radius-lg);
 }
 .game-card:hover { background-color: var(--bg-hover); border-color: var(--line-4); }
@@ -222,10 +226,10 @@ button.fav-btn {
   text-shadow: 0 1px 2px var(--shadow);
   font-size: 1.1em;
 }
-button.fav-btn:hover { color: var(--text-strong); background-color: var(--scrim); border-radius: 999px; }
+button.fav-btn:hover { color: var(--text-strong); background-color: var(--scrim); border-radius: var(--radius-pill); }
 button.fav-btn.is-favorited { color: var(--warning); }
 label.badge {
-  font-size: 0.72em; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+  font-size: 0.72em; font-weight: 600; padding: 1px 6px; border-radius: var(--radius-pill);
   background-color: var(--fill-3); color: var(--text-secondary);
 }
 label.badge.badge-platform { background-color: var(--accent-fill); color: var(--text-strong); }
@@ -245,8 +249,8 @@ button.jump-btn { background: none; border: none; box-shadow: none; padding: 1px
 button.jump-btn:hover { color: var(--accent); background-color: var(--fill-2); }
 
 /* ---- Context menus ---- */
-popover.context-menu > contents { background-color: var(--bg-hover); border: 1px solid var(--line-4); border-radius: var(--radius); padding: 4px; box-shadow: 0 8px 24px var(--shadow); }
-button.menu-item { background: none; border: none; box-shadow: none; padding: 6px 12px; color: var(--text-primary); border-radius: 6px; }
+popover.context-menu > contents { background-color: var(--bg-hover); border: var(--border) solid var(--line-4); border-radius: var(--radius); padding: 4px; box-shadow: 0 8px 24px var(--shadow); }
+button.menu-item { background: none; border: none; box-shadow: none; padding: 6px 12px; color: var(--text-primary); border-radius: var(--radius); }
 button.menu-item label { }
 button.menu-item:hover { background-color: var(--fill-3); }
 button.menu-item.danger { color: var(--danger); }
@@ -259,15 +263,27 @@ overlaysplitview > sidebar { border-left: 1px solid var(--line-3); }
 .detail-actions { margin-top: 4px; }
 .detail-description { line-height: 1.45; }
 .detail-info { margin-top: 6px; }
-button.chip { background-color: var(--fill-2); border: 1px solid var(--line-3); border-radius: 999px; padding: 2px 10px; color: var(--text-secondary); box-shadow: none; }
+button.chip { background-color: var(--fill-2); border: var(--border) solid var(--line-3); border-radius: var(--radius-pill); padding: 2px 10px; color: var(--text-secondary); box-shadow: none; }
 button.chip:checked { background-color: var(--accent-fill); color: var(--text-strong); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
-button.gallery-btn { padding: 0; border: 1px solid var(--line-3); border-radius: 6px; background: none; box-shadow: none; }
-.gallery-thumb { border-radius: 5px; }
+button.gallery-btn { padding: 0; border: var(--border) solid var(--line-3); border-radius: var(--radius); background: none; box-shadow: none; }
+.gallery-thumb { border-radius: var(--radius); }
 
 /* ---- My Library: "N installed games are hidden" ---- */
 .hidden-note {
   background-color: var(--bg-card);
-  border: 1px solid var(--line-2);
+  border: var(--border) solid var(--line-2);
   border-radius: var(--radius);
   padding: 6px 6px 6px 14px;
+}
+
+/* ---- Square corners on libadwaita's own widgets ----
+   Omarchy draws square windows; libadwaita rounds buttons, lists, popovers,
+   dialogs and toasts on its own. Radio buttons stay round (they mean it). */
+button, entry, spinbutton, dropdown > button, menubutton > button,
+popover > contents, popover > arrow, list.boxed-list, list.boxed-list > row,
+.card, toast, tooltip, sheet, dialog-host sheet, floating-sheet > sheet,
+switch, switch > slider, checkbutton > check, scale > trough, scale > trough > slider,
+progressbar > trough, progressbar > trough > progress, scrollbar slider,
+searchbar, headerbar, tabbar tab, .osd {
+  border-radius: 0;
 }

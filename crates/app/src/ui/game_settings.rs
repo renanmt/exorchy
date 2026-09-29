@@ -24,18 +24,11 @@ const ASPECT: [(&str, &str); 2] = [("true", "Corrected (4:3)"), ("false", "Pixel
 
 pub fn open(parent: &impl IsA<gtk::Widget>, game: &Game) {
     let Some(id) = game.id else { return };
-    let dialog = adw::Dialog::builder().title(format!("Game Settings: {}", game.title)).content_width(540).build();
-    let tv = adw::ToolbarView::new();
-    tv.add_top_bar(&adw::HeaderBar::new());
-    let body = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).margin_start(16).margin_end(16).margin_top(4).margin_bottom(16).css_classes(["dialog-body"]).build();
-    let loading = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    loading.append(&gtk::Spinner::builder().spinning(true).build());
-    loading.append(&gtk::Label::builder().label("Loading…").css_classes(["muted"]).build());
-    body.append(&loading);
-    tv.set_content(Some(&gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).max_content_height(720).child(&body).build()));
-    dialog.set_child(Some(&tv));
-    dialog.present(Some(parent));
-
+    let parent = parent.clone().upcast::<gtk::Widget>();
+    let title = format!("Game Settings: {}", game.title);
+    // Read everything first (local and quick), then build the dialog with its
+    // form in place: a dialog presented around a "Loading…" line kept that
+    // height when the form arrived, and showed one row.
     let core = app::core();
     app::local(async move {
         let c = core.clone();
@@ -43,11 +36,18 @@ pub fn open(parent: &impl IsA<gtk::Widget>, game: &Game) {
         let ece_available = app::call(async move { games::game_engine_info(id).await }).await.map(|e| e.ece_available).unwrap_or(false);
         let c = core.clone();
         let settings = app::call(async move { games::get_game_settings(c.state(), id).await }).await;
-        body.remove(&loading);
+
+        let dialog = adw::Dialog::builder().title(title).content_width(540).build();
+        let tv = adw::ToolbarView::new();
+        tv.add_top_bar(&adw::HeaderBar::new());
+        let body = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).margin_start(16).margin_end(16).margin_top(4).margin_bottom(16).css_classes(["dialog-body"]).build();
         match settings {
             Ok(s) => build_form(&dialog, &body, id, svm, ece_available, s),
             Err(e) => body.append(&gtk::Label::builder().label(format!("Couldn't load the settings: {e}")).wrap(true).xalign(0.0).css_classes(["danger"]).build()),
         }
+        tv.set_content(Some(&gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).max_content_height(720).child(&body).build()));
+        dialog.set_child(Some(&tv));
+        dialog.present(Some(&parent));
     });
 }
 
