@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "exorchy"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "exorchy-core",
  "gtk4",
@@ -817,7 +817,7 @@ dependencies = [
 
 [[package]]
 name = "exorchy-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "axum",

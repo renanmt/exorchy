@@ -37,6 +37,7 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     let app_group = widgets::group("eXorchy", None);
     app_group.add(&Row::new("Version").value(env!("CARGO_PKG_VERSION")).hint("An eXo launcher for Omarchy (Arch + Hyprland).").widget);
     app_group.add(&Row::new("Author").value("Renan Tonheiro").hint("eXorchy, the Omarchy port of Exodium.").widget);
+    app_group.add(&updates_row());
     let open_btn = widgets::button("Open");
     let log_row = Row::new("Log folder").hint("Share exorchy.log when a download stalls or the app misbehaves.").selectable().code().action(&open_btn);
     app_group.add(&log_row.widget);
@@ -94,6 +95,46 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     });
 
     page.upcast()
+}
+
+/// Updates: what the last check found, "Check now", and Update when a newer
+/// release exists and this copy can update itself (`ui::updates`).
+fn updates_row() -> gtk::ListBoxRow {
+    let check = widgets::button("Check now");
+    let update = widgets::button("Update");
+    let row = Row::new("Updates").action(&check);
+    row.add_action(&update);
+    let show = {
+        let (row, update) = (row.clone(), update.clone());
+        move || {
+            let (text, can_update) = crate::ui::updates::status_text();
+            row.set_value(&text);
+            update.set_visible(can_update);
+            row.set_hint(if crate::ui::updates::available().is_some() && !can_update {
+                "This copy was not installed as the pacman package: update it the way you installed it."
+            } else {
+                ""
+            });
+        }
+    };
+    show();
+    check.connect_clicked({
+        let row = row.clone();
+        move |b| {
+            b.set_sensitive(false);
+            row.set_value("Checking…");
+            let (b, row, show) = (b.clone(), row.clone(), show.clone());
+            crate::ui::updates::check_now(move |res| {
+                b.set_sensitive(true);
+                match res {
+                    Ok(_) => show(),
+                    Err(e) => row.set_error(&format!("Could not check: {e}")),
+                }
+            });
+        }
+    });
+    update.connect_clicked(|_| crate::ui::updates::start_update());
+    row.widget
 }
 
 /// The reset dialog: the database and settings go; the game folder only

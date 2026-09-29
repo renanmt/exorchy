@@ -479,3 +479,25 @@ refreshes its grid flags and shelves as before, and the panel only repaints its 
 it shows that game. `library_changed` stays for what really changes a row's state (downloads,
 installs, uninstalls, playlists).
 
+## 2026-09-29 - Self-update: check GitHub releases, install in a terminal, restart
+
+eXorchy checks `releases/latest` of the GitHub repository shortly after start and every six
+hours (switchable, skipped offline) and shows a banner above the toolbar. Update does not
+install from inside the app: installing is `sudo pacman -U`, and Omarchy ships no graphical
+polkit agent to ask for the password, so the app opens Omarchy's floating terminal (the one its
+own Install menu uses; `xdg-terminal-exec` otherwise) running that exact release's `install.sh
+--version vX.Y.Z`, which downloads, verifies and installs, then waits for the old process to
+exit and starts eXorchy again through `uwsm-app` (whether or not the install succeeded). The app
+quits right after opening the terminal. Only the pacman-installed `/usr/bin/exorchy` offers
+Update; other copies get the notice and a hint, since the script would put a second install
+beside them. The tag goes into a shell command, so only `vN.N.N` with digits is accepted.
+
+## 2026-09-29 - Release notes come from a hand-written CHANGELOG.md
+
+GitHub's generated notes list pull-request titles, which here were branch names ("Merge pull
+request #6 from renanmt/fix-favorite-flicker"), and the app's "What's new" opens those notes.
+`CHANGELOG.md` (Keep a Changelog shape, written for users) now holds one section per version;
+the release workflow publishes the tag's section above the install instructions
+(`packaging/release/changelog-section.sh`) and fails before building when the section is
+missing, so a release cannot go out without notes.
+

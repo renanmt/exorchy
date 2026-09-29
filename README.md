@@ -75,6 +75,9 @@ full list of credits.
   Settings → Hidden titles.
 - Your own background image behind the library, with an opacity slider, and
   an option to open straight into My Library.
+- Tells you when a new release is out and updates itself: one click opens a
+  terminal that installs it (pacman asks for your password) and eXorchy
+  starts again.
 - A native GTK4 / libadwaita window: no web view, no title bar (Hyprland
   draws the borders and tiles it), a virtualised grid that stays smooth on
   11,000 games, keyboard-first navigation.
@@ -127,11 +130,55 @@ Then launch **eXorchy** from the Omarchy launcher (Super+Space) or run
 Optional: `omarchy pkg aur add dosbox-staging-bin` and enable "Prefer system
 dosbox-staging" in Settings → Emulators.
 
-To remove it: `sudo pacman -R exorchy`, or run the install line with
-`bash -s -- --uninstall`. Your settings, library and downloaded games stay.
-
 From a checkout instead: `cd packaging && makepkg -si` (system-wide) or
 `packaging/install-dev.sh` (under `~/.local`, needs rustup).
+
+## Update
+
+**From eXorchy 0.4.0 on, the app updates itself.** A few seconds after it
+starts (and every few hours) it checks for a new release; when one is out, a
+banner at the top of the library offers:
+
+- **Update**: eXorchy closes, a terminal installs the new version (pacman asks
+  for your password) and eXorchy starts again. If anything goes wrong, the
+  version you had starts instead.
+- **What's new**: the release notes on GitHub.
+- **Skip this version**: no more reminders until the next release.
+
+You can also check by hand in Settings → About → **Check now**, and turn the
+automatic check off in Settings → General → **Check for updates**.
+
+**By hand, or from eXorchy 0.3.0 and older** (which cannot update itself yet):
+run the install line again. It installs the latest release over the one you
+have and keeps your settings, library and games:
+
+```bash
+curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash
+```
+
+To install a particular version instead:
+
+```bash
+curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --version v0.4.0
+```
+
+Everything that changed is in [CHANGELOG.md](CHANGELOG.md).
+
+**Installed with `packaging/install-dev.sh`** (under `~/.local`): the banner
+tells you about new releases but cannot update that copy. Pull and rebuild
+with `git pull && packaging/install-dev.sh`. (A copy built with
+`cd packaging && makepkg -si` is a normal pacman package: Update replaces it
+with the release build.)
+
+## Remove
+
+```bash
+sudo pacman -R exorchy
+```
+
+or `curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --uninstall`. Your settings, library
+and downloaded games stay (in `~/.local/share/exorchy`,
+`~/.local/state/exorchy` and your game folder).
 
 ## Keyboard
 

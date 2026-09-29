@@ -1,0 +1,9 @@
+/* updates: rules for ui/updates.rs. Tokens only (see theme.rs). */
+.update-banner {
+  background-color: var(--accent-fill);
+  border-bottom: var(--border) solid var(--accent);
+  padding: 6px 14px;
+  color: var(--text-strong);
+}
+.update-banner image { color: var(--accent); }
+.update-title { font-weight: 600; }
