@@ -684,13 +684,14 @@ pub async fn factory_reset(
 }
 
 
-/// Return the default parent directory for game storage ($HOME).
-/// The eXoDOS folder will be created inside this directory by the torrent engine.
+/// The library folder setup offers: `~/Games/eXorchy`. The eXoDOS folder and
+/// eXorchy's `content/` are created inside it. (It used to be `$HOME`;
+/// those installs are offered a move, see `library_location`.)
 pub async fn get_default_data_dir() -> Result<String, String> {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map_err(|_| "Cannot determine home directory".to_string())?;
-    Ok(home)
+    if std::env::var_os("HOME").is_none_or(|h| h.is_empty()) {
+        return Err("Cannot determine home directory".to_string());
+    }
+    Ok(super::library_location::default_library_dir().to_string_lossy().into_owned())
 }
 
 /// Holds nothing Exorchy recognises as game data (OS metadata aside). An
