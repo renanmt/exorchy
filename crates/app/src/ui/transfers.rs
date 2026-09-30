@@ -8,6 +8,7 @@
 //!   (the only queue there is: game files all download at once);
 //! - Torrents: every torrent in the shared session with its own rates, peers
 //!   and upload this session, which is what shows what is being seeded.
+//!
 //! A 1 s poll updates rows in place (keyed), so hover and clicks survive it.
 
 use std::cell::{Cell, RefCell};
