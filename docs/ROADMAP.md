@@ -24,11 +24,16 @@ place from `content/emulators/<pack>/`. Omarchy ships `fuse3`, not `fuse2`. An
 AppImage built on the classic runtime needs `libfuse.so.2` and will not
 start.
 
-- [ ] Run each pack's AppImage once on a stock Omarchy box: DOSBox-X,
+- [x] Run each pack's AppImage once on a stock Omarchy box: DOSBox-X,
       86Box, ScummVM 2.5.0 and 2026.1.0. Get the tarballs from the
       `platforms.linux-x86_64` URLs in `manifest.json`. Run the AppImage with
       `--version`, or with no arguments for 86Box.
-- [ ] If any of them needs libfuse2, extract it when the pack is installed
+      **Done 2026-09-30:** all four start with `fuse3` and no `fuse2`
+      (DOSBox-X 2025.02.01, ScummVM 2.5.0 and 2026.1.0 print their version,
+      86Box prints its usage). So the AppImages do not need `libfuse.so.2`.
+      They do still need FUSE itself, and `fuse3` is present on Omarchy here.
+- [x] ~~If any of them needs libfuse2~~: not needed. Kept for the record: the
+      fallback would be to extract it when the pack is installed
       (`--appimage-extract` into the pack dir) and resolve `AppRun`
       instead. Then nothing needs FUSE at runtime, and startup is faster
       too. Other options: add `fuse2` to `depends` (a system package pulled in

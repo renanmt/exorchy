@@ -41,8 +41,9 @@ package, directories and identifiers stay `exorchy`; the GApplication id is
 - Omarchy (Arch, Hyprland). GTK 4.22, libadwaita 1.9, poppler-glib,
   GStreamer core + base. `gst-plugins-good` / `gst-libav` are NOT installed
   on the dev machine (preview videos and music need them; the players hide
-  when GStreamer cannot decode). `fuse3` is installed, `fuse2` is not, which
-  matters for the AppImage emulator packs (`docs/ROADMAP.md` step 1).
+  when GStreamer cannot decode). `fuse3` is installed, `fuse2` is not. The
+  AppImage emulator packs (DOSBox-X, 86Box, ScummVM) run with that
+  (checked 2026-09-30).
 - Rust via rustup in `~/.cargo`, not on PATH by default in fish:
   `export PATH="$HOME/.cargo/bin:$PATH"` before `cargo`. No node, no pnpm.
 - `dosbox-staging` is not in the Arch repos (AUR: `dosbox-staging`,

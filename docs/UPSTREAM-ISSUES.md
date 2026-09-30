@@ -120,8 +120,9 @@ Extra risk found in the survey: every non-Staging emulator pack (DOSBox-X,
 `content/emulators/<pack>/`, and nothing sets `APPIMAGE_EXTRACT_AND_RUN` or
 extracts it. A stock Omarchy install has `fuse3` but not `fuse2`, so if these
 AppImages use the classic runtime (which loads `libfuse.so.2`) they will not
-start. Not verified: running the downloaded packs was out of reach in the
-survey session. Plan: [ROADMAP.md](ROADMAP.md) step 1.
+start. Checked 2026-09-30: all four Linux packs (DOSBox-X, 86Box, ScummVM
+2.5.0 and 2026.1.0) start natively with only `fuse3`. What remains is an end
+to end game launch. Plan: [ROADMAP.md](ROADMAP.md) step 1.
 
 ## P2
 
