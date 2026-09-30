@@ -15,6 +15,7 @@ Read in this order before changing code:
 3. `docs/DECISIONS.md` - why (append-only; add an entry for every non-obvious decision)
 4. `docs/COLLECTIONS.md` - how each collection is wired and how enabling/hiding works
 5. `docs/PORTING.md` - conventions for UI code while the native port is in progress
+6. `docs/ROADMAP.md` - what to build next; `docs/UPSTREAM-ISSUES.md` maps every Exodium issue to us
 
 Hard rules:
 - `export PATH="$HOME/.cargo/bin:$PATH"` before any `cargo` command. No node, no pnpm.
