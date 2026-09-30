@@ -121,8 +121,10 @@ Extra risk found in the survey: every non-Staging emulator pack (DOSBox-X,
 extracts it. A stock Omarchy install has `fuse3` but not `fuse2`, so if these
 AppImages use the classic runtime (which loads `libfuse.so.2`) they will not
 start. Checked 2026-09-30: all four Linux packs (DOSBox-X, 86Box, ScummVM
-2.5.0 and 2026.1.0) start natively with only `fuse3`. What remains is an end
-to end game launch. Plan: [ROADMAP.md](ROADMAP.md) step 1.
+2.5.0 and 2026.1.0) start natively with only `fuse3`, and a game on each
+ScummVM pack (Deja Vu on 2.5.0, Alpha Polaris on 2026.1.0) installed,
+launched and saved through eXorchy. For us this is done; the Win9x launches
+are tracked in the roadmap. Plan: [ROADMAP.md](ROADMAP.md) step 1.
 
 ## P2
 

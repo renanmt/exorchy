@@ -170,7 +170,10 @@ re-run since:
 
 Never verified by a session (needs the user's real profile and network):
 - the real torrent session: a download from Browse, cancel, the extras phase, resume after restart;
-- a DOSBox Staging / Win9x / ScummVM launch from the native app, `game-exited` handling;
+- a Win9x (DOSBox-X / 86Box) launch from the native app. DOSBox Staging
+  launches (Heretic, Jane's ATF) and ScummVM launches on the 2.5.0 and
+  2026.1.0 packs, with saves, were seen working on the real profile on
+  2026-09-30;
 - preview video / theme music playback (the dev machine lacks `gst-plugins-good` / `gst-libav`);
 - the online-only dialogs (seeding consent, welcome modal, Win9x network prompt), content-pack installs;
 - `packaging/install-dev.sh` end to end, `omarchy theme set` while the window is open.

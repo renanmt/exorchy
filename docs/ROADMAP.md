@@ -42,9 +42,15 @@ start.
       Resolution lives in `commands/win9x.rs:174` (`resolve_dosbox_x`),
       `pack_candidate` (`:119`) and `commands/scummvm.rs`; extraction goes in
       `commands/content_packs.rs`.
-- [ ] ScummVM end to end: install one game pinned to 2.5.0 and one pinned
+- [x] ScummVM end to end: install one game pinned to 2.5.0 and one pinned
       to 2026.1.0, check that the pinned pack is queued with the first
       download, launch both, and check that saves land in `<game dir>/!saves`.
+      **Done 2026-09-30** on the real profile: Deja Vu (snapshot pin
+      `svn2.3_18903` → 2.5.0 pack; the only game in the catalogue on that pack)
+      and Alpha Polaris (2026.1.0). Each first download queued its pack, both
+      ran from the pack AppImage and exited with status 0, and the saves are in
+      `!saves`. Nothing was written to `~/.config/scummvm` or
+      `~/.local/share/scummvm`.
 - [ ] Also launch one Win9x `x98` title and one `86box` title. The
       handover lists every non-Staging launch as unverified.
 - [ ] Comment the result on upstream #29; they asked for exactly this run.
