@@ -173,13 +173,13 @@ pub(crate) fn spawn_emulator_and_track(
                     Ok(stderr_file) => {
                         cmd.stdout(std::process::Stdio::from(stdout_file));
                         cmd.stderr(std::process::Stdio::from(stderr_file));
-                        log::info!("DOSBox output → {}", dosbox_log_path.display());
+                        log::info!("Emulator output → {}", dosbox_log_path.display());
                         stdio_set = true;
                     }
-                    Err(e) => log::warn!("DOSBox log handle clone failed: {e}"),
+                    Err(e) => log::warn!("Emulator log handle clone failed: {e}"),
                 },
                 Err(e) => log::warn!(
-                    "Failed to open DOSBox log file {}: {e}",
+                    "Failed to open emulator log file {}: {e}",
                     dosbox_log_path.display()
                 ),
             }
@@ -227,6 +227,11 @@ pub(crate) fn spawn_emulator_and_track(
 mod audio_backend_tests {
     use super::prefer_pulse_audio_backend;
     use std::process::Command;
+    use std::sync::Mutex;
+
+    /// The environment is process-wide and tests run in parallel: every test
+    /// here that sets a variable holds this for its whole body.
+    static ENV: Mutex<()> = Mutex::new(());
 
     fn env_of(cmd: &Command, key: &str) -> Option<String> {
         cmd.get_envs()
@@ -238,6 +243,7 @@ mod audio_backend_tests {
     /// is never overridden; the pulse socket decides otherwise.
     #[test]
     fn respects_an_explicit_sdl_audio_driver() {
+        let _env = ENV.lock().unwrap_or_else(|e| e.into_inner());
         // Environment is process-wide: set, check, restore.
         let saved = std::env::var_os("SDL_AUDIODRIVER");
         std::env::set_var("SDL_AUDIODRIVER", "alsa");
@@ -252,6 +258,7 @@ mod audio_backend_tests {
 
     #[test]
     fn points_sdl_at_pulse_when_the_socket_exists() {
+        let _env = ENV.lock().unwrap_or_else(|e| e.into_inner());
         let saved_driver = std::env::var_os("SDL_AUDIODRIVER");
         let saved_runtime = std::env::var_os("XDG_RUNTIME_DIR");
         let saved_server = std::env::var_os("PULSE_SERVER");
