@@ -101,7 +101,10 @@ pub struct Sidebar {
 }
 
 pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -> Rc<Sidebar> {
-    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(200).css_classes(["sidebar"]).build();
+    // Fixed width: the rows' labels expand inside it, and without an explicit
+    // `hexpand(false)` that would spread to the sidebar and split a wide
+    // window's spare room with the grid.
+    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(220).hexpand(false).css_classes(["sidebar"]).build();
 
     // Values page: a heading, a filter field, the virtualised list.
     let values = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).css_classes(["sidebar-values"]).build();
