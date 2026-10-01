@@ -476,6 +476,16 @@ impl DetailPanel {
         add("Collection", row.torrent_source.clone());
         add("Size", row.download_size.filter(|s| *s > 0).map(|s| format_bytes(s as u64)));
         add("Emulator", Some(emulator_name(&row)));
+        // DOS / Windows 3.x: the backend knows the engine for sure (eXo's
+        // DOSBox-X pins, printing confs, the per-game override).
+        if let (Some(id), Some(value)) = (row.id, self.info.child_at(1, r - 1).and_downcast::<gtk::Label>()) {
+            let core = app::core();
+            app::spawn(async move { games::game_engine_info(core.state(), id).await }, move |res| {
+                if let Ok(Some(engine)) = res.map(|e| e.engine) {
+                    value.set_label(if engine == "dosbox-x" { "DOSBox-X" } else { "DOSBox Staging" });
+                }
+            });
+        }
 
         self.render_actions();
     }

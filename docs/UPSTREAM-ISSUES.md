@@ -107,7 +107,9 @@ Our state:
   `x` 16 and `x2` 3 (`games.dosbox_variant`).
 - The IDE/ATAPI half upstream shipped is in (`translate_ide_for_staging`).
 
-Plan: [ROADMAP.md](ROADMAP.md) step 3.
+Implemented 2026-09-30: the 31 affected games default to DOSBox-X and
+printing writes PNG pages to the game's `!prints` folder (DECISIONS
+2026-09-30). [ROADMAP.md](ROADMAP.md) step 3 tracks the playtest.
 
 ### #29 ScummVM AppImages on native x86_64
 

@@ -57,12 +57,21 @@ impl PanelNote {
 pub struct EngineInfo {
     pub ece_available: bool,
     pub uses_ece: bool,
+    /// DOS / Windows 3.x only: "staging" | "dosbox-x", what the next launch uses.
+    pub engine: Option<String>,
+    /// The conf uses eXo's virtual printer.
+    pub prints: bool,
+    /// `engine` resolves on this system.
+    pub engine_available: bool,
 }
 
 /// The content pack that could supply the missing emulator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmulatorPack {
     pub id: String,
+    /// The collection that owns the pack in the manifest (DOSBox-X: eXoWin9x,
+    /// for DOS games too); installs and progress key on it.
+    pub collection: String,
     pub display_name: String,
     pub size_bytes: u64,
 }
@@ -112,12 +121,17 @@ pub fn is_scummvm(g: Option<&Game>) -> bool {
 
 /// What will actually run the game; the backend's own resolver decides ECE
 /// vs Staging (`runs_under_ece`), the variant slug the rest.
-pub fn emulator_name(g: Option<&Game>, svm_engine: Option<&ScummVmEngineInfo>, runs_under_ece: bool) -> String {
+pub fn emulator_name(g: Option<&Game>, svm_engine: Option<&ScummVmEngineInfo>, runs_under_ece: bool, dos_engine: Option<&str>) -> String {
     if is_scummvm(g) {
         return match svm_engine.map(|e| e.pinned_version.as_str()).filter(|v| !v.is_empty()) {
             Some(v) => format!("ScummVM {v}"),
             None => "ScummVM".into(),
         };
+    }
+    match dos_engine {
+        Some("dosbox-x") => return "DOSBox-X".into(),
+        Some("staging") => return "DOSBox Staging".into(),
+        _ => {}
     }
     match g.and_then(|g| g.dosbox_variant.as_deref()) {
         Some("x98") => "DOSBox-X".into(),
@@ -353,7 +367,8 @@ pub fn launch_note(ctx: &NoteContext) -> Option<PanelNote> {
     let g = ctx.game.as_ref();
     let v = g.and_then(|g| g.dosbox_variant.as_deref());
     let runs_under_ece = ctx.engine_info.as_ref().map(|e| e.uses_ece).unwrap_or(ctx.is_windows);
-    let engine = emulator_name(g, ctx.svm_engine.as_ref(), runs_under_ece);
+    let dos_engine = ctx.engine_info.as_ref().and_then(|e| e.engine.as_deref());
+    let engine = emulator_name(g, ctx.svm_engine.as_ref(), runs_under_ece, dos_engine);
 
     // This localized variant is a patch; the English game installs with it
     // and stays playable on its own. Informational, and only while it would
@@ -383,6 +398,25 @@ pub fn launch_note(ctx: &NoteContext) -> Option<PanelNote> {
     if ctx.win9x_engine_missing {
         return engine_missing_note(ctx, &engine);
     }
+    if ctx.engine_info.as_ref().is_some_and(|e| e.engine.as_deref() == Some("dosbox-x") && !e.engine_available) {
+        // The game's own Download fetches DOSBox-X with it (download_game
+        // queues the pack): before that, the price; after, the button.
+        if !ctx.installed && !ctx.downloading && ctx.pack_job.is_none() {
+            if let Some(pack) = &ctx.emulator_pack {
+                return Some(PanelNote::info(
+                    "dosbox-x-size",
+                    format!("eXo runs this game under DOSBox-X: downloading the game also fetches it{}.", one_time(pack.size_bytes)),
+                ));
+            }
+        }
+        if let Some(remedy) = pack_remedy(ctx, "engine-missing", &engine, true) {
+            return Some(remedy);
+        }
+        return Some(PanelNote::block(
+            "engine-missing",
+            "This game runs under DOSBox-X, which was not found. Install dosbox-x (AUR) or its Flatpak (com.dosbox_x.DOSBox-X), or pick DOSBox Staging in Game Settings.".into(),
+        ));
+    }
 
     // Engine resolves, but the shared payload (parent OS images, needed on
     // every platform) may still be on its way.
@@ -404,7 +438,13 @@ pub fn launch_note(ctx: &NoteContext) -> Option<PanelNote> {
     if ctx.printing_unavailable {
         return Some(PanelNote::info(
             "printing",
-            "This game can print to a (virtual) printer, which the bundled DOSBox Staging does not support yet. The game runs, but its printing features are unavailable for now.".into(),
+            "This game can print, but you set it to run under DOSBox Staging, which has no printer. Pick DOSBox-X in Game Settings to print.".into(),
+        ));
+    }
+    if ctx.engine_info.as_ref().is_some_and(|e| e.prints && e.engine.as_deref() == Some("dosbox-x")) {
+        return Some(PanelNote::info(
+            "printing-x",
+            "This game can print: each printed page is saved as a PNG image in the game's !prints folder.".into(),
         ));
     }
     if let Some(mp) = ctx.mp.as_ref().filter(|m| m.multiplayer) {
@@ -425,7 +465,7 @@ pub fn launch_note(ctx: &NoteContext) -> Option<PanelNote> {
         }
     }
     if let (Some(true), Some(info)) = (v.map(|v| v.starts_with("ece")), ctx.engine_info.as_ref()) {
-        if !runs_under_ece {
+        if !runs_under_ece && info.engine.as_deref() != Some("dosbox-x") {
             // An override the user chose, a build not yet extracted (Windows),
             // or a platform ECE was never built for.
             let text = if info.ece_available {
@@ -514,7 +554,7 @@ pub fn attach(panel: &Rc<DetailPanel>) {
             let pack_id = payload.get("pack_id").and_then(|v| v.as_str()).unwrap_or_default();
             let matches = {
                 let l = live.borrow();
-                l.collection == collection && l.ctx.emulator_pack.as_ref().map(|p| p.id == pack_id).unwrap_or(false)
+                l.ctx.emulator_pack.as_ref().map(|p| p.collection == collection && p.id == pack_id).unwrap_or(false)
             };
             if matches {
                 live.borrow_mut().ctx.pack_job = Some(PackJob { phase: "starting".into(), downloaded_bytes: 0, total_bytes: 0, finished: false });
@@ -628,14 +668,7 @@ fn probe_row(live: &Shared, row: &Game, id: i64) {
 
     {
         let (core, l) = (app::core(), live.clone());
-        app::spawn(async move { games::game_engine_info(id).await }, move |res| {
-            if let Ok(e) = res {
-                if still(&l, id) {
-                    l.borrow_mut().ctx.engine_info = Some(EngineInfo { ece_available: e.ece_available, uses_ece: e.uses_ece });
-                    refresh(&l);
-                }
-            }
-        });
+        probe_dos_engine(&l, id);
         let l = live.clone();
         app::spawn(async move { games::game_printing_unavailable(core.state(), id).await }, move |res| {
             if let Ok(p) = res {
@@ -658,7 +691,8 @@ fn probe_row(live: &Shared, row: &Game, id: i64) {
             }
         });
         if let Some(pack_id) = emulator_pack_id(variant.as_deref()) {
-            load_pack(live, id, pack_id.to_string());
+            let collection = live.borrow().collection.clone();
+            load_pack(live, id, pack_id.to_string(), collection);
         }
     }
     if svm {
@@ -670,7 +704,8 @@ fn probe_row(live: &Shared, row: &Game, id: i64) {
                     l.borrow_mut().ctx.svm_engine = Some(e);
                     refresh(&l);
                     if let Some(pid) = pack_id {
-                        load_pack(&l, id, pid);
+                        let collection = l.borrow().collection.clone();
+                        load_pack(&l, id, pid, collection);
                     }
                 }
             }
@@ -749,10 +784,45 @@ fn probe_support(live: &Shared) {
     );
 }
 
+/// Which emulator a DOS / Windows 3.x game runs under and whether it is
+/// there; offers the DOSBox-X pack when it is not.
+fn probe_dos_engine(live: &Shared, id: i64) {
+    let (core, l) = (app::core(), live.clone());
+    app::spawn(async move { games::game_engine_info(core.state(), id).await }, move |res| {
+        let Ok(e) = res else { return };
+        if !still(&l, id) {
+            return;
+        }
+        let needs_x = e.engine.as_deref() == Some("dosbox-x") && !e.engine_available;
+        l.borrow_mut().ctx.engine_info = Some(EngineInfo {
+            ece_available: e.ece_available,
+            uses_ece: e.uses_ece,
+            engine: e.engine,
+            prints: e.prints,
+            engine_available: e.engine_available,
+        });
+        refresh(&l);
+        if needs_x {
+            load_home_pack(&l, id, "dosbox-x");
+        }
+    });
+}
+
+/// `load_pack` for a pack another collection owns (DOSBox-X for DOS games).
+fn load_home_pack(live: &Shared, id: i64, pack_id: &'static str) {
+    let l = live.clone();
+    app::spawn(async move { content_packs::content_pack_collection(pack_id.to_string()).await }, move |res| {
+        if let Ok(Some(collection)) = res {
+            if still(&l, id) {
+                load_pack(&l, id, pack_id.to_string(), collection);
+            }
+        }
+    });
+}
+
 /// The pack that could supply the emulator (available, not installed), and
 /// its install if one is already running.
-fn load_pack(live: &Shared, id: i64, pack_id: String) {
-    let collection = live.borrow().collection.clone();
+fn load_pack(live: &Shared, id: i64, pack_id: String, collection: String) {
     let (core, l) = (app::core(), live.clone());
     let col = collection.clone();
     app::spawn(async move { content_packs::list_content_packs(core.state(), col).await }, move |res| {
@@ -760,7 +830,7 @@ fn load_pack(live: &Shared, id: i64, pack_id: String) {
             return;
         }
         let pack = res.ok().and_then(|packs| {
-            packs.into_iter().find(|p| p.id == pack_id && p.available && !p.installed).map(|p| EmulatorPack { id: p.id, display_name: p.display_name, size_bytes: p.size_bytes })
+            packs.into_iter().find(|p| p.id == pack_id && p.available && !p.installed).map(|p| EmulatorPack { id: p.id, collection: collection.clone(), display_name: p.display_name, size_bytes: p.size_bytes })
         });
         let has = pack.is_some();
         l.borrow_mut().ctx.emulator_pack = pack;
@@ -778,7 +848,7 @@ fn poll_pack(live: &Shared) {
         let l = live.borrow();
         let Some(id) = l.row_id else { return };
         let Some(p) = l.ctx.emulator_pack.as_ref() else { return };
-        (id, l.collection.clone(), p.id.clone())
+        (id, p.collection.clone(), p.id.clone())
     };
     let (core, l) = (app::core(), live.clone());
     let (col, pid) = (collection.clone(), pack_id.clone());
@@ -803,8 +873,11 @@ fn poll_pack(live: &Shared) {
                         // pack is no longer on offer.
                         let variant = l.borrow().ctx.game.as_ref().and_then(|g| g.dosbox_variant.clone());
                         l.borrow_mut().ctx.emulator_pack = None;
-                        if !is_scummvm(l.borrow().ctx.game.as_ref()) {
+                        let game = l.borrow().ctx.game.clone();
+                        if is_win9x(game.as_ref()) {
                             probe_engine(&l, id, variant);
+                        } else if !is_scummvm(game.as_ref()) {
+                            probe_dos_engine(&l, id);
                         } else {
                             let (core, l2) = (app::core(), l.clone());
                             app::spawn(async move { scummvm::scummvm_engine_info(core.state(), id).await }, move |res| {
@@ -831,7 +904,10 @@ fn poll_pack(live: &Shared) {
 fn install_pack(live: &Shared, pack_id: String) {
     let (collection, name) = {
         let l = live.borrow();
-        (l.collection.clone(), l.ctx.emulator_pack.as_ref().map(|p| p.display_name.clone()).unwrap_or_else(|| pack_id.clone()))
+        (
+            l.ctx.emulator_pack.as_ref().map(|p| p.collection.clone()).unwrap_or_else(|| l.collection.clone()),
+            l.ctx.emulator_pack.as_ref().map(|p| p.display_name.clone()).unwrap_or_else(|| pack_id.clone()),
+        )
     };
     // Claim the row now; the first poll is a second out.
     live.borrow_mut().ctx.pack_job = Some(PackJob { phase: "starting".into(), downloaded_bytes: 0, total_bytes: 0, finished: false });
@@ -947,7 +1023,7 @@ mod tests {
     }
 
     fn pack() -> EmulatorPack {
-        EmulatorPack { id: "dosbox-x".into(), display_name: "DOSBox-X".into(), size_bytes: 50_000_000 }
+        EmulatorPack { id: "dosbox-x".into(), collection: "eXoWin9x".into(), display_name: "DOSBox-X".into(), size_bytes: 50_000_000 }
     }
 
     fn support(phase: &str, progress: f32, total: u64) -> Win9xSupportStatus {
@@ -999,7 +1075,7 @@ mod tests {
 
     #[test]
     fn uninstalled_scummvm_game_states_the_engine_cost() {
-        let svm_pack = EmulatorPack { id: "scummvm-2.8.0".into(), display_name: "ScummVM 2.8.0".into(), size_bytes: 127_745_114 };
+        let svm_pack = EmulatorPack { id: "scummvm-2.8.0".into(), collection: "eXoScummVM".into(), display_name: "ScummVM 2.8.0".into(), size_bytes: 127_745_114 };
         let mut c = svm();
         c.svm_engine = Some(svm_engine(false, "2.8.0", None, Some("scummvm-2.8.0")));
         c.emulator_pack = Some(svm_pack);
@@ -1048,7 +1124,7 @@ mod tests {
 
     #[test]
     fn offers_the_pinned_build_pack_and_on_a_system_scummvm_too() {
-        let svm_pack = EmulatorPack { id: "scummvm-2.9.0".into(), display_name: "ScummVM 2.9.0".into(), size_bytes: 50_000_000 };
+        let svm_pack = EmulatorPack { id: "scummvm-2.9.0".into(), collection: "eXoScummVM".into(), display_name: "ScummVM 2.9.0".into(), size_bytes: 50_000_000 };
         let mut c = svm();
         c.svm_engine = Some(svm_engine(false, "2.9.0", None, Some("scummvm-2.9.0")));
         c.emulator_pack = Some(svm_pack.clone());
@@ -1213,22 +1289,52 @@ mod tests {
     #[test]
     fn dos_printing_and_ece_notes() {
         let ece = |info: Option<EngineInfo>| NoteContext { game: Some(game("eXoDOS", Some("ece4230"))), engine_info: info, ..Default::default() };
-        let mut p = ece(Some(EngineInfo { ece_available: false, uses_ece: false }));
+        let mut p = ece(Some(EngineInfo { ece_available: false, uses_ece: false, ..Default::default() }));
         p.printing_unavailable = true;
         assert_eq!(key(&p), Some("printing"));
         assert!(launch_note(&ece(None)).is_none());
-        assert!(launch_note(&ece(Some(EngineInfo { ece_available: true, uses_ece: true }))).is_none());
-        assert!(launch_note(&ece(Some(EngineInfo { ece_available: true, uses_ece: false }))).unwrap().text.contains("you set it"));
-        let mut w = ece(Some(EngineInfo { ece_available: false, uses_ece: false }));
+        assert!(launch_note(&ece(Some(EngineInfo { ece_available: true, uses_ece: true, ..Default::default() }))).is_none());
+        assert!(launch_note(&ece(Some(EngineInfo { ece_available: true, uses_ece: false, ..Default::default() }))).unwrap().text.contains("you set it"));
+        let mut w = ece(Some(EngineInfo { ece_available: false, uses_ece: false, ..Default::default() }));
         w.is_windows = true;
         assert!(launch_note(&w).unwrap().text.contains("not unpacked yet"));
-        assert!(launch_note(&ece(Some(EngineInfo { ece_available: false, uses_ece: false }))).unwrap().text.contains("only exists on Windows"));
+        assert!(launch_note(&ece(Some(EngineInfo { ece_available: false, uses_ece: false, ..Default::default() }))).unwrap().text.contains("only exists on Windows"));
         let mut v = ctx();
         v.video_unsupported = true;
         assert_eq!(key(&v), Some("no-gstreamer"));
-        let mut e = ece(Some(EngineInfo { ece_available: false, uses_ece: false }));
+        let mut e = ece(Some(EngineInfo { ece_available: false, uses_ece: false, ..Default::default() }));
         e.video_unsupported = true;
         assert_eq!(key(&e), Some("ece"));
+    }
+
+    #[test]
+    fn dosbox_x_games_name_it_and_offer_it() {
+        let x = |info: EngineInfo| NoteContext { game: Some(game("eXoDOS", Some("x"))), engine_info: Some(info), ..Default::default() };
+        let needs = EngineInfo { engine: Some("dosbox-x".into()), engine_available: false, ..Default::default() };
+        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("x"))), None, false, Some("dosbox-x")), "DOSBox-X");
+        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("x"))), None, false, Some("staging")), "DOSBox Staging");
+        // Missing, no pack known: a blocking note that names the way out.
+        let c = x(needs.clone());
+        let n = launch_note(&c).unwrap();
+        assert_eq!(n.key, "engine-missing");
+        assert!(n.blocking && n.text.contains("Game Settings"));
+        // Pack known, game not downloaded: the price, since Download brings it.
+        let pack = EmulatorPack { id: "dosbox-x".into(), collection: "eXoWin9x".into(), display_name: "DOSBox-X".into(), size_bytes: 43_000_000 };
+        let mut c = x(needs.clone());
+        c.emulator_pack = Some(pack.clone());
+        assert_eq!(key(&c), Some("dosbox-x-size"));
+        // Installed without it: the download button.
+        c.installed = true;
+        let n = launch_note(&c).unwrap();
+        assert_eq!(n.action.map(|a| a.pack_id), Some("dosbox-x".into()));
+        // Present: nothing to say unless it prints.
+        let ok = EngineInfo { engine: Some("dosbox-x".into()), engine_available: true, ..Default::default() };
+        assert!(launch_note(&x(ok.clone())).is_none());
+        assert_eq!(key(&x(EngineInfo { prints: true, ..ok })), Some("printing-x"));
+        // Printing game forced onto Staging.
+        let mut st = x(EngineInfo { engine: Some("staging".into()), engine_available: true, prints: true, ..Default::default() });
+        st.printing_unavailable = true;
+        assert_eq!(key(&st), Some("printing"));
     }
 
     #[test]
@@ -1240,14 +1346,14 @@ mod tests {
 
     #[test]
     fn emulator_names_and_pack_ids() {
-        assert_eq!(emulator_name(Some(&game("eXoDOS", None)), None, false), "DOSBox Staging");
-        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("ece4230"))), None, true), "DOSBox ECE");
-        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("ece4230"))), None, false), "DOSBox Staging");
-        assert_eq!(emulator_name(Some(&game("eXoWin9x", Some("x98"))), None, false), "DOSBox-X");
-        assert_eq!(emulator_name(Some(&game("eXoWin9x", Some("86boxME"))), None, false), "86Box");
-        assert_eq!(emulator_name(Some(&game("eXoScummVM", None)), None, false), "ScummVM");
+        assert_eq!(emulator_name(Some(&game("eXoDOS", None)), None, false, None), "DOSBox Staging");
+        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("ece4230"))), None, true, None), "DOSBox ECE");
+        assert_eq!(emulator_name(Some(&game("eXoDOS", Some("ece4230"))), None, false, None), "DOSBox Staging");
+        assert_eq!(emulator_name(Some(&game("eXoWin9x", Some("x98"))), None, false, None), "DOSBox-X");
+        assert_eq!(emulator_name(Some(&game("eXoWin9x", Some("86boxME"))), None, false, None), "86Box");
+        assert_eq!(emulator_name(Some(&game("eXoScummVM", None)), None, false, None), "ScummVM");
         let e = svm_engine(true, "2.8.0", Some(EngineSource::Pack), None);
-        assert_eq!(emulator_name(Some(&game("eXoScummVM", None)), Some(&e), false), "ScummVM 2.8.0");
+        assert_eq!(emulator_name(Some(&game("eXoScummVM", None)), Some(&e), false, None), "ScummVM 2.8.0");
         assert_eq!(emulator_pack_id(Some("x98")), Some("dosbox-x"));
         assert_eq!(emulator_pack_id(Some("86boxME")), Some("86box"));
         assert_eq!(emulator_pack_id(Some("pcbox")), None);

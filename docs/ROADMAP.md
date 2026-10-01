@@ -103,6 +103,12 @@ URLs therefore leaves installed packs alone.
 
 ## Step 3: DOSBox-X for printer and x-variant titles (#15)
 
+**Done 2026-09-30** (branch `dosbox-x-routing`): engine choice, DOSBox-X
+branch, PNG printouts in `!prints`, pack queued with the download, Game
+Settings and panel notes. 31 games default to DOSBox-X (eXoDOS 20 incl.
+Laffer Utilities via the printer rule, eXoWin3x 11). Still open below: the
+playtest on real games, and a panel button to open the printouts folder.
+
 Who is affected:
 - 30 titles eXo assigns to DOSBox-X, counted from `games.dosbox_variant`:
   eXoWin3x `x` (11), eXoDOS `x` (16) and `x2` (3). They run under Staging

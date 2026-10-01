@@ -558,3 +558,32 @@ marks the important thing with `accent`, which the detail panel's Play already u
 now use the accent; the card's "↓ Download" label, on nearly every card, drops to secondary
 text so the accent stays meaningful. `--success` remains for genuine success messages and
 `--danger` for errors.
+
+## 2026-09-30 - DOS and Windows 3.x games run under DOSBox-X where eXo says so, and print to PNG
+
+Every DOS and Windows 3.x game used to run under DOSBox Staging, including the 30 eXo pins to
+its DOSBox-X build (`x` / `x2` in `dosbox.txt` and `dosbox3x.txt`: 19 eXoDOS, 11 eXoWin3x) and the
+13 printing titles (Print Shop, Newsroom, ...), which Staging cannot serve: it has no printer
+(the `jn/printing` branch missed 0.83.0). DOSBox-X was already on disk for anyone with a Win9x
+game, but only the Win9x launcher could reach it.
+
+`launchers/dosbox.rs` now picks the engine per game: the `engine` game setting
+(`staging` / `dosbox-x`) wins, otherwise eXo's pick, which is DOSBox-X for the `x` pins and for
+any conf that enables the printer, Staging for the rest. 12 of the 13 printing titles are `x`
+pins already; Laffer Utilities is pinned to ECE (Windows-only) and comes along through the
+printer rule. 31 catalogue games default to DOSBox-X. The same pipeline builds the command line
+(host paths, LP overlay, options.conf, overrides); for DOSBox-X it skips the Staging translations
+(DOSBox-X reads eXo's ECE `[midi]` keys and `[ide]` sections natively), adds eXo's `-nomenu`,
+and drops the CRT shader keys, which are Staging's.
+
+Printing: eXo's confs say `printoutput=printer`, which in DOSBox-X means a Windows printer.
+eXorchy adds a fragment sending pages to PNG files (DOSBox-X has no PDF output; PNG is its default
+and opens anywhere) in `<game dir>/!prints`, next to the game's saves, so uninstall and backups
+treat printouts like saves. Opening the folder from the panel is left for later; the panel note
+says where pages go.
+
+The `dosbox-x` pack stays listed once, under eXoWin9x: duplicating it under eXoDOS would break
+the one-install-path-per-pack invariant (`manifest_install_paths_are_unique`), whose point is
+that uninstalling a pack from one collection cannot delete another's emulator.
+`content_packs::pack_collection` finds a pack's home; `download_game` and the panel's pack
+button use it, so a DOS game queues and installs the same pack the Win9x games use.

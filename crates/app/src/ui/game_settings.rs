@@ -15,7 +15,9 @@ use adw::prelude::*;
 
 use crate::app;
 
-const ENGINE: [(&str, &str); 2] = [("", "eXo's choice (DOSBox ECE)"), ("staging", "DOSBox Staging")];
+// "eXo's choice" names what it resolves to for this game.
+const ENGINE_EXO_STAGING: [(&str, &str); 3] = [("", "eXo's choice (DOSBox Staging)"), ("staging", "DOSBox Staging"), ("dosbox-x", "DOSBox-X")];
+const ENGINE_EXO_X: [(&str, &str); 3] = [("", "eXo's choice (DOSBox-X)"), ("staging", "DOSBox Staging"), ("dosbox-x", "DOSBox-X")];
 const SHADER: [(&str, &str); 3] = [("", "Default (global)"), ("crt-auto", "On"), ("sharp", "Off")];
 const FULLSCREEN: [(&str, &str); 3] = [("", "Default (global)"), ("true", "On"), ("false", "Off")];
 const CYCLES: [(&str, &str); 4] = [("", "Default (game's own)"), ("auto", "Auto"), ("max", "Max"), ("fixed", "Fixed")];
@@ -33,7 +35,8 @@ pub fn open(parent: &impl IsA<gtk::Widget>, game: &Game) {
     app::local(async move {
         let c = core.clone();
         let svm = app::call(async move { scummvm::scummvm_variants(c.state(), id).await }).await.ok().flatten();
-        let ece_available = app::call(async move { games::game_engine_info(id).await }).await.map(|e| e.ece_available).unwrap_or(false);
+        let c = core.clone();
+        let engine = app::call(async move { games::game_engine_info(c.state(), id).await }).await.ok();
         let c = core.clone();
         let settings = app::call(async move { games::get_game_settings(c.state(), id).await }).await;
 
@@ -42,7 +45,7 @@ pub fn open(parent: &impl IsA<gtk::Widget>, game: &Game) {
         tv.add_top_bar(&adw::HeaderBar::new());
         let body = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).margin_start(16).margin_end(16).margin_top(4).margin_bottom(16).css_classes(["dialog-body"]).build();
         match settings {
-            Ok(s) => build_form(&dialog, &body, id, svm, ece_available, s),
+            Ok(s) => build_form(&dialog, &body, id, svm, engine, s),
             Err(e) => body.append(&gtk::Label::builder().label(format!("Couldn't load the settings: {e}")).wrap(true).xalign(0.0).css_classes(["danger"]).build()),
         }
         tv.set_content(Some(&gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).max_content_height(720).child(&body).build()));
@@ -132,7 +135,7 @@ impl SvmForm {
     }
 }
 
-fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummVmVariants>, ece_available: bool, s: games::GameSettings) {
+fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummVmVariants>, engine_info: Option<games::GameEngineInfo>, s: games::GameSettings) {
     let svm_form = svm.map(|tree| {
         let variant = tree.selected.variant.as_deref().and_then(|sel| tree.variants.iter().find(|v| v.name == sel)).cloned();
         let sub_names: Vec<String> = variant.as_ref().map(|v| v.subs.iter().map(|s| s.name.clone()).collect()).unwrap_or_default();
@@ -172,27 +175,44 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
     });
 
     let is_svm = svm_form.is_some();
-    let engine = (!is_svm && ece_available).then(|| {
-        let d = drop(&ENGINE, s.engine.as_deref().unwrap_or(""));
+    // DOS and Windows 3.x games pick their emulator; the backend answers
+    // None for every other collection.
+    let exo_x = engine_info.as_ref().and_then(|e| e.exo_engine.as_deref()) == Some("dosbox-x");
+    let prints = engine_info.as_ref().is_some_and(|e| e.prints);
+    let engine_opts: &'static [(&str, &str); 3] = if exo_x { &ENGINE_EXO_X } else { &ENGINE_EXO_STAGING };
+    let engine = (!is_svm && engine_info.as_ref().is_some_and(|e| e.engine.is_some())).then(|| {
+        let d = drop(engine_opts, s.engine.as_deref().unwrap_or(""));
         row(body, "Emulator", &d);
-        note(body, "eXo tuned this game for DOSBox ECE. Staging adds shaders and the newer feature set, but the game was not tested with it - and for the handful of games that print, ECE is the only engine that can.");
+        note(
+            body,
+            if prints {
+                "This game prints. Under DOSBox-X its pages are saved as PNG images in the game's !prints folder; DOSBox Staging has no printer."
+            } else if exo_x {
+                "eXo runs this game under DOSBox-X. DOSBox Staging adds CRT shaders and a newer feature set, but eXo did not test the game with it."
+            } else {
+                "eXo's configuration for this game targets DOSBox Staging or DOSBox ECE (Windows only); DOSBox-X is an alternative if it misbehaves."
+            },
+        );
         d
     });
     let glshader = (!is_svm).then(|| {
         let d = drop(&SHADER, s.glshader.as_deref().unwrap_or(""));
         row(body, "CRT Shader", &d);
-        let n = note(body, "This game runs under DOSBox ECE, which has no shader support. Shaders are a DOSBox Staging feature, so neither this setting nor the global one applies. Switch the emulator above to DOSBox Staging if you want the CRT look.");
+        let n = note(body, "CRT shaders are a DOSBox Staging feature: they do not apply while this game runs under DOSBox-X. Switch the emulator above to DOSBox Staging for the CRT look.");
         // What would run it with the choice currently in the dialog is what
-        // the note reflects - switching the engine takes the warning away
-        // before saving.
-        let uses_ece = glib::clone!(#[weak] d, #[weak] n, #[strong] engine, move || {
-            let ece = ece_available && engine.as_ref().map(|e| drop_value(e, &ENGINE) != "staging").unwrap_or(true);
-            d.set_sensitive(!ece);
-            n.set_visible(ece);
+        // the note reflects - switching the engine updates it before saving.
+        let uses_x = glib::clone!(#[weak] d, #[weak] n, #[strong] engine, move || {
+            let x = match engine.as_ref().map(|e| drop_value(e, engine_opts)) {
+                Some(v) if v == "dosbox-x" => true,
+                Some(v) if v == "staging" => false,
+                _ => exo_x,
+            };
+            d.set_sensitive(!x);
+            n.set_visible(x);
         });
-        uses_ece();
+        uses_x();
         if let Some(e) = &engine {
-            e.connect_selected_notify(move |_| uses_ece());
+            e.connect_selected_notify(move |_| uses_x());
         }
         d
     });
@@ -253,7 +273,7 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
                 games::set_game_settings(core.state(), id, None, None, fullscreen, None, None).await
             })
         } else {
-            let engine = engine.as_ref().map(|d| drop_value(d, &ENGINE)).filter(|v| !v.is_empty());
+            let engine = engine.as_ref().map(|d| drop_value(d, engine_opts)).filter(|v| !v.is_empty());
             let glshader = glshader.as_ref().map(|d| drop_value(d, &SHADER)).filter(|v| !v.is_empty());
             let cycles = cycles.as_ref().and_then(|(mode, value)| match drop_value(mode, &CYCLES).as_str() {
                 "" => None,

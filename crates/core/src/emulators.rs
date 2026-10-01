@@ -46,6 +46,72 @@ pub fn system_dosbox_binary() -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
+/// Manifest pack id and install dir leaf for DOSBox-X (owned by eXoWin9x in
+/// the manifest; DOS and Windows 3.x games use the same pack).
+pub const DOSBOX_X_PACK_ID: &str = "dosbox-x";
+/// DOSBox-X's Flatpak id (no official Linux binaries exist for it).
+pub const DOSBOX_X_FLATPAK: &str = "com.dosbox_x.DOSBox-X";
+
+/// How a resolved emulator is invoked: a binary on disk, or a Flatpak.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum EngineCmd {
+    Direct(PathBuf),
+    Flatpak(&'static str),
+}
+
+impl EngineCmd {
+    /// Build a Command; `grant` is a directory the Flatpak sandbox must see.
+    pub(crate) fn command(&self, grant: &Path) -> (std::process::Command, PathBuf) {
+        self.command_granting(&[grant])
+    }
+
+    /// Same, for every directory the emulator reads or writes.
+    pub(crate) fn command_granting(&self, grants: &[&Path]) -> (std::process::Command, PathBuf) {
+        match self {
+            EngineCmd::Direct(bin) => (std::process::Command::new(bin), bin.clone()),
+            EngineCmd::Flatpak(id) => {
+                let mut cmd = std::process::Command::new("flatpak");
+                cmd.arg("run");
+                for g in grants {
+                    cmd.arg(format!("--filesystem={}", g.display()));
+                }
+                cmd.arg(id);
+                (cmd, PathBuf::from("flatpak"))
+            }
+        }
+    }
+}
+
+/// DOSBox-X: the pack's AppImage, then `dosbox-x` on PATH, then the Flatpak.
+/// The Win9x launcher puts its own preferences in front of this.
+pub(crate) fn resolve_dosbox_x(data_dir: &str) -> Option<EngineCmd> {
+    if !data_dir.is_empty() {
+        let pack = Path::new(data_dir).join("content/emulators").join(DOSBOX_X_PACK_ID).join("DOSBox-X.AppImage");
+        if pack.is_file() {
+            return Some(EngineCmd::Direct(pack));
+        }
+    }
+    if let Some(bin) = on_path("dosbox-x") {
+        return Some(EngineCmd::Direct(bin));
+    }
+    flatpak_installed(DOSBOX_X_FLATPAK).then_some(EngineCmd::Flatpak(DOSBOX_X_FLATPAK))
+}
+
+fn on_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path).map(|dir| dir.join(name)).find(|c| c.is_file())
+}
+
+fn flatpak_installed(id: &str) -> bool {
+    std::process::Command::new("flatpak")
+        .args(["info", id])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Which binary a launch would use, and why.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
