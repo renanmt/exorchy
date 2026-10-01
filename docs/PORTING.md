@@ -89,7 +89,12 @@ Look at the PNG (Read tool) to verify layouts. Do not use grim (it hangs on this
 Snapshots need painted frames: with the monitors off (DPMS) a Wayland window never gets one, so
 render headlessly instead - `gtk4-broadwayd :7 &` then `GDK_BACKEND=broadway BROADWAY_DISPLAY=:7`
 in front of the command above (`GDK_BACKEND=x11` via XWayland works too). The app is single-instance:
-a leftover instance makes later runs exit at once as a remote, so `pkill -x exorchy` first.
+a running instance makes later runs exit at once as a remote. Never `pkill` it: it may be the user's
+own eXorchy. Isolate the check instead with `dbus-run-session -- ...`, and inside that session also
+`unset WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE DISPLAY XDG_CURRENT_DESKTOP` and set
+`GDK_DEBUG=no-portals GTK_USE_PORTAL=0`: otherwise GTK starts a private
+`xdg-desktop-portal-hyprland` against the user's Hyprland, which segfaults when the session ends
+and pops Omarchy's crash notice on their desktop (2026-09-30, once per run).
 More switches: `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
 `EXORCHY_SNAPSHOT_READING=1` (+ `_VIEW=list`, `EXORCHY_SNAPSHOT_ISSUE=<key>`, `EXORCHY_SNAPSHOT_DOC=<file>`).
 `EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
