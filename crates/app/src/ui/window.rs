@@ -62,7 +62,13 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
         glib::clone!(#[weak] stack, #[strong] splash, move |status| {
             let ready = status.map(|s| s.ready).unwrap_or(false);
             if ready {
-                show_library(&win, &stack, &toasts);
+                // The library folder first: a requested move, a missing
+                // folder or the old home-folder layout, before anything uses it.
+                let library: Rc<dyn Fn()> = {
+                    let (win, stack, toasts) = (win.clone(), stack.clone(), toasts.clone());
+                    Rc::new(move || show_library(&win, &stack, &toasts))
+                };
+                crate::ui::library_location::gate(&win, &stack, library);
             } else {
                 show_setup(&win, &stack, &toasts);
             }

@@ -1,0 +1,4 @@
+/* Library location pages (ui/library_location.rs): the setup card's look,
+   plus the target path set like the other paths in the app. */
+.library-location .move-path { font-family: monospace; }
+.library-location progressbar { margin-top: 4px; }

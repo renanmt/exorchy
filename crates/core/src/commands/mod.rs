@@ -13,6 +13,7 @@ pub mod content_packs;
 pub mod games;
 pub mod playlists;
 pub mod setup;
+pub mod library_location;
 pub mod shell_open;
 pub mod updates;
 pub mod app_update;

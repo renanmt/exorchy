@@ -30,6 +30,7 @@ pub mod backdrop;
 pub mod game_settings;
 pub mod hidden;
 pub mod launch_notes;
+pub mod library_location;
 pub mod media;
 pub mod onboarding;
 pub mod pdf;
