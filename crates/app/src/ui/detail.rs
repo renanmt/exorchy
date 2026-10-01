@@ -1,7 +1,10 @@
-//! The game detail panel: cover, title, language variants (one selected row
-//! at a time, so a merged card can play the German version), the action bar
-//! (Play / Stop / Download / Cancel, favourite, more), the status line,
-//! description, information table, gallery and manual.
+//! The game detail panel, laid out as a dossier: a header (favourite, close),
+//! the hero row (cover beside platform, title, meta line, language variants -
+//! one selected row at a time, so a merged card can play the German version -
+//! and the actions: Play / Stop / Download / Cancel with a menu, playlist,
+//! more), then the launch note, the preview video, genre tags, description
+//! and four tabs: Overview (facts and features), Media (screenshots, press
+//! articles), Manuals and Setup (emulator, game settings, reset, uninstall).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -30,17 +33,25 @@ pub struct DetailPanel {
     busy: RefCell<Option<String>>,
     launching: Cell<bool>,
     cover: gtk::Picture,
+    kind: gtk::Label,
     title: gtk::Label,
     subtitle: gtk::Label,
     chips: gtk::Box,
     actions: gtk::Box,
+    secondary: gtk::Box,
+    favorite: gtk::Button,
+    tags: adw::WrapBox,
     status: gtk::Label,
     description: gtk::Label,
     notes: gtk::Label,
     info: gtk::Grid,
+    features: gtk::Box,
     gallery: gtk::FlowBox,
     gallery_head: gtk::Label,
     articles_slot: gtk::Box,
+    manuals: gtk::Box,
+    setup: gtk::Box,
+    tabs: adw::ViewStack,
     manual_path: RefCell<Option<String>>,
     scroller: gtk::ScrolledWindow,
     /// Below the cover; `ui::media` fills it.
@@ -61,46 +72,87 @@ type OpenListener = Rc<dyn Fn(bool)>;
 
 impl DetailPanel {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
-        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["detail-panel"]).build();
+        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["detail-panel", "dossier"]).build();
 
         let head = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["detail-head"]).build();
+        let favorite = gtk::Button::builder().icon_name("non-starred-symbolic").css_classes(["btn", "icon", "ghost", "dossier-star"]).tooltip_text("Add to favorites (F)").build();
+        let heading = gtk::Label::builder().label("GAME DOSSIER").xalign(0.0).hexpand(true).css_classes(["dossier-heading"]).build();
         let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Close (Esc)").build();
-        let title = gtk::Label::builder().xalign(0.0).wrap(true).hexpand(true).css_classes(["title-2"]).selectable(true).build();
-        head.append(&title);
+        head.append(&favorite);
+        head.append(&heading);
         head.append(&close);
         root.append(&head);
 
         let body = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).margin_start(16).margin_end(16).margin_bottom(20).build();
-        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).height_request(280).can_shrink(true).css_classes(["detail-cover"]).build();
-        body.append(&cover);
-        // The media module (preview video, theme music) mounts here.
-        let media_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
-        body.append(&media_slot);
+
+        // Hero: the cover beside who and what the game is, and what to do.
+        let hero = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["dossier-hero"]).build();
+        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).width_request(150).height_request(210).can_shrink(true).valign(gtk::Align::Start).css_classes(["detail-cover"]).build();
+        hero.append(&cover);
+        let side = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).hexpand(true).build();
+        let kind = gtk::Label::builder().xalign(0.0).css_classes(["dossier-kind"]).build();
+        let title = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["title-2"]).selectable(true).build();
         let subtitle = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["secondary"]).build();
-        body.append(&subtitle);
         let chips = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).visible(false).build();
-        body.append(&chips);
-        // The launch note (engine missing, support download, ...) sits right
-        // above the bar whose Play it explains.
-        let note_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).visible(false).build();
-        body.append(&note_slot);
-        let actions = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["detail-actions"]).build();
-        body.append(&actions);
+        let actions = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).margin_top(6).css_classes(["detail-actions"]).build();
+        let secondary = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).build();
+        side.append(&kind);
+        side.append(&title);
+        side.append(&subtitle);
+        side.append(&chips);
+        side.append(&actions);
+        side.append(&secondary);
+        hero.append(&side);
+        body.append(&hero);
+
         let status = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["muted", "small"]).visible(false).build();
         body.append(&status);
+        // The launch note (engine missing, support download, ...) right
+        // under the actions whose Play it explains.
+        let note_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).visible(false).build();
+        body.append(&note_slot);
+        // The media module (preview video, theme music) mounts here. Not in a
+        // tab: the video pauses the theme music while it plays, and a hidden
+        // tab would play it unseen.
+        let media_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
+        body.append(&media_slot);
+        let tags = adw::WrapBox::builder().child_spacing(6).line_spacing(6).visible(false).css_classes(["dossier-tags"]).build();
+        body.append(&tags);
         let description = gtk::Label::builder().xalign(0.0).wrap(true).selectable(true).css_classes(["detail-description"]).build();
         body.append(&description);
-        let notes = gtk::Label::builder().xalign(0.0).wrap(true).selectable(true).visible(false).css_classes(["muted", "small"]).build();
-        body.append(&notes);
+
+        // Tabs.
+        let tabs = adw::ViewStack::builder().vhomogeneous(false).hhomogeneous(false).build();
+        let switcher = adw::InlineViewSwitcher::builder().stack(&tabs).display_mode(adw::InlineViewSwitcherDisplayMode::Labels).css_classes(["dossier-tabs"]).build();
+        body.append(&switcher);
+        body.append(&tabs);
+
+        // Overview: the facts beside what the game can do here, then eXo's notes.
+        let overview = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(14).build();
+        let columns = adw::WrapBox::builder().child_spacing(24).line_spacing(14).build();
         let info = gtk::Grid::builder().row_spacing(4).column_spacing(16).css_classes(["detail-info"]).build();
-        body.append(&info);
-        // "Covered in": magazine articles about the game (ui::reading).
-        let articles_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
-        body.append(&articles_slot);
-        let gallery_head = gtk::Label::builder().label("Screenshots").xalign(0.0).css_classes(["title-3"]).visible(false).build();
-        body.append(&gallery_head);
+        columns.append(&info);
+        let features = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).css_classes(["dossier-features"]).build();
+        columns.append(&features);
+        overview.append(&columns);
+        let notes = gtk::Label::builder().xalign(0.0).wrap(true).selectable(true).visible(false).css_classes(["dossier-notes"]).build();
+        overview.append(&notes);
+        tabs.add_titled(&overview, Some("overview"), "Overview");
+
+        // Media: screenshots, then "Covered in" (magazine articles, ui::reading).
+        let media = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).build();
+        let gallery_head = gtk::Label::builder().label("Screenshots").xalign(0.0).css_classes(["dossier-section"]).visible(false).build();
+        media.append(&gallery_head);
         let gallery = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).column_spacing(6).row_spacing(6).min_children_per_line(2).max_children_per_line(6).homogeneous(true).build();
-        body.append(&gallery);
+        media.append(&gallery);
+        let articles_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
+        media.append(&articles_slot);
+        tabs.add_titled(&media, Some("media"), "Media");
+
+        let manuals = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).build();
+        tabs.add_titled(&manuals, Some("manuals"), "Manuals");
+        let setup = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(10).build();
+        tabs.add_titled(&setup, Some("setup"), "Setup");
 
         let scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).child(&body).build();
         root.append(&scroller);
@@ -117,17 +169,25 @@ impl DetailPanel {
             busy: RefCell::new(None),
             launching: Cell::new(false),
             cover,
+            kind,
             title,
             subtitle,
             chips,
             actions,
+            secondary,
+            favorite,
+            tags,
             status,
             description,
             notes,
             info,
+            features,
             gallery,
             gallery_head,
             articles_slot,
+            manuals,
+            setup,
+            tabs,
             manual_path: RefCell::new(None),
             scroller,
             media_slot,
@@ -137,6 +197,7 @@ impl DetailPanel {
             shown_listeners: RefCell::new(Vec::new()),
         });
         close.connect_clicked(glib::clone!(#[weak] panel, move |_| panel.close()));
+        panel.favorite.connect_clicked(glib::clone!(#[weak] panel, move |_| panel.toggle_favorite()));
         launch_notes::attach(&panel);
         panel
     }
@@ -169,6 +230,19 @@ impl DetailPanel {
 
     pub fn is_open(&self) -> bool {
         self.open.get()
+    }
+
+    /// The dossier is open on this game.
+    pub fn shows(&self, id: Option<i64>) -> bool {
+        self.open.get() && id.is_some() && self.game.borrow().as_ref().and_then(|g| g.id) == id
+    }
+
+    /// Open again on the last game shown (the I shortcut).
+    pub fn reopen(self: &Rc<Self>) {
+        let last = self.game.borrow().clone();
+        if let Some(g) = last {
+            self.show(g);
+        }
     }
 
     /// The host (the library's split view) shows or hides the panel on this.
@@ -389,7 +463,9 @@ impl DetailPanel {
                     btn.connect_clicked(move |_| actions::open_document(full.clone()));
                     panel.gallery.insert(&btn, -1);
                 }
-                panel.render_actions();
+                panel.tabs.page(&panel.gallery.parent().expect("media tab")).set_title(Some(&format!("Media ({})", meta.images.len())));
+                // The manual and counts feed the tabs, the features and Play's menu.
+                panel.render();
             }),
         );
     }
@@ -402,15 +478,18 @@ impl DetailPanel {
     fn render(self: &Rc<Self>) {
         let Some(game) = self.game.borrow().clone() else { return };
         self.title.set_label(&game.title);
+        let platform = platform_tag(game.torrent_source.as_deref());
+        self.kind.set_label(&platform.map(str::to_uppercase).unwrap_or_default());
+        self.kind.set_visible(platform.is_some());
         let mut parts = Vec::new();
         if let Some(y) = game.year {
             parts.push(y.to_string());
         }
+        if let Some(g) = genres(game.genre.as_deref()).into_iter().next() {
+            parts.push(g);
+        }
         if let Some(d) = game.developer.as_deref().filter(|s| !s.is_empty()) {
             parts.push(d.to_string());
-        }
-        if let Some(p) = platform_tag(game.torrent_source.as_deref()) {
-            parts.push(p.to_string());
         }
         self.subtitle.set_label(&parts.join(" · "));
 
@@ -442,6 +521,21 @@ impl DetailPanel {
         }
 
         let row = self.selected_row().unwrap_or(game.clone());
+
+        // Tags: the genres, then how it is played.
+        while let Some(c) = self.tags.first_child() {
+            self.tags.remove(&c);
+        }
+        let mut tags = genres(row.genre.as_deref());
+        if let Some(m) = row.play_mode.as_deref().filter(|m| !m.is_empty()) {
+            tags.extend(m.split(['/', ';', ',']).map(str::trim).filter(|t| !t.is_empty()).map(String::from));
+        }
+        tags.dedup();
+        self.tags.set_visible(!tags.is_empty());
+        for t in tags.iter().take(6) {
+            self.tags.append(&gtk::Label::builder().label(t).css_classes(["dossier-tag"]).build());
+        }
+
         let desc = row.description.clone().or(game.description.clone()).unwrap_or_default();
         self.description.set_label(&desc);
         self.description.set_visible(!desc.is_empty());
@@ -449,7 +543,7 @@ impl DetailPanel {
         self.notes.set_label(&notes);
         self.notes.set_visible(!notes.is_empty());
 
-        // Information table.
+        // Overview facts.
         while let Some(c) = self.info.first_child() {
             self.info.remove(&c);
         }
@@ -457,7 +551,7 @@ impl DetailPanel {
         let mut add = |k: &str, v: Option<String>| {
             let Some(v) = v.filter(|v| !v.trim().is_empty()) else { return };
             let kl = gtk::Label::builder().label(k).xalign(0.0).css_classes(["muted", "small"]).valign(gtk::Align::Start).build();
-            let vl = gtk::Label::builder().label(&v).xalign(0.0).wrap(true).selectable(true).hexpand(true).build();
+            let vl = gtk::Label::builder().label(&v).xalign(0.0).wrap(true).max_width_chars(28).selectable(true).build();
             self.info.attach(&kl, 0, r, 1, 1);
             self.info.attach(&vl, 1, r, 1, 1);
             r += 1;
@@ -466,37 +560,177 @@ impl DetailPanel {
         add("Publisher", row.publisher.clone());
         // LaunchBox dates are ISO timestamps; the day is what the reader wants.
         add("Released", row.release_date.as_deref().map(|d| d.chars().take(10).collect()).or(row.year.map(|y| y.to_string())));
+        add("Platform", Some(row.platform.clone()));
         add("Genre", row.genre.clone());
         add("Series", row.series.clone());
-        add("Play mode", row.play_mode.clone());
+        add("Mode", row.play_mode.clone());
         add("Players", row.max_players.map(|n| n.to_string()));
-        add("Rating", row.rating.map(|r| format!("{r:.1} / 5{}", row.rating_votes.map(|v| format!(" ({v} votes)")).unwrap_or_default())));
         add("Region", row.region.clone());
-        add("Platform", Some(row.platform.clone()));
-        add("Collection", row.torrent_source.clone());
+        add("Rating", row.rating.map(|r| format!("{r:.1} / 5{}", row.rating_votes.map(|v| format!(" ({v} votes)")).unwrap_or_default())));
         add("Size", row.download_size.filter(|s| *s > 0).map(|s| format_bytes(s as u64)));
-        add("Emulator", Some(emulator_name(&row)));
+
+        self.render_features(&row, None);
+        self.render_setup(&row, None);
         // DOS / Windows 3.x: the backend knows the engine for sure (eXo's
         // DOSBox-X pins, printing confs, the per-game override).
-        if let (Some(id), Some(value)) = (row.id, self.info.child_at(1, r - 1).and_downcast::<gtk::Label>()) {
+        if let Some(id) = row.id {
             let core = app::core();
-            app::spawn(async move { games::game_engine_info(core.state(), id).await }, move |res| {
-                if let Ok(Some(engine)) = res.map(|e| e.engine) {
-                    value.set_label(if engine == "dosbox-x" { "DOSBox-X" } else { "DOSBox Staging" });
-                }
-            });
+            app::spawn(async move { games::game_engine_info(core.state(), id).await }, glib::clone!(#[weak(rename_to = panel)] self, move |res| {
+                let Ok(info) = res else { return };
+                let Some(row) = panel.selected_row().filter(|r| r.id == Some(id)) else { return };
+                panel.render_features(&row, Some(&info));
+                panel.render_setup(&row, Some(&info));
+            }));
         }
+        self.render_manuals();
 
         self.render_actions();
+    }
+
+    /// What the game can do here, from what is known for sure: the emulator,
+    /// printing, players, the manual, language versions, CRT shaders.
+    fn render_features(&self, row: &Game, engine: Option<&games::GameEngineInfo>) {
+        while let Some(c) = self.features.first_child() {
+            self.features.remove(&c);
+        }
+        self.features.append(&gtk::Label::builder().label("Features").xalign(0.0).css_classes(["muted", "small"]).build());
+        let dos_engine = engine.and_then(|e| e.engine.as_deref());
+        let emulator = match dos_engine {
+            Some("dosbox-x") => "DOSBox-X".to_string(),
+            Some(_) => "DOSBox Staging".to_string(),
+            None => emulator_name(row),
+        };
+        let mut items: Vec<(&str, String)> = vec![("applications-games-symbolic", format!("Runs under {emulator}"))];
+        if engine.is_some_and(|e| e.prints) {
+            items.push(("printer-symbolic", if dos_engine == Some("dosbox-x") { "Prints to PNG".into() } else { "Prints (needs DOSBox-X)".into() }));
+        }
+        if let Some(n) = row.max_players.filter(|n| *n > 1) {
+            items.push(("system-users-symbolic", format!("Up to {n} players")));
+        }
+        if self.manual_path.borrow().is_some() {
+            items.push(("x-office-document-symbolic", "Manual included".into()));
+        }
+        let languages = self.variants.borrow().len();
+        if languages > 1 {
+            items.push(("preferences-desktop-locale-symbolic", format!("{languages} language versions")));
+        }
+        if dos_engine == Some("staging") {
+            items.push(("video-display-symbolic", "CRT shaders".into()));
+        }
+        for (icon, text) in items {
+            let line = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["dossier-feature"]).build();
+            line.append(&gtk::Image::from_icon_name(icon));
+            line.append(&gtk::Label::builder().label(&text).xalign(0.0).build());
+            self.features.append(&line);
+        }
+    }
+
+    /// The Manuals tab, and its count in the tab title.
+    fn render_manuals(self: &Rc<Self>) {
+        while let Some(c) = self.manuals.first_child() {
+            self.manuals.remove(&c);
+        }
+        let manual = self.manual_path.borrow().clone();
+        let page = self.tabs.page(&self.manuals);
+        page.set_title(Some(&format!("Manuals ({})", manual.is_some() as u8)));
+        page.set_visible(manual.is_some());
+        let Some(path) = manual else { return };
+        let title = self.game.borrow().as_ref().map(|g| g.title.clone()).unwrap_or_default();
+        let line = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["dossier-doc"]).build();
+        line.append(&gtk::Image::from_icon_name("x-office-document-symbolic"));
+        line.append(&gtk::Label::builder().label("Game manual").xalign(0.0).hexpand(true).build());
+        let open = btn("Read", &[]);
+        let w = self.window.clone();
+        open.connect_clicked(move |_| crate::ui::pdf::open_document_viewer(&w, &path, &title, None, 1));
+        line.append(&open);
+        self.manuals.append(&line);
+    }
+
+    /// The Setup tab: what runs the game and the per-game controls.
+    fn render_setup(self: &Rc<Self>, row: &Game, engine: Option<&games::GameEngineInfo>) {
+        while let Some(c) = self.setup.first_child() {
+            self.setup.remove(&c);
+        }
+        let grid = gtk::Grid::builder().row_spacing(4).column_spacing(16).css_classes(["detail-info"]).build();
+        let mut r = 0;
+        let mut add = |k: &str, v: String| {
+            grid.attach(&gtk::Label::builder().label(k).xalign(0.0).css_classes(["muted", "small"]).build(), 0, r, 1, 1);
+            grid.attach(&gtk::Label::builder().label(&v).xalign(0.0).wrap(true).selectable(true).build(), 1, r, 1, 1);
+            r += 1;
+        };
+        let emulator = match engine.and_then(|e| e.engine.as_deref()) {
+            Some(e) => {
+                let name = if e == "dosbox-x" { "DOSBox-X" } else { "DOSBox Staging" };
+                let picked = engine.and_then(|i| i.exo_engine.as_deref()) == Some(e);
+                format!("{name}{}", if picked { " (eXo's choice)" } else { " (your choice)" })
+            }
+            None => emulator_name(row),
+        };
+        add("Emulator", emulator);
+        if let Some(c) = row.torrent_source.clone() {
+            add("Collection", c);
+        }
+        add("Status", if row.installed { "Installed" } else if row.in_library { "In your library, not installed" } else { "Not installed" }.into());
+        self.setup.append(&grid);
+
+        if !row.installed {
+            self.setup.append(&gtk::Label::builder().label("Install the game to change its emulator and settings.").xalign(0.0).wrap(true).css_classes(["muted", "small"]).build());
+            return;
+        }
+        let buttons = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).build();
+        let settings = btn("Game settings…", &[]);
+        let (w, g) = (self.window.clone(), row.clone());
+        settings.connect_clicked(move |_| actions::game_settings(&w, &g));
+        buttons.append(&settings);
+        let reset = btn("Reset game data", &["danger"]);
+        let (w, g, s) = (self.window.clone(), row.clone(), self.status_setter());
+        reset.connect_clicked(move |_| actions::reset(&w, &g, s.clone()));
+        buttons.append(&reset);
+        self.setup.append(&buttons);
+    }
+
+    /// A busy line for long actions started from the panel ("Resetting…").
+    fn status_setter(self: &Rc<Self>) -> Rc<dyn Fn(&str)> {
+        let panel = Rc::downgrade(self);
+        Rc::new(move |s: &str| {
+            if let Some(p) = panel.upgrade() {
+                p.busy.replace(if s.is_empty() { None } else { Some(s.trim_end_matches("...").trim_end_matches('…').to_string()) });
+                // Deferred: a menu's popover may still be closing, and
+                // rebuilding the bar under it would leave its grab.
+                let p2 = p.clone();
+                glib::idle_add_local_once(move || p2.render_actions());
+            }
+        })
+    }
+
+    fn toggle_favorite(self: &Rc<Self>) {
+        let Some(gid) = self.game.borrow().as_ref().and_then(|g| g.id) else { return };
+        // The bus brings the new state back to this panel (`set_favorite`).
+        actions::toggle_favorite(gid, move |res| {
+            if let Ok(v) = res {
+                bus::notify_favorite_changed(gid, v);
+            }
+        });
     }
 
     fn render_actions(self: &Rc<Self>) {
         while let Some(c) = self.actions.first_child() {
             self.actions.remove(&c);
         }
+        while let Some(c) = self.secondary.first_child() {
+            self.secondary.remove(&c);
+        }
         let Some(game) = self.game.borrow().clone() else { return };
         let Some(row) = self.selected_row() else { return };
         let Some(id) = row.id else { return };
+
+        self.favorite.set_icon_name(if game.favorited { "starred-symbolic" } else { "non-starred-symbolic" });
+        self.favorite.set_tooltip_text(Some(if game.favorited { "Remove from favorites (F)" } else { "Add to favorites (F)" }));
+        if game.favorited {
+            self.favorite.add_css_class("is-favorite");
+        } else {
+            self.favorite.remove_css_class("is-favorite");
+        }
 
         if let Some(b) = self.busy.borrow().clone() {
             let l = gtk::Label::builder().label(format!("{b}…")).css_classes(["muted"]).build();
@@ -513,7 +747,7 @@ impl DetailPanel {
 
         if installed {
             if running {
-                let b = btn("■ Stop", &["primary"]);
+                let b = btn("■ Stop", &["primary", "dossier-primary"]);
                 b.connect_clicked(move |_| actions::stop(id));
                 self.actions.append(&b);
             } else {
@@ -527,25 +761,36 @@ impl DetailPanel {
                 } else {
                     "▶ Play"
                 };
-                let b = btn(label, &["primary"]);
+                // Play, and what belongs to playing it behind the arrow.
+                let play = adw::SplitButton::builder().label(label).css_classes(["primary", "dossier-primary"]).hexpand(true).build();
                 if launching || pending {
                     // The spinner is the button's own content while it waits.
                     let inner = gtk::Box::new(gtk::Orientation::Horizontal, 6);
                     inner.append(&gtk::Spinner::builder().spinning(true).build());
                     inner.append(&gtk::Label::new(Some(label)));
-                    b.set_child(Some(&inner));
+                    play.set_child(Some(&inner));
                 }
-                b.set_sensitive(!launching && !pending && blocked.is_none());
-                b.set_tooltip_text(blocked.as_deref());
+                play.set_sensitive(!launching && !pending && blocked.is_none());
+                play.set_tooltip_text(blocked.as_deref().or(Some("Play (Enter)")));
                 let (title, panel) = (row.title.clone(), Rc::downgrade(self));
-                b.connect_clicked(move |_| play_with_net_prompt(&panel, id, title.clone()));
-                self.actions.append(&b);
-            }
-            if let Some(m) = self.manual_path.borrow().clone() {
-                let b = btn("Manual", &[]);
-                let (w, title) = (self.window.clone(), row.title.clone());
-                b.connect_clicked(move |_| crate::ui::pdf::open_document_viewer(&w, &m, &title, None, 1));
-                self.actions.append(&b);
+                play.connect_clicked(move |_| play_with_net_prompt(&panel, id, title.clone()));
+                let (pop, items) = menu();
+                {
+                    let (w, r, p) = (self.window.clone(), row.clone(), pop.clone());
+                    items.append(&menu_item("Game settings…", false, move || {
+                        p.popdown();
+                        actions::game_settings(&w, &r);
+                    }));
+                }
+                if let Some(m) = self.manual_path.borrow().clone() {
+                    let (w, title, p) = (self.window.clone(), row.title.clone(), pop.clone());
+                    items.append(&menu_item("Read the manual", false, move || {
+                        p.popdown();
+                        crate::ui::pdf::open_document_viewer(&w, &m, &title, None, 1);
+                    }));
+                }
+                play.set_popover(Some(&pop));
+                self.actions.append(&play);
             }
         } else if downloading {
             let d = dl.clone().unwrap_or_default();
@@ -562,7 +807,7 @@ impl DetailPanel {
             b.connect_clicked(move |_| downloads::cancel(id));
             self.actions.append(&b);
         } else if bus::offline() {
-            self.actions.append(&gtk::Label::builder().label("Not installed - offline mode").css_classes(["muted"]).tooltip_text("Enable downloads in Settings → Network").build());
+            self.actions.append(&gtk::Label::builder().label("Not installed - offline mode").xalign(0.0).wrap(true).css_classes(["muted"]).tooltip_text("Enable downloads in Settings → Network").build());
         } else if row.game_torrent_index.is_some() {
             let label = if row.in_library {
                 "↓ Re-download".to_string()
@@ -572,86 +817,106 @@ impl DetailPanel {
                     _ => "↓ Download".into(),
                 }
             };
-            let b = btn(&label, &["primary"]);
+            let b = btn(&label, &["primary", "dossier-primary"]);
+            b.set_hexpand(true);
             let r = row.clone();
             b.connect_clicked(move |_| actions::download(&r));
             self.actions.append(&b);
         }
 
-        // Favourite: frequent and reversible, stays in the bar.
-        let fav = btn(if game.favorited { "★" } else { "☆" }, &["icon"]);
-        fav.set_tooltip_text(Some(if game.favorited { "Remove from favorites" } else { "Add to favorites" }));
-        if let Some(gid) = game.id {
-            // The bus brings the new state back to this panel (`set_favorite`).
-            fav.connect_clicked(move |_| {
-                actions::toggle_favorite(gid, move |res| {
-                    if let Ok(v) = res {
-                        bus::notify_favorite_changed(gid, v);
-                    }
-                });
-            });
-        }
-        self.actions.append(&fav);
-
-        // Everything else behind one control.
+        // Second row: playlists, then everything else behind one control.
+        let playlist = btn("Add to playlist", &[]);
+        playlist.set_hexpand(true);
         {
-            let more = gtk::MenuButton::builder().label("⋯").css_classes(["btn", "icon"]).tooltip_text("More actions").build();
-            let pop = gtk::Popover::builder().has_arrow(false).css_classes(["context-menu"]).build();
-            let items = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            let add = |label: &str, danger: bool, f: Box<dyn Fn()>| {
-                let b = gtk::Button::builder().label(label).css_classes(["menu-item"]).build();
-                if danger {
-                    b.add_css_class("danger");
-                }
-                let p = pop.clone();
-                b.connect_clicked(move |_| {
-                    p.popdown();
-                    f();
-                });
-                items.append(&b);
-            };
-            let status: Rc<dyn Fn(&str)> = {
-                let panel = Rc::downgrade(self);
-                Rc::new(move |s: &str| {
-                    if let Some(p) = panel.upgrade() {
-                        p.busy.replace(if s.is_empty() { None } else { Some(s.trim_end_matches("...").trim_end_matches('…').to_string()) });
-                        // Deferred: the menu's popover may still be closing,
-                        // and rebuilding the bar under it would leave its grab.
-                        let p2 = p.clone();
-                        glib::idle_add_local_once(move || p2.render_actions());
-                    }
-                })
-            };
-            {
-                let (w, r) = (self.window.clone(), game.clone());
-                add("Add to playlist…", false, Box::new(move || actions::add_to_playlist(&w, &r)));
-            }
-            if installed {
-                let (w, r) = (self.window.clone(), row.clone());
-                add("Game settings…", false, Box::new(move || actions::game_settings(&w, &r)));
-                let (w, r, s) = (self.window.clone(), row.clone(), status.clone());
-                add("↺ Reset game data", true, Box::new(move || actions::reset(&w, &r, s.clone())));
-            }
+            let (w, r) = (self.window.clone(), game.clone());
+            playlist.connect_clicked(move |_| actions::add_to_playlist(&w, &r));
+        }
+        self.secondary.append(&playlist);
+        {
+            let more = gtk::MenuButton::builder().icon_name("view-more-symbolic").css_classes(["btn", "icon"]).tooltip_text("More actions").build();
+            let (pop, items) = menu();
+            let status = self.status_setter();
             {
                 let title = game.title.clone();
+                let p = pop.clone();
                 if crate::ui::hidden::is_hidden(id) {
-                    add("Unhide title", false, Box::new(move || crate::ui::hidden::unhide(id, &title)));
+                    items.append(&menu_item("Unhide title", false, move || {
+                        p.popdown();
+                        crate::ui::hidden::unhide(id, &title);
+                    }));
                 } else {
-                    add("Hide title", false, Box::new(move || crate::ui::hidden::hide(id, &title)));
+                    items.append(&menu_item("Hide title", false, move || {
+                        p.popdown();
+                        crate::ui::hidden::hide(id, &title);
+                    }));
                 }
             }
-            let (w, r, s) = (self.window.clone(), row.clone(), status.clone());
-            add("Uninstall", true, Box::new(move || actions::uninstall_group(&w, &r, s.clone())));
-            pop.set_child(Some(&items));
+            if installed {
+                let (w, r, s, p) = (self.window.clone(), row.clone(), status.clone(), pop.clone());
+                items.append(&menu_item("↺ Reset game data", true, move || {
+                    p.popdown();
+                    actions::reset(&w, &r, s.clone());
+                }));
+            }
+            let (w, r, s, p) = (self.window.clone(), row.clone(), status.clone(), pop.clone());
+            items.append(&menu_item("Uninstall", true, move || {
+                p.popdown();
+                actions::uninstall_group(&w, &r, s.clone());
+            }));
             more.set_popover(Some(&pop));
-            self.actions.append(&more);
+            self.secondary.append(&more);
         }
 
-        // Status line under the bar.
+        // Status line under the actions.
         let text = dl.as_ref().filter(|d| !d.downloading && !d.status.is_empty() && !d.installed).map(|d| d.status.clone());
         self.status.set_label(text.as_deref().unwrap_or(""));
         self.status.set_visible(text.is_some());
     }
+
+    /// Play the shown game (the Enter shortcut); false when Play is not on offer.
+    pub fn play_shown(self: &Rc<Self>) -> bool {
+        let Some(row) = self.selected_row() else { return false };
+        let Some(id) = row.id else { return false };
+        let installed = row.installed || downloads::state(id).map(|d| d.installed).unwrap_or(false);
+        if !installed || bus::is_running(id) || self.launching.get() || self.play_pending.get() || self.play_blocked.borrow().is_some() {
+            return false;
+        }
+        play_with_net_prompt(&Rc::downgrade(self), id, row.title.clone());
+        true
+    }
+
+    /// Star or unstar the shown game (the F shortcut).
+    pub fn favorite_shown(self: &Rc<Self>) {
+        self.toggle_favorite();
+    }
+}
+
+/// A context-menu popover and the box its items go in.
+fn menu() -> (gtk::Popover, gtk::Box) {
+    let pop = gtk::Popover::builder().has_arrow(false).css_classes(["context-menu"]).build();
+    let items = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    pop.set_child(Some(&items));
+    (pop, items)
+}
+
+fn menu_item(label: &str, danger: bool, f: impl Fn() + 'static) -> gtk::Button {
+    let b = gtk::Button::builder().label(label).css_classes(["menu-item"]).build();
+    if danger {
+        b.add_css_class("danger");
+    }
+    b.connect_clicked(move |_| f());
+    b
+}
+
+/// A genre string ("Action / Adventure", "RPG; Strategy") as its parts.
+fn genres(genre: Option<&str>) -> Vec<String> {
+    genre
+        .unwrap_or_default()
+        .split(['/', ';', ','])
+        .map(str::trim)
+        .filter(|g| !g.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 /// Online-capable Win9x games ask once, on the first Play, whether to turn

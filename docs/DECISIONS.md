@@ -609,3 +609,22 @@ DOSBox-X its banner printing stops partway (the page holds the first words; the 
 the printer until closed). The user chose to keep it on DOSBox-X rather than go back to Staging,
 which cannot print at all; Game Settings can still switch it. Known issue, not investigated
 further.
+
+## 2026-10-01 - The detail panel becomes the "Game Dossier"
+
+First phase of the user's UI revamp (ROADMAP "UI revamp"). The panel keeps all of its logic
+(variants, launch notes, downloads, the Win9x network prompt) and is re-laid out after the
+mockup: header (favourite, close), a hero row with the cover beside platform, title, meta, the
+Play split button (its menu holds Game settings and the manual) and a second row (Add to
+playlist, ⋯), then tags, description and Overview / Media / Manuals / Setup tabs.
+
+- The preview video stays above the tabs, not in Media: it pauses the theme music while it
+  plays (`PauseReason::Video`), and in a hidden tab it would play unseen and hold the music.
+- The mockup's features (save states, controller support, rewind, achievements) are not true
+  for these games; the Features list shows only what eXorchy knows: the emulator (from
+  `game_engine_info`), printing, players, manual, language versions, CRT shaders.
+- Shortcuts: Enter plays the shown game, F stars it, I shows or hides the dossier, never while
+  typing or with a modifier. On the grid, activating (Enter, double-click) the card the dossier
+  already shows plays it, like double-click-to-play elsewhere; the list view keeps its
+  single-click activation for opening only, or a second click would start games.
+- Tabs are libadwaita's `InlineViewSwitcher`, restyled from a pill group to an underline row.

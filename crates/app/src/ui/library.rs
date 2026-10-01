@@ -361,10 +361,14 @@ impl LibraryPage {
             }
         });
         self.grid.set_factory(Some(&factory));
-        // Enter / Space on a focused card (keyboard navigation) opens it.
+        // Enter / Space or a double-click on a card opens its dossier; the
+        // same again on the game the dossier shows plays it.
         self.grid.connect_activate(glib::clone!(#[weak(rename_to = page)] self, move |gv, pos| {
             if let Some(obj) = gv.model().and_then(|m| m.item(pos)).and_downcast::<GameObject>() {
-                page.detail.show(obj.game());
+                let game = obj.game();
+                if !(page.detail.shows(game.id) && page.detail.play_shown()) {
+                    page.detail.show(game);
+                }
             }
         }));
 
@@ -512,7 +516,8 @@ impl LibraryPage {
         covers::on_dirs_changed(|| {
             CARDS.with(|c| c.borrow().values().for_each(|card| card.reload_cover()));
         });
-        // Keyboard: "/" focuses search, Escape closes the panel.
+        // Keyboard: "/" focuses search, Escape closes the panel, Enter plays,
+        // F stars, I shows or hides the dossier.
         let keys = gtk::EventControllerKey::new();
         keys.connect_key_pressed(glib::clone!(#[weak(rename_to = page)] self, #[upgrade_or] glib::Propagation::Proceed, move |_, key, _, state| {
             let focused_entry = gtk::prelude::RootExt::focus(&page.window).map(|w| w.is::<gtk::Text>() || w.is::<gtk::Entry>() || w.is::<gtk::SearchEntry>()).unwrap_or(false);
@@ -527,6 +532,30 @@ impl LibraryPage {
             if key == gtk::gdk::Key::comma && state.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
                 page.settings_button.emit_clicked();
                 return glib::Propagation::Stop;
+            }
+            // Single-letter shortcuts, never while typing or with a modifier.
+            let plain = !focused_entry && !state.intersects(gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::ALT_MASK | gtk::gdk::ModifierType::SUPER_MASK);
+            if plain {
+                match key {
+                    gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter if page.detail.is_open() => {
+                        if page.detail.play_shown() {
+                            return glib::Propagation::Stop;
+                        }
+                    }
+                    gtk::gdk::Key::f | gtk::gdk::Key::F if page.detail.is_open() => {
+                        page.detail.favorite_shown();
+                        return glib::Propagation::Stop;
+                    }
+                    gtk::gdk::Key::i | gtk::gdk::Key::I => {
+                        if page.detail.is_open() {
+                            page.detail.close();
+                        } else {
+                            page.detail.reopen();
+                        }
+                        return glib::Propagation::Stop;
+                    }
+                    _ => {}
+                }
             }
             glib::Propagation::Proceed
         }));

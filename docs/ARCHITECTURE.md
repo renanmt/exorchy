@@ -302,15 +302,30 @@ recently played, installed, favourites and user playlists. `LibraryPage`
 exposes `toolbar_slot`, `bar_slot` and `set_reading_widget()` for the feature
 modules.
 
-### Detail panel (`ui/detail.rs`)
+### Detail panel: the game dossier (`ui/detail.rs`, `styles/detail.css`)
 
-A `gtk::Revealer` (slide left, `PANEL_WIDTH` 560 px) showing one game:
-title, variant chips (one variant at a time; every refresh keys on ids, never
-on the game object), the action bar Play / Stop / Download / Cancel / ★ / ⋯,
-the info table, the gallery (box scans, screenshots from the metadata
-pack), the manual button, and `media_slot` (a box the media module fills
-with the preview player / music controls). Hooks: `on_shown(cb)`,
-`current()`, `refresh_by_id`, `refresh_download`, `refresh_running`.
+The split view's end sidebar (`PANEL_WIDTH` 560 px; it overlays the grid in
+narrow windows) showing one game as a dossier:
+- header: favourite star (F), "GAME DOSSIER", close (Esc);
+- hero: cover beside the platform (accent), title, year · genre · developer,
+  language chips (one variant at a time; every refresh keys on ids, never on
+  the game object), the primary action (Play as an `adw::SplitButton` whose
+  menu holds Game settings and the manual; Stop / Download / Cancel /
+  progress otherwise), then Add to playlist and ⋯ (hide, reset, uninstall);
+- the launch note (`note_slot`), then `media_slot` (preview video and theme
+  row; deliberately not in a tab, since the video pauses the theme music and
+  a hidden tab would play it unseen), genre tags, description;
+- tabs (`adw::ViewStack` + `adw::InlineViewSwitcher` styled as an underline
+  row): Overview (facts beside Features, which are only true facts: emulator,
+  printing, players, manual, language versions, CRT shaders; then eXo's
+  notes), Media (screenshots, count in the title; "Covered in" press
+  articles), Manuals (hidden without one), Setup (emulator and whose choice
+  it is, collection, status, Game settings, Reset).
+Hooks: `on_shown(cb)`, `refresh_by_id`, `refresh_download`,
+`refresh_running`, `shows(id)`, `reopen()`, `play_shown()`,
+`favorite_shown()`. Keys (library.rs): Enter plays the shown game, F stars
+it, I shows or hides the dossier; Enter or a double-click on the grid card
+the dossier already shows plays it.
 
 ### Covers (`ui/covers.rs`)
 

@@ -7,9 +7,13 @@ record each non-obvious choice in `DECISIONS.md`.
 | Step | What | Upstream | Size | Depends on | Status (2026-10-01) |
 |---|---|---|---|---|---|
 | 1 | Make sure the emulator AppImage packs start on Omarchy; ScummVM end to end | #29 | hours | - | done except one 86Box launch and the optional comment on upstream #29 |
-| 2 | Host our own content and manifest | #32 + handover gap | 1-2 days | - | parked by the user; fully researched |
+| 2 | Host our own content and manifest | #32 + handover gap | 1 session | - | parked by the user; fully researched |
 | 3 | Route printer and DOSBox-X titles to DOSBox-X | #15 | 3-5 days | 1 | done and playtested (PR #12) |
-| 4 | Survive a new eXo torrent release | #18 | 1-2 weeks | 2 | parked until eXoDOS 7 is closer; fully researched |
+| 4 | Survive a new eXo torrent release | #18 | 2-3 sessions | 2 | parked until eXoDOS 7 is closer; fully researched |
+
+Sizes are counted in working sessions with Claude, not person-days: the code
+itself is quick, and what takes time is the user's review and playtests in
+between (corrected 2026-10-01; earlier drafts said days and weeks).
 
 Why this order: step 1 is cheap and can block step 3 (same DOSBox-X pack).
 Step 2 removes our dependency on Exodium's release assets and gives step 4
@@ -90,7 +94,7 @@ control: if Exodium deletes a release, renames its repo or makes it private,
 box art and the DOSBox-X / 86Box / ScummVM downloads stop working for every
 eXorchy user. The alternative, which is also legitimate, is to keep relying
 on Exodium (MIT, credited in README / ACKNOWLEDGEMENTS / About) and mirror only
-if something breaks. Recommended: mirror; about a day of work.
+if something breaks. Recommended: mirror; one working session.
 
 ### Licensing: already solved
 
@@ -306,10 +310,9 @@ playlists and the Reading Room tables are replaced.
 
 ### Size
 
-About 1–2 weeks: matching and orphans a few days, the torrent switch a few
-days, configs about a day, detection and the dry run about a day each, plus
-docs (ARCHITECTURE: catalogue refresh and torrent switch; COLLECTIONS;
-DECISIONS).
+Two to three working sessions plus the user's checks: matching and orphans,
+the torrent switch, configs, detection and the dry run, docs (ARCHITECTURE:
+catalogue refresh and torrent switch; COLLECTIONS; DECISIONS).
 
 ### Tests (synthetic fixtures)
 
@@ -319,3 +322,40 @@ DECISIONS).
 - [ ] A user playlist that contains an orphan.
 - [ ] An infohash change that triggers the torrent switch exactly once.
 - [ ] A changed config replaced on upgrade, Game Settings untouched.
+
+## UI revamp (before 0.5)
+
+The user's design (2026-10-01, "Concept A — Archive" mockup): a left
+navigation sidebar, a filter bar, denser cover cards, a "Game Dossier" detail
+panel with tabs, and a status bar with counts and keyboard hints. The
+mockup's colours are one theme; everything is built on the Omarchy tokens,
+so it takes each theme's colours. Its content is placeholder: invented
+covers, console platform codes, and a features list (save states, rewind,
+achievements) that is not true for DOS games.
+
+Decisions (user, 2026-10-01):
+- The sidebar **browses**: Publishers, Series, Years, Regions list their
+  values with counts, picking one shows its games; Platforms, Genres, Play
+  status and Favorites filter directly. "Tags" is left out (no such data);
+  catalogue has 5 platforms, 2,100 publishers, 2,306 series, 49 years,
+  13 regions, 11 play modes.
+- The **A–Z jump bar stays**.
+- **No decoration**: no taglines, no pixel illustration.
+- The **Game Dossier first**.
+
+Phases, each its own PR checked with snapshots at wide and narrow widths
+(the sidebar collapses and the dossier overlays in a half-screen tile):
+
+- [x] **Game Dossier** (branch `ui-dossier`, 2026-10-01): header with
+      favourite and close, hero row (cover, platform, title, meta, language
+      chips, Play split button, Add to playlist, ⋯), genre tags, tabs
+      Overview / Media / Manuals / Setup, real features only; shortcuts
+      Enter (play), F (favourite), I (dossier); Enter or double-click on
+      the shown card plays. Awaiting the user's review.
+- [ ] **Shell and cards:** a status bar (version, game / platform /
+      favourite / playlist counts, key hints), top-bar polish, the denser
+      card (cover, title, "year · platform · genre", star on the cover).
+- [ ] **Sidebar and filters:** the browse-by sidebar with counts; Years and
+      Regions filters (new `get_games` parameters and section keys);
+      Publishers / Series / Years / Regions value lists.
+- [ ] **Polish:** narrow-window behaviour of all of it, docs.

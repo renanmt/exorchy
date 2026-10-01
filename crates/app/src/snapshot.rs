@@ -82,6 +82,22 @@ pub fn arm(window: &adw::ApplicationWindow) {
             });
         }
     }
+    // EXORCHY_SNAPSHOT_SCROLL=<css class>:<px> scrolls the first scrolled
+    // window inside the first widget with that class (Broadway's screen is
+    // 1024x768, so a tall panel is checked by scrolling, not by growing).
+    if let Some((class, px)) = std::env::var("EXORCHY_SNAPSHOT_SCROLL").ok().and_then(|v| {
+        let (c, p) = v.rsplit_once(':')?;
+        Some((c.to_string(), p.parse::<f64>().ok()?))
+    }) {
+        let w = window.clone();
+        glib::timeout_add_local_once(Duration::from_millis(delay_ms.saturating_sub(1000)), move || {
+            let target = find(w.upcast_ref(), &|x| x.has_css_class(&class)).and_then(|host| find(&host, &|x| x.is::<gtk::ScrolledWindow>()));
+            match target.and_downcast::<gtk::ScrolledWindow>() {
+                Some(sw) => sw.vadjustment().set_value(px),
+                None => log::warn!("snapshot: nothing scrollable inside .{class}"),
+            }
+        });
+    }
     glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
         if std::env::var_os("EXORCHY_DUMP_TREE").is_some() {
             dump(window.upcast_ref::<gtk::Widget>(), 0);
@@ -94,6 +110,21 @@ pub fn arm(window: &adw::ApplicationWindow) {
             app.quit();
         }
     });
+}
+
+/// Depth-first search for the first descendant (or `root` itself) matching `pred`.
+fn find(root: &gtk::Widget, pred: &dyn Fn(&gtk::Widget) -> bool) -> Option<gtk::Widget> {
+    if pred(root) {
+        return Some(root.clone());
+    }
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        if let Some(hit) = find(&c, pred) {
+            return Some(hit);
+        }
+        child = c.next_sibling();
+    }
+    None
 }
 
 fn render(window: &adw::ApplicationWindow, path: &str) -> Result<(), String> {

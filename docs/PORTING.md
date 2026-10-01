@@ -95,7 +95,7 @@ own eXorchy. Isolate the check instead with `dbus-run-session -- ...`, and insid
 `GDK_DEBUG=no-portals GTK_USE_PORTAL=0`: otherwise GTK starts a private
 `xdg-desktop-portal-hyprland` against the user's Hyprland, which segfaults when the session ends
 and pops Omarchy's crash notice on their desktop (2026-09-30, once per run).
-More switches: `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
+More switches: `EXORCHY_SNAPSHOT_SCROLL=<css class>:<px>` (scrolls inside e.g. `detail-panel`; Broadway is capped at 1024x768), `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
 `EXORCHY_SNAPSHOT_READING=1` (+ `_VIEW=list`, `EXORCHY_SNAPSHOT_ISSUE=<key>`, `EXORCHY_SNAPSHOT_DOC=<file>`).
 `EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
 
