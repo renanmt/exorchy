@@ -587,3 +587,25 @@ the one-install-path-per-pack invariant (`manifest_install_paths_are_unique`), w
 that uninstalling a pack from one collection cannot delete another's emulator.
 `content_packs::pack_collection` finds a pack's home; `download_game` and the panel's pack
 button use it, so a DOS game queues and installs the same pack the Win9x games use.
+
+## 2026-10-01 - DOSBox-X opens as a large floating window on Hyprland; Laffer stays on it
+
+DOSBox-X draws at the size its window has when it first appears and never rescales: a tile
+Hyprland resizes later (Super+F, a move to an emptier workspace) shows the picture in the
+top-left corner with black bars, and its own fullscreen is broken on Linux under XWayland and
+Wayland alike (upstream joncampbell123/dosbox-x#1959; on the dev machine `-fullscreen` showed a
+magnified corner of the screen, with and without `SDL_VIDEODRIVER=wayland`). No DOSBox-X setting
+avoids it. What works is a window nothing resizes, so on Hyprland
+`emulators::float_dosbox_x_on_hyprland` (DOS, Windows 3.x and Win9x launches): DOSBox-X gets
+the window class `exorchy-dosbox-x` (SDL's `SDL_VIDEO_*_WMCLASS`), eXorchy adds a session rule
+through `hyprctl eval` that floats and centers exactly that class (the user's config is not
+touched; a Hyprland reload drops it and the next launch adds it again), and DOSBox-X starts
+windowed at the largest 4:3 size fitting 95 % of the focused monitor below its bars. The
+"Launch in fullscreen" settings are ignored for DOSBox-X there, since fullscreen would give
+the broken picture. Elsewhere, or if Hyprland refuses the rule, nothing changes.
+
+Laffer Utilities reaches DOSBox-X only through the printer rule (eXo pins it to ECE). Under
+DOSBox-X its banner printing stops partway (the page holds the first words; the game waits on
+the printer until closed). The user chose to keep it on DOSBox-X rather than go back to Staging,
+which cannot print at all; Game Settings can still switch it. Known issue, not investigated
+further.

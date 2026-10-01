@@ -1026,9 +1026,16 @@ fn launch_dosbox_x(
 
     // User overrides, applied last. 1024x768 fits every common display
     // (eXo's 1280x960 overflows a MacBook); opengl windows are resizable.
+    // On Hyprland the window floats at the monitor's size instead, windowed:
+    // DOSBox-X cannot rescale a resized window, nor go fullscreen there.
+    let (fullscreen, size) = match crate::emulators::float_dosbox_x_on_hyprland(&mut cmd) {
+        Some(size) => ("false".to_string(), size),
+        None => (fullscreen.to_string(), "1024x768".to_string()),
+    };
     let mut frag = format!(
-        "[sdl]\nfullscreen = {}\nwindowresolution = 1024x768\noutput = opengl\n{}",
+        "[sdl]\nfullscreen = {}\nwindowresolution = {}\noutput = opengl\n{}",
         fullscreen,
+        size,
         ne2000_override()
     );
     if let Some(custom) = per_game_config.get("custom_conf") {

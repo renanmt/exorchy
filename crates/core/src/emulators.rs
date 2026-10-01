@@ -97,6 +97,62 @@ pub(crate) fn resolve_dosbox_x(data_dir: &str) -> Option<EngineCmd> {
     flatpak_installed(DOSBOX_X_FLATPAK).then_some(EngineCmd::Flatpak(DOSBOX_X_FLATPAK))
 }
 
+/// The window class eXorchy gives DOSBox-X, so its Hyprland rule can only
+/// ever match windows eXorchy started.
+pub const DOSBOX_X_WM_CLASS: &str = "exorchy-dosbox-x";
+
+/// DOSBox-X draws at the size its window has when it first appears and never
+/// rescales after: a tile Hyprland later resizes shows the picture in a corner
+/// with black bars, and its own fullscreen is broken under XWayland and Wayland
+/// alike (upstream joncampbell123/dosbox-x#1959). So on Hyprland the window
+/// must appear floating, at its final size, and stay there: this tags the
+/// process with `DOSBOX_X_WM_CLASS`, adds a session rule (`hyprctl eval`,
+/// nothing written to the user's config) that floats and centers that class,
+/// and returns the `windowresolution` to start at - the largest 4:3 box that
+/// fits the focused monitor below its bars. None elsewhere, and when Hyprland
+/// refuses the rule: the window then tiles as before.
+pub(crate) fn float_dosbox_x_on_hyprland(cmd: &mut std::process::Command) -> Option<String> {
+    cmd.env("SDL_VIDEO_X11_WMCLASS", DOSBOX_X_WM_CLASS).env("SDL_VIDEO_WAYLAND_WMCLASS", DOSBOX_X_WM_CLASS);
+    std::env::var_os("HYPRLAND_INSTANCE_SIGNATURE").filter(|v| !v.is_empty())?;
+    let rule = format!(
+        "hl.window_rule({{ match = {{ class = \"^({DOSBOX_X_WM_CLASS})$\" }}, float = true, center = true }})"
+    );
+    let added = std::process::Command::new("hyprctl")
+        .args(["eval", &rule])
+        .output()
+        .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).trim() == "ok")
+        .unwrap_or(false);
+    if !added {
+        log::warn!("Hyprland did not accept the DOSBox-X float rule; its window will tile");
+        return None;
+    }
+    let out = std::process::Command::new("hyprctl").args(["monitors", "-j"]).output().ok()?;
+    let monitors: Vec<serde_json::Value> = serde_json::from_slice(&out.stdout).ok()?;
+    let m = monitors.iter().find(|m| m["focused"].as_bool() == Some(true)).or(monitors.first())?;
+    let num = |v: &serde_json::Value| v.as_f64().unwrap_or(0.0);
+    let reserved: Vec<f64> = m["reserved"].as_array().map(|a| a.iter().map(num).collect()).unwrap_or_default();
+    let (w, h) = fit_4_3(num(&m["width"]), num(&m["height"]), num(&m["scale"]), &reserved)?;
+    Some(format!("{w}x{h}"))
+}
+
+/// The largest 4:3 window, at 95 % of the free area, on a monitor of
+/// `width` x `height` physical pixels at `scale`, minus `reserved` [l, t, r, b].
+fn fit_4_3(width: f64, height: f64, scale: f64, reserved: &[f64]) -> Option<(u32, u32)> {
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let r = |i: usize| reserved.get(i).copied().unwrap_or(0.0);
+    let free_w = (width / scale - r(0) - r(2)) * 0.95;
+    let free_h = (height / scale - r(1) - r(3)) * 0.95;
+    if free_w < 320.0 || free_h < 240.0 {
+        return None;
+    }
+    let (mut w, mut h) = (free_h * 4.0 / 3.0, free_h);
+    if w > free_w {
+        w = free_w;
+        h = free_w * 3.0 / 4.0;
+    }
+    Some((w.round() as u32, h.round() as u32))
+}
+
 fn on_path(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path).map(|dir| dir.join(name)).find(|c| c.is_file())
@@ -219,6 +275,17 @@ pub fn warn_if_shaders_missing(binary: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dosbox_x_window_fits_the_monitor_at_4_3() {
+        // 2560x1440 with Omarchy's 26 px bar: height-bound.
+        assert_eq!(super::fit_4_3(2560.0, 1440.0, 1.0, &[0.0, 26.0, 0.0, 0.0]), Some((1791, 1343)));
+        // Portrait-ish free area: width-bound.
+        assert_eq!(super::fit_4_3(1080.0, 1920.0, 1.0, &[]), Some((1026, 770)));
+        // Scaled monitor: logical pixels.
+        assert_eq!(super::fit_4_3(3840.0, 2160.0, 2.0, &[]), Some((1368, 1026)));
+        assert_eq!(super::fit_4_3(300.0, 200.0, 1.0, &[]), None);
+    }
 
     #[test]
     fn pack_wins_unless_the_user_prefers_the_system_binary() {

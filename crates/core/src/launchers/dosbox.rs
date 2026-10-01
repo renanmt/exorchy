@@ -108,6 +108,8 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
     if options_conf.exists() {
         cmd.arg("-conf").arg(&options_conf);
     }
+    // Hyprland: DOSBox-X opens floating at its final size (it cannot rescale).
+    let float_window = (engine == DosEngine::DosboxX).then(|| crate::emulators::float_dosbox_x_on_hyprland(&mut cmd)).flatten();
     if engine == DosEngine::DosboxX {
         // eXo's own launch line; the confs set showmenu=false as well.
         cmd.arg("-nomenu");
@@ -126,7 +128,11 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
         let fullscreen_val = if ctx.fullscreen { "true" } else { "false" };
         let frag = match engine {
             DosEngine::Staging => format!("[sdl]\nfullscreen = {fullscreen_val}\n[render]\nglshader = {glshader_val}\n"),
-            DosEngine::DosboxX => format!("[sdl]\nfullscreen = {fullscreen_val}\n"),
+            // Its fullscreen is broken where it floats (see emulators.rs).
+            DosEngine::DosboxX => match &float_window {
+                Some(size) => format!("[sdl]\nfullscreen = false\nwindowresolution = {size}\n"),
+                None => format!("[sdl]\nfullscreen = {fullscreen_val}\n"),
+            },
         };
         let conf_path = launch_conf_dir()?.join(format!("global_overrides_{}.conf", id));
         std::fs::write(&conf_path, &frag)
@@ -139,7 +145,7 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
     {
         let game_conf_path = launch_conf_dir()?.join(format!("game_{}.conf", id));
         let mut frag = String::new();
-        if let Some(fs) = ctx.per_game.get("fullscreen") {
+        if let Some(fs) = ctx.per_game.get("fullscreen").filter(|_| float_window.is_none()) {
             frag.push_str(&format!("[sdl]\nfullscreen = {}\n", fs));
         }
         if let Some(gs) = ctx.per_game.get("glshader").filter(|_| engine == DosEngine::Staging) {
