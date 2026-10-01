@@ -4,7 +4,7 @@
 //! Paging, the fetch epoch and the "library follows intent" refresh mirror
 //! the web UI's `stores/games.ts` + `pages/Library.tsx`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
@@ -38,13 +38,17 @@ pub const SORT_OPTIONS: [(&str, &str); 6] = [
     ("genre", "Genre A–Z"),
 ];
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Filters {
     query: String,
     genre: String,
     sort_by: String,
     collection: String,
     playlist: Option<i64>,
+    /// The sidebar's Favorites.
+    favorites: bool,
+    /// The sidebar's browse-by value and the Years / Regions filters.
+    browse: exorchy_core::db::queries::BrowseFilter,
     page: usize,
     has_more: bool,
     loading: bool,
@@ -83,8 +87,20 @@ pub struct LibraryPage {
     genre_drop: gtk::DropDown,
     genre_values: RefCell<Vec<String>>,
     sort_drop: gtk::DropDown,
-    shelf: adw::WrapBox,
-    shelf_buttons: RefCell<Vec<(String, gtk::ToggleButton)>>,
+    /// Collections ("All platforms" first), years and regions: the filter
+    /// bar's dropdowns and the values behind their entries.
+    platform_drop: gtk::DropDown,
+    platform_values: RefCell<Vec<String>>,
+    year_drop: gtk::DropDown,
+    year_values: RefCell<Vec<Option<i64>>>,
+    region_drop: gtk::DropDown,
+    region_values: RefCell<Vec<String>>,
+    /// The sidebar's pick that no dropdown shows ("Publisher: Sierra ✕").
+    browse_chip: gtk::Box,
+    browse_chip_label: gtk::Label,
+    sidebar: Rc<crate::ui::sidebar::Sidebar>,
+    /// The list view is chosen (else the grid).
+    list_mode: Cell<bool>,
     jump_bar: gtk::Box,
     section_keys: RefCell<Vec<String>>,
     status: gtk::Label,
@@ -151,13 +167,28 @@ impl LibraryPage {
 
         // ── filter row: wraps onto more lines in a narrow tile ──
         let filter_row = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row"]).build();
-        let shelf = adw::WrapBox::builder().child_spacing(4).line_spacing(4).css_classes(["shelf"]).build();
-        filter_row.append(&shelf);
+        // The sidebar's pick, removable (only for what no dropdown shows).
+        let browse_chip = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).css_classes(["browse-chip"]).visible(false).build();
+        let browse_chip_label = gtk::Label::new(None);
+        let browse_chip_clear = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Clear").build();
+        browse_chip.append(&browse_chip_label);
+        browse_chip.append(&browse_chip_clear);
+        filter_row.append(&browse_chip);
+        let drop_of = |first: &str| {
+            let d = gtk::DropDown::from_strings(&[first]);
+            d.add_css_class("drop");
+            d
+        };
+        let platform_drop = drop_of("All platforms");
+        filter_row.append(&platform_drop);
+        let genre_drop = drop_of("All genres");
+        filter_row.append(&genre_drop);
+        let year_drop = drop_of("All years");
+        filter_row.append(&year_drop);
+        let region_drop = drop_of("All regions");
+        filter_row.append(&region_drop);
         let playlist_menu = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         filter_row.append(&playlist_menu);
-        let genre_drop = gtk::DropDown::from_strings(&["All genres"]);
-        genre_drop.add_css_class("drop");
-        filter_row.append(&genre_drop);
         let sort_labels: Vec<&str> = SORT_OPTIONS.iter().map(|(_, l)| *l).collect();
         let sort_drop = gtk::DropDown::from_strings(&sort_labels);
         sort_drop.add_css_class("drop");
@@ -218,7 +249,26 @@ impl LibraryPage {
         // Jump bar beside the scroller.
         let jump_bar = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(0).css_classes(["jump-bar"]).valign(gtk::Align::Start).build();
         let jump_scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vscrollbar_policy(gtk::PolicyType::External).child(&jump_bar).build();
+        // The sidebar reports picks; the page it reports to exists only below.
+        let page_ref: Rc<RefCell<std::rc::Weak<LibraryPage>>> = Rc::new(RefCell::new(std::rc::Weak::new()));
+        let sidebar = {
+            let (p1, p2) = (page_ref.clone(), page_ref.clone());
+            crate::ui::sidebar::build(
+                move |pick| {
+                    if let Some(p) = p1.borrow().upgrade() {
+                        p.apply_pick(pick);
+                    }
+                },
+                move || {
+                    if let Some(p) = p2.borrow().upgrade() {
+                        p.show_values();
+                    }
+                },
+            )
+        };
+        view_stack.add_named(&sidebar.values, Some("values"));
         let browse_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        browse_row.append(&sidebar.nav);
         browse_row.append(&browse);
         browse_row.append(&jump_scroller);
 
@@ -284,6 +334,8 @@ impl LibraryPage {
         let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1100.0, adw::LengthUnit::Sp));
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
         narrow.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
+        // The dropdowns carry the filters when the sidebar does not fit.
+        narrow.add_setter(&sidebar.nav, "visible", Some(&false.to_value()));
         widget.add_breakpoint(narrow);
         let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
@@ -294,6 +346,7 @@ impl LibraryPage {
         tiny.add_setter(&toolbar, "spacing", Some(&8i32.to_value()));
         tiny.add_setter(&status_bar.details, "visible", Some(&false.to_value()));
         tiny.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
+        tiny.add_setter(&sidebar.nav, "visible", Some(&false.to_value()));
         widget.add_breakpoint(tiny);
 
         let page = Rc::new(LibraryPage {
@@ -312,8 +365,16 @@ impl LibraryPage {
             genre_drop,
             genre_values: RefCell::new(vec![String::new()]),
             sort_drop,
-            shelf,
-            shelf_buttons: RefCell::new(Vec::new()),
+            platform_drop,
+            platform_values: RefCell::new(vec![String::new()]),
+            year_drop,
+            year_values: RefCell::new(vec![None]),
+            region_drop,
+            region_values: RefCell::new(vec![String::new()]),
+            browse_chip,
+            browse_chip_label,
+            sidebar,
+            list_mode: Cell::new(false),
             jump_bar,
             section_keys: RefCell::new(Vec::new()),
             status,
@@ -331,6 +392,8 @@ impl LibraryPage {
             window: window.clone(),
         });
 
+        *page_ref.borrow_mut() = Rc::downgrade(&page);
+        browse_chip_clear.connect_clicked(glib::clone!(#[weak] page, move |_| page.clear_browse_pick()));
         page.setup_factories();
         page.wire(view_grid, view_list);
         page.set_tab("browse");
@@ -442,6 +505,32 @@ impl LibraryPage {
             let v = page.genre_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
             if page.filters.borrow().genre != v {
                 page.filters.borrow_mut().genre = v;
+                page.show_games();
+                page.fetch();
+            }
+        }));
+        self.platform_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
+            let v = page.platform_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
+            if page.filters.borrow().collection != v {
+                page.filters.borrow_mut().collection = v;
+                page.load_genres();
+                page.show_games();
+                page.fetch();
+            }
+        }));
+        self.year_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
+            let v = page.year_values.borrow().get(d.selected() as usize).cloned().flatten();
+            if page.filters.borrow().browse.year != v {
+                page.filters.borrow_mut().browse.year = v;
+                page.show_games();
+                page.fetch();
+            }
+        }));
+        self.region_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
+            let v = page.region_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
+            if page.filters.borrow().browse.region != v {
+                page.filters.borrow_mut().browse.region = v;
+                page.show_games();
                 page.fetch();
             }
         }));
@@ -455,6 +544,7 @@ impl LibraryPage {
         // View mode
         view_grid.connect_toggled(glib::clone!(#[weak(rename_to = page)] self, move |b| {
             if b.is_active() {
+                page.list_mode.set(false);
                 page.view_stack.set_visible_child_name("grid");
                 let core = app::core();
                 app::spawn(async move { games::set_config(core.clone(), core.state(), "view_mode".into(), "grid".into()).await }, |_| {});
@@ -462,6 +552,7 @@ impl LibraryPage {
         }));
         view_list.connect_toggled(glib::clone!(#[weak(rename_to = page)] self, move |b| {
             if b.is_active() {
+                page.list_mode.set(true);
                 page.view_stack.set_visible_child_name("list");
                 let core = app::core();
                 app::spawn(async move { games::set_config(core.clone(), core.state(), "view_mode".into(), "list".into()).await }, |_| {});
@@ -622,59 +713,176 @@ impl LibraryPage {
             async move {
                 let enabled = games::get_config(core.state(), "collections".into()).await.ok().flatten().unwrap_or_else(|| "eXoDOS".into());
                 let all = setup::get_available_collections(core.state()).await.unwrap_or_default();
-                (enabled, all)
+                let total = games::get_games_browse(core.state(), 1, 1, games::GameQuery::default()).await.map(|l| l.total).unwrap_or(0);
+                let years = games::get_facet_values(core.state(), "year".into()).await.unwrap_or_default();
+                let regions = games::get_facet_values(core.state(), "region".into()).await.unwrap_or_default();
+                (enabled, all, total, years, regions)
             },
-            glib::clone!(#[weak(rename_to = page)] self, move |(enabled, all)| {
+            glib::clone!(#[weak(rename_to = page)] self, move |(enabled, all, total, years, regions)| {
                 let enabled: Vec<&str> = enabled.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
                 let cols: Vec<(String, String, i64)> = all
                     .iter()
                     .filter(|c| enabled.contains(&c.id.as_str()))
                     .map(|c| (c.id.clone(), c.display_name.clone(), c.game_count))
                     .collect();
-                while let Some(c) = page.shelf.first_child() {
-                    page.shelf.remove(&c);
-                }
-                let mut buttons = Vec::new();
-                page.shelf.set_visible(cols.len() > 1);
-                if cols.len() > 1 {
-                    let mut entries = vec![(String::new(), "All".to_string(), 0)];
-                    entries.extend(cols.iter().cloned());
-                    let mut group: Option<gtk::ToggleButton> = None;
-                    for (id, label, count) in entries {
-                        let b = gtk::ToggleButton::builder().child(&shelf_chip(&label, count)).css_classes(["shelf-btn"]).build();
-                        if let Some(g) = &group {
-                            b.set_group(Some(g));
-                        } else {
-                            group = Some(b.clone());
-                        }
-                        let id2 = id.clone();
-                        b.connect_toggled(glib::clone!(#[weak] page, move |b| {
-                            if b.is_active() && page.filters.borrow().collection != id2 {
-                                page.filters.borrow_mut().collection = id2.clone();
-                                page.load_genres();
-                                page.fetch();
-                            }
-                        }));
-                        page.shelf.append(&b);
-                        buttons.push((id, b));
-                    }
-                }
+                page.sidebar.set_total(total);
+
                 // A filter on a collection that was just disabled would show nothing.
                 let current = page.filters.borrow().collection.clone();
-                let valid = cols.len() > 1 && (current.is_empty() || cols.iter().any(|c| c.0 == current));
-                let target = if valid { current } else { String::new() };
-                page.filters.borrow_mut().collection = target.clone();
-                for (id, b) in &buttons {
-                    if *id == target {
-                        b.set_active(true);
-                    }
+                if !current.is_empty() && !cols.iter().any(|c| c.0 == current) {
+                    page.filters.borrow_mut().collection = String::new();
                 }
-                page.shelf_buttons.replace(buttons);
+                let mut values = vec![String::new()];
+                let mut labels = vec!["All platforms".to_string()];
+                for (id, name, count) in &cols {
+                    values.push(id.clone());
+                    labels.push(if *count > 0 { format!("{name}  ({})", short_count(*count)) } else { name.clone() });
+                }
+                set_drop(&page.platform_drop, &labels);
+                page.platform_drop.set_visible(cols.len() > 1);
+                let target = page.filters.borrow().collection.clone();
+                page.platform_values.replace(values.clone());
+                page.platform_drop.set_selected(values.iter().position(|v| *v == target).unwrap_or(0) as u32);
+
+                let mut yv = vec![None];
+                let mut yl = vec!["All years".to_string()];
+                for y in years {
+                    yl.push(y.value.clone());
+                    yv.push(y.value.parse().ok());
+                }
+                set_drop(&page.year_drop, &yl);
+                let cy = page.filters.borrow().browse.year;
+                page.year_values.replace(yv.clone());
+                page.year_drop.set_selected(yv.iter().position(|v| *v == cy).unwrap_or(0) as u32);
+
+                let mut rv = vec![String::new()];
+                let mut rl = vec!["All regions".to_string()];
+                for r in regions {
+                    rl.push(r.value.clone());
+                    rv.push(r.value);
+                }
+                set_drop(&page.region_drop, &rl);
+                let cr = page.filters.borrow().browse.region.clone();
+                page.region_values.replace(rv.clone());
+                page.region_drop.set_selected(rv.iter().position(|v| *v == cr).unwrap_or(0) as u32);
+
                 page.load_genres();
                 page.load_playlists();
                 page.fetch();
             }),
         );
+    }
+
+    /// The grid or the list, whichever the user chose (leaving the values page).
+    fn show_games(&self) {
+        self.view_stack.set_visible_child_name(if self.list_mode.get() { "list" } else { "grid" });
+    }
+
+    /// The sidebar asked for a category's values.
+    fn show_values(&self) {
+        self.view_stack.set_visible_child_name("values");
+        self.jump_bar.set_visible(false);
+    }
+
+    /// A sidebar pick: one browse-by value at a time; the dropdowns follow
+    /// for what they can show, the chip says the rest.
+    fn apply_pick(self: &Rc<Self>, pick: crate::ui::sidebar::Pick) {
+        use crate::ui::sidebar::{Category, Pick};
+        let chip: Option<String>;
+        {
+            let mut f = self.filters.borrow_mut();
+            // Clear the sidebar-only dimensions; dropdown ones stay.
+            f.favorites = false;
+            f.browse.publisher.clear();
+            f.browse.developer.clear();
+            f.browse.series.clear();
+            f.browse.tag.clear();
+            f.browse.status.clear();
+            match &pick {
+                Pick::All => {
+                    f.collection.clear();
+                    f.genre.clear();
+                    f.browse = Default::default();
+                    chip = None;
+                }
+                Pick::Favorites => {
+                    f.favorites = true;
+                    chip = Some("Favorites".into());
+                }
+                Pick::Value { category, value, label } => {
+                    chip = match category {
+                        Category::Platforms => {
+                            f.collection = value.clone();
+                            None
+                        }
+                        Category::Genres => {
+                            f.genre = value.clone();
+                            None
+                        }
+                        Category::Years => {
+                            f.browse.year = value.parse().ok();
+                            None
+                        }
+                        Category::Regions => {
+                            f.browse.region = value.clone();
+                            None
+                        }
+                        Category::Publishers => {
+                            f.browse.publisher = value.clone();
+                            Some(format!("{}: {label}", category.noun()))
+                        }
+                        Category::Series => {
+                            f.browse.series = value.clone();
+                            Some(format!("{}: {label}", category.noun()))
+                        }
+                        Category::Tags => {
+                            f.browse.tag = value.clone();
+                            Some(label.clone())
+                        }
+                        Category::Status => {
+                            f.browse.status = value.clone();
+                            Some(label.clone())
+                        }
+                    };
+                }
+            }
+        }
+        self.sync_drops();
+        self.browse_chip_label.set_label(chip.as_deref().unwrap_or(""));
+        self.browse_chip.set_visible(chip.is_some());
+        if matches!(pick, Pick::Value { category: Category::Platforms, .. } | Pick::All) {
+            self.load_genres();
+        }
+        self.show_games();
+        self.fetch();
+    }
+
+    /// The chip's ✕: back to the games without the sidebar's pick.
+    fn clear_browse_pick(self: &Rc<Self>) {
+        {
+            let mut f = self.filters.borrow_mut();
+            f.favorites = false;
+            f.browse.publisher.clear();
+            f.browse.developer.clear();
+            f.browse.series.clear();
+            f.browse.tag.clear();
+            f.browse.status.clear();
+        }
+        self.browse_chip.set_visible(false);
+        self.sidebar.set_active(None, false);
+        self.show_games();
+        self.fetch();
+    }
+
+    /// Dropdowns to the filters (their handlers see no change, so no fetch).
+    fn sync_drops(&self) {
+        let f = self.filters.borrow().clone();
+        let pos = |values: &[String], v: &str| values.iter().position(|x| x == v).unwrap_or(0) as u32;
+        self.platform_drop.set_selected(pos(&self.platform_values.borrow(), &f.collection));
+        self.genre_drop.set_selected(pos(&self.genre_values.borrow(), &f.genre));
+        self.region_drop.set_selected(pos(&self.region_values.borrow(), &f.browse.region));
+        let y = self.year_values.borrow().iter().position(|v| *v == f.browse.year).unwrap_or(0) as u32;
+        self.year_drop.set_selected(y);
     }
 
     fn load_genres(self: &Rc<Self>) {
@@ -762,9 +970,19 @@ impl LibraryPage {
 
     // ── fetching ──
 
-    fn args(&self) -> (String, String, String, String, Option<i64>) {
+    /// The grid's query from the current filters.
+    fn args(&self) -> games::GameQuery {
         let f = self.filters.borrow();
-        (f.query.clone(), f.genre.clone(), f.sort_by.clone(), f.collection.clone(), f.playlist)
+        games::GameQuery {
+            query: f.query.clone(),
+            genre: f.genre.clone(),
+            sort_by: f.sort_by.clone(),
+            collection: f.collection.clone(),
+            favorites_only: f.favorites,
+            playlist_id: f.playlist,
+            with_music: false,
+            browse: f.browse.clone(),
+        }
     }
 
     /// Run the current search on the tab in view.
@@ -788,10 +1006,10 @@ impl LibraryPage {
         };
         let hide_platform = !self.filters.borrow().collection.is_empty();
         CARDS.with(|c| c.borrow().values().for_each(|card| card.set_hide_platform(hide_platform)));
-        let (q, g, s, c, p) = self.args();
+        let gq = self.args();
         let core = app::core();
         app::spawn(
-            async move { games::get_games(core.state(), Some(1), Some(PER_PAGE), Some(q), Some(g), Some(s), Some(c), Some(false), p, Some(false)).await },
+            async move { games::get_games_browse(core.state(), 1, PER_PAGE, gq).await },
             glib::clone!(#[weak(rename_to = page)] self, move |res| {
                 if page.filters.borrow().epoch != epoch {
                     return;
@@ -829,10 +1047,10 @@ impl LibraryPage {
             f.epoch += 1;
             (f.epoch, f.page + 1)
         };
-        let (q, g, s, c, p) = self.args();
+        let gq = self.args();
         let core = app::core();
         app::spawn(
-            async move { games::get_games(core.state(), Some(next), Some(PER_PAGE), Some(q), Some(g), Some(s), Some(c), Some(false), p, Some(false)).await },
+            async move { games::get_games_browse(core.state(), next, PER_PAGE, gq).await },
             glib::clone!(#[weak(rename_to = page)] self, move |res| {
                 if page.filters.borrow().epoch != epoch {
                     return;
@@ -861,11 +1079,11 @@ impl LibraryPage {
             f.epoch += 1;
             f.epoch
         };
-        let (q, g, s, c, p) = self.args();
+        let gq = self.args();
         let total = self.filters.borrow().total.max(9999);
         let core = app::core();
         app::spawn(
-            async move { games::get_games(core.state(), Some(1), Some(total), Some(q), Some(g), Some(s), Some(c), Some(false), p, Some(false)).await },
+            async move { games::get_games_browse(core.state(), 1, total, gq).await },
             glib::clone!(#[weak(rename_to = page)] self, move |res| {
                 if page.filters.borrow().epoch != epoch {
                     return;
@@ -899,10 +1117,10 @@ impl LibraryPage {
             f.epoch += 1;
             f.epoch
         };
-        let (q, g, s, c, p) = self.args();
+        let gq = self.args();
         let core = app::core();
         app::spawn(
-            async move { games::get_games(core.state(), Some(1), Some(count.max(PER_PAGE)), Some(q), Some(g), Some(s), Some(c), Some(false), p, Some(false)).await },
+            async move { games::get_games_browse(core.state(), 1, count.max(PER_PAGE), gq).await },
             glib::clone!(#[weak(rename_to = page)] self, move |res| {
                 if page.filters.borrow().epoch != epoch {
                     return;
@@ -973,10 +1191,10 @@ impl LibraryPage {
     // ── jump bar ──
 
     fn load_section_keys(self: &Rc<Self>, epoch: u64) {
-        let (q, g, s, c, p) = self.args();
+        let gq = self.args();
         let core = app::core();
         app::spawn(
-            async move { games::get_section_keys(core.state(), Some(s), Some(q), Some(g), Some(c), Some(false), p, Some(false)).await },
+            async move { games::get_section_keys_browse(core.state(), gq).await },
             glib::clone!(#[weak(rename_to = page)] self, move |res| {
                 if page.filters.borrow().epoch < epoch {
                     return;
@@ -1144,17 +1362,6 @@ impl LibraryPage {
     }
 }
 
-/// A collection chip: the name with the game count in a small badge.
-fn shelf_chip(label: &str, count: i64) -> gtk::Box {
-    let b = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    b.append(&gtk::Label::new(Some(label)));
-    if count > 0 {
-        let n = if count >= 1000 { format!("{:.1}k", count as f64 / 1000.0) } else { count.to_string() };
-        b.append(&gtk::Label::builder().label(&n).css_classes(["shelf-count"]).tooltip_text(format!("{count} games")).build());
-    }
-    b
-}
-
 /// Section label per row, matching `get_section_keys` server-side.
 pub fn group_key(g: &Game, sort: &str) -> String {
     match sort {
@@ -1283,6 +1490,21 @@ fn bind_row(row: &gtk::Widget, g: &Game, _on_detail: Rc<dyn Fn(Game)>) {
     }
     if let Some(first) = labels.first() {
         first.set_markup(&format!("<b>{}</b>", esc(&g.title)));
+    }
+}
+
+/// Replace a dropdown's entries.
+fn set_drop(d: &gtk::DropDown, labels: &[String]) {
+    let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+    d.set_model(Some(&gtk::StringList::new(&refs)));
+}
+
+/// 7666 -> "7.7k", for the platform dropdown.
+fn short_count(n: i64) -> String {
+    if n >= 1000 {
+        format!("{:.1}k", n as f64 / 1000.0)
+    } else {
+        n.to_string()
     }
 }
 

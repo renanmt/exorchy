@@ -49,6 +49,7 @@ pub mod model;
 pub mod setup;
 pub mod transfers;
 pub mod updates;
+pub mod sidebar;
 pub mod splash;
 pub mod statusbar;
 pub mod util;

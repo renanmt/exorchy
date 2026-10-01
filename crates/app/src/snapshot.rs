@@ -44,8 +44,10 @@ pub fn arm(window: &adw::ApplicationWindow) {
             });
         });
     }
-    // EXORCHY_SNAPSHOT_SEQUENCE=<step,step,...> drives the open panel before the
-    // shot, one step every 400 ms: `uninstall`, `close`, `play`, `reopen`.
+    // EXORCHY_SNAPSHOT_SEQUENCE=<step,step,...> drives the app before the
+    // shot, one step every 250 ms: the open panel (`uninstall`, `close`,
+    // `run`, `exit`, `reopen`), `click:<label>` (the first button whose text
+    // is <label>) and `activate:<label>` (the first list row showing <label>).
     if let Ok(seq) = std::env::var("EXORCHY_SNAPSHOT_SEQUENCE") {
         let steps: Vec<String> = seq.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
         let base = delay_ms.saturating_sub(1500) + 400;
@@ -55,6 +57,42 @@ pub fn arm(window: &adw::ApplicationWindow) {
                 let panel = lib.detail();
                 let game = panel.selected_game();
                 log::info!("sequence step {step}: open={} game={:?}", panel.is_open(), game.as_ref().and_then(|g| g.id));
+                if let Some(label) = step.strip_prefix("click:") {
+                    let root = lib.widget.clone();
+                    let hit = find(&root, &|w| w.is::<gtk::Button>() && find(w, &|l| l.downcast_ref::<gtk::Label>().is_some_and(|l| l.label() == label)).is_some());
+                    match hit.and_downcast::<gtk::Button>() {
+                        Some(b) => b.emit_clicked(),
+                        None => log::warn!("snapshot: no button \"{label}\""),
+                    }
+                    return;
+                }
+                if let Some(label) = step.strip_prefix("activate:") {
+                    let root = lib.widget.clone();
+                    let mut done = false;
+                    let mut stack = vec![root];
+                    while let Some(w) = stack.pop() {
+                        if let Some(lv) = w.downcast_ref::<gtk::ListView>() {
+                            if let Some(model) = lv.model() {
+                                for i in 0..model.n_items() {
+                                    if model.item(i).and_downcast::<gtk::StringObject>().is_some_and(|o| o.string() == label) {
+                                        lv.emit_by_name::<()>("activate", &[&i]);
+                                        done = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        let mut c = w.first_child();
+                        while let Some(ch) = c {
+                            c = ch.next_sibling();
+                            stack.push(ch);
+                        }
+                    }
+                    if !done {
+                        log::warn!("snapshot: no row \"{label}\"");
+                    }
+                    return;
+                }
                 match step.as_str() {
                     "close" => panel.close(),
                     "uninstall" => {

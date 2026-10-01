@@ -364,13 +364,14 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       for downloads and incomplete installs, star only on favourites or on
       hover, hairline outline, installed in an accent hairline, selected in
       a 2 px accent outline). Awaiting the user's review.
-- [ ] **Sidebar and filters:** the browse-by sidebar with counts; Years and
-      Regions filters (new `get_games` parameters and section keys);
-      Publishers / Series / Years / Regions value lists. Found 2026-10-01: eXo
-      puts tag-like values in `series` ("Playlist: Remote Multiplayer;
-      Playlist: Sound Canvas; Theme: Fantasy; Warcraft universe"), so a
-      "Tags" entry is possible after all: split `series` on `;`, read the
-      `Playlist:` / `Theme:` prefixes as tags, keep the rest as series.
+- [x] **Sidebar and filters** (branch `ui-sidebar`, 2026-10-01): the
+      sidebar browses by Platforms, Genres, Publishers, Series, Years,
+      Regions, Tags (122 from eXo's `series` field) and Play Status, with
+      counts; Favorites filters. The filter bar has Platforms (replacing the
+      collection chips), Genres, Years, Regions and Playlists dropdowns and
+      a chip for a sidebar pick. Backend: `BrowseFilter` in `GameFilter`,
+      `get_games_browse` / `get_section_keys_browse` / `get_facet_values`.
+      Awaiting the user's review.
 
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,

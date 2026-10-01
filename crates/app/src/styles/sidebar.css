@@ -1,0 +1,50 @@
+/* The library's sidebar and values page (ui/sidebar.rs), after
+   tmp/concept 01.png: a rule on the right, plain items, the active one with
+   an accent bar and tint; counts muted on the right. */
+.sidebar {
+  background-color: var(--bg-primary);
+  border-right: var(--hairline) solid var(--line-frame);
+  padding: 10px 8px;
+}
+button.sidebar-item {
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  box-shadow: none;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+}
+button.sidebar-item:hover { background-color: var(--fill-2); color: var(--text-primary); }
+button.sidebar-item.active {
+  background-color: var(--accent-glow);
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.sidebar-count {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  padding: 0 6px;
+}
+.sidebar-values { padding: 12px 14px; }
+.sidebar-values-title { font-weight: 600; color: var(--text-strong); }
+listview.sidebar-value-list { background: none; }
+listview.sidebar-value-list > row {
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  margin-bottom: 4px;
+  padding: 6px 10px;
+}
+listview.sidebar-value-list > row:hover { background-color: var(--fill-2); border-color: var(--accent); }
+
+/* The sidebar pick in the filter bar. */
+.browse-chip {
+  border: var(--hairline) solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0 0 0 10px;
+  color: var(--accent);
+  background-color: var(--accent-glow);
+}

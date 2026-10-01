@@ -641,3 +641,22 @@ their accent outline instead. The selected card's 2 px accent ring is a border p
 so selecting a card never shifts the grid. The star is the accent's (it was the warning yellow)
 and shows only on favourites, or on hover. Language badges stay: the concept does not show them,
 but they are real information.
+
+## 2026-10-01 - UI revamp phase 3: a browse-by sidebar and dropdown filters
+
+The sidebar browses (user's decision): a category lists its values with counts, picking one
+narrows the grid. One sidebar value at a time; Platforms, Genres, Years and Regions are also
+dropdowns in the filter bar and stay in sync with the sidebar, while Publishers, Series, Tags,
+Play Status and Favorites, which have no dropdown, show as a removable chip. The collection chips
+became the concept's "All platforms" dropdown; the sidebar is hidden below 1100 sp, where the
+dropdowns carry the same filters.
+
+"Tags" exist after all: eXo's `series` field mixes series with `Prefix: value` entries ("Theme:
+Fantasy", "Playlist: Roland MT-32", "Education: Geography"), 122 of them. `queries::is_tag`
+splits them (the prefix must start with a letter, so "1942: The Pacific Air War series" stays a
+series); filtering matches one whole `;`-separated entry, so "Theme" never matches "Theme:
+Fantasy". Play Status is a group property ("In your library" = some variant in the library, none
+installed). The new filters ride in `BrowseFilter` inside `GameFilter`; the library calls
+`get_games_browse` / `get_section_keys_browse` with one `GameQuery` instead of growing the
+positional `get_games`, which other callers keep using. Facet counts are over primary rows of the
+visible catalogue, independent of the other filters.
