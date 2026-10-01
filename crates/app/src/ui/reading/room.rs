@@ -930,15 +930,10 @@ impl Room {
     }
 }
 
-/// The articles ("Covered in") section for a game's detail panel.
-#[allow(dead_code)]
-pub fn game_articles_widget(game_id: i64, window: &gtk::Window) -> gtk::Widget {
+/// The articles about a game, for the dossier's Media tab; `on_count`
+/// gets how many there are once they arrive (the tab title carries it).
+pub fn game_articles_widget(game_id: i64, window: &gtk::Window, on_count: impl Fn(usize) + 'static) -> gtk::Widget {
     let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(4).css_classes(["detail-articles"]).visible(false).build();
-    let head = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    head.append(&gtk::Label::builder().label("Covered in").xalign(0.0).css_classes(["title-3"]).build());
-    let count = gtk::Label::builder().css_classes(["section-count", "muted", "small"]).valign(gtk::Align::Baseline).build();
-    head.append(&count);
-    root.append(&head);
     let list = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).build();
     root.append(&list);
 
@@ -960,6 +955,7 @@ pub fn game_articles_widget(game_id: i64, window: &gtk::Window) -> gtk::Widget {
                     return;
                 }
             };
+            on_count(rows.len());
             if rows.is_empty() {
                 return;
             }
@@ -967,7 +963,6 @@ pub fn game_articles_widget(game_id: i64, window: &gtk::Window) -> gtk::Widget {
             if let Some(lang) = language {
                 rows.sort_by_key(|a| a.language != lang);
             }
-            count.set_label(&rows.len().to_string());
             notice::load();
             for a in rows {
                 let b = gtk::Button::builder().css_classes(["article-row"]).tooltip_text(format!("{}, page {}", a.issue_title, a.page)).build();

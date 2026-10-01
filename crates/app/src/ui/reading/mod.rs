@@ -75,11 +75,10 @@ pub fn set_query(q: &str) {
     }
 }
 
-/// The "Covered in" section for a game's detail panel: eXo's article index
-/// (review, preview, ...) with the page each one starts on. Returns an
-/// invisible widget until (and unless) articles arrive.
-#[allow(dead_code)]
-pub fn game_articles_widget(game_id: i64, window: &gtk::Window) -> gtk::Widget {
-    room::game_articles_widget(game_id, window)
+/// A game's magazine articles for the dossier's Media tab: eXo's article
+/// index (review, preview, ...) with the page each one starts on. Invisible
+/// until (and unless) articles arrive; `on_count` reports how many.
+pub fn game_articles_widget(game_id: i64, window: &gtk::Window, on_count: impl Fn(usize) + 'static) -> gtk::Widget {
+    room::game_articles_widget(game_id, window, on_count)
 }
 

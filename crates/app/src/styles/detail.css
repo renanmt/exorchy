@@ -1,12 +1,26 @@
 /* The game dossier (ui/detail.rs): header, hero row, tags, tabs, features.
    Tokens only; the accent marks what is the game's own and what to press. */
-.dossier .detail-head { border-bottom: var(--border) solid var(--line-2); padding: 8px 8px 8px 10px; }
+/* Framed like the concept (tmp/concept 01.png): a box inset from the window
+   edge, a hairline outline, a line under the header. */
+.dossier {
+  margin: 8px;
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  background-color: var(--bg-secondary);
+}
+.dossier .detail-head { border-bottom: var(--hairline) solid var(--line-frame); padding: 8px 8px 8px 10px; }
+.dossier .title-2 { font-size: 1.5em; }
 .dossier-heading { font-size: 0.85em; font-weight: 600; letter-spacing: 0.12em; color: var(--text-secondary); }
 button.dossier-star { color: var(--text-secondary); }
 button.dossier-star.is-favorite { color: var(--accent); }
 
 .dossier-hero { margin-top: 14px; }
-.dossier-hero .detail-cover { border: var(--border) solid var(--line-3); border-radius: var(--radius); }
+.dossier-hero .detail-cover { border: var(--hairline) solid var(--line-frame); border-radius: var(--radius); }
+/* Outlined secondary controls. */
+.dossier button.btn:not(.primary):not(.ghost),
+.dossier menubutton.btn > button { border: var(--hairline) solid var(--line-frame); background-color: transparent; box-shadow: none; }
+.dossier button.btn:not(.primary):not(.ghost):hover,
+.dossier menubutton.btn > button:hover { background-color: var(--fill-2); }
 .dossier-kind { color: var(--accent); font-size: 0.85em; font-weight: 700; letter-spacing: 0.08em; }
 
 /* Play with its menu: the primary button's look on both halves. */
@@ -28,7 +42,7 @@ button.btn.dossier-primary { padding: 8px 14px; }
 
 .dossier-tag {
   background-color: var(--fill-2);
-  border: var(--border) solid var(--line-3);
+  border: var(--hairline) solid var(--line-frame);
   border-radius: var(--radius);
   padding: 2px 10px;
   color: var(--text-secondary);
@@ -36,7 +50,7 @@ button.btn.dossier-primary { padding: 8px 14px; }
 }
 
 /* Tabs as an underline row rather than a pill group. */
-.dossier-tabs { margin-top: 8px; border-bottom: var(--border) solid var(--line-3); }
+.dossier-tabs { margin-top: 8px; border-bottom: var(--hairline) solid var(--line-frame); }
 .dossier-tabs toggle-group { background: none; padding: 0; }
 .dossier-tabs toggle { background: none; border-radius: 0; color: var(--text-secondary); padding: 6px 12px; box-shadow: none; }
 .dossier-tabs toggle:hover { color: var(--text-primary); }
@@ -44,6 +58,7 @@ button.btn.dossier-primary { padding: 8px 14px; }
 
 .dossier-section { font-weight: 600; color: var(--text-strong); }
 .dossier-feature image { color: var(--accent); }
-.dossier-notes { color: var(--text-secondary); line-height: 1.45; border-top: var(--border) solid var(--line-2); padding-top: 12px; }
-.dossier-doc { padding: 8px 10px; background-color: var(--fill-1); border: var(--border) solid var(--line-2); border-radius: var(--radius); }
+.dossier-notes { color: var(--text-secondary); line-height: 1.45; border-top: var(--hairline) solid var(--line-frame); padding-top: 12px; }
+.dossier-doc { padding: 8px 10px; border: var(--hairline) solid var(--line-frame); border-radius: var(--radius); }
+.dossier .detail-articles button.article-row { border: var(--hairline) solid var(--line-frame); }
 .dossier-tabs separator { background: none; min-width: 0; min-height: 0; }

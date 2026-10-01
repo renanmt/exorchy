@@ -183,6 +183,7 @@ const SEMANTIC: &str = r#"
   --line-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --line-3: color-mix(in srgb, var(--om-foreground) 8%, transparent);
   --line-4: color-mix(in srgb, var(--om-foreground) 12%, transparent);
+  --line-frame: color-mix(in srgb, var(--om-foreground) 20%, transparent);
   --fill-1: color-mix(in srgb, var(--om-foreground) 3%, transparent);
   --fill-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --fill-3: color-mix(in srgb, var(--om-foreground) 10%, transparent);

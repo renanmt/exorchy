@@ -276,6 +276,9 @@ impl LibraryPage {
         widget.add_breakpoint(narrow);
         let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
+        // A small tile: the dossier takes the whole area rather than a strip.
+        tiny.add_setter(&split, "sidebar-width-fraction", Some(&1.0f64.to_value()));
+        tiny.add_setter(&split, "max-sidebar-width", Some(&10_000.0f64.to_value()));
         tiny.add_setter(&toolbar, "orientation", Some(&gtk::Orientation::Vertical.to_value()));
         tiny.add_setter(&toolbar, "spacing", Some(&8i32.to_value()));
         widget.add_breakpoint(tiny);

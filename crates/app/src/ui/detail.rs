@@ -48,10 +48,14 @@ pub struct DetailPanel {
     features: gtk::Box,
     gallery: gtk::FlowBox,
     gallery_head: gtk::Label,
+    articles_head: gtk::Label,
     articles_slot: gtk::Box,
     manuals: gtk::Box,
     setup: gtk::Box,
     tabs: adw::ViewStack,
+    /// Screenshots and articles: together the Media tab's count.
+    shots: Cell<usize>,
+    articles: Cell<usize>,
     manual_path: RefCell<Option<String>>,
     scroller: gtk::ScrolledWindow,
     /// Below the cover; `ui::media` fills it.
@@ -145,6 +149,8 @@ impl DetailPanel {
         media.append(&gallery_head);
         let gallery = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).column_spacing(6).row_spacing(6).min_children_per_line(2).max_children_per_line(6).homogeneous(true).build();
         media.append(&gallery);
+        let articles_head = gtk::Label::builder().label("Magazine articles").xalign(0.0).css_classes(["dossier-section"]).visible(false).build();
+        media.append(&articles_head);
         let articles_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         media.append(&articles_slot);
         tabs.add_titled(&media, Some("media"), "Media");
@@ -184,10 +190,13 @@ impl DetailPanel {
             features,
             gallery,
             gallery_head,
+            articles_head,
             articles_slot,
             manuals,
             setup,
             tabs,
+            shots: Cell::new(0),
+            articles: Cell::new(0),
             manual_path: RefCell::new(None),
             scroller,
             media_slot,
@@ -299,6 +308,11 @@ impl DetailPanel {
             self.game.replace(Some(game.clone()));
         }
         if !same {
+            // Every game opens on its overview.
+            self.tabs.set_visible_child_name("overview");
+            self.shots.set(0);
+            self.articles.set(0);
+            self.update_media_title();
             self.selected.set(game.id);
             self.variants.replace(vec![game.clone()]);
             self.scroller.vadjustment().set_value(0.0);
@@ -309,7 +323,13 @@ impl DetailPanel {
                 self.articles_slot.remove(&c);
             }
             if let Some(id) = game.id {
-                self.articles_slot.append(&crate::ui::reading::game_articles_widget(id, &self.window));
+                let panel = Rc::downgrade(self);
+                self.articles_slot.append(&crate::ui::reading::game_articles_widget(id, &self.window, move |n| {
+                    if let Some(p) = panel.upgrade().filter(|p| p.game.borrow().as_ref().and_then(|g| g.id) == Some(id)) {
+                        p.articles.set(n);
+                        p.update_media_title();
+                    }
+                }));
             }
             // An installed game whose extras are still downloading after a
             // restart gets its tracker back, so the phase stays visible.
@@ -447,7 +467,6 @@ impl DetailPanel {
                 let Ok(meta) = res else { return };
                 panel.manual_path.replace(meta.manual_path.clone());
                 panel.gallery.remove_all();
-                panel.gallery_head.set_visible(!meta.images.is_empty());
                 for (thumb, full) in meta.thumbnails.iter().zip(meta.images.iter()) {
                     let pic = gtk::Picture::builder().content_fit(gtk::ContentFit::Cover).height_request(96).css_classes(["gallery-thumb"]).build();
                     let path = std::path::PathBuf::from(thumb);
@@ -463,7 +482,8 @@ impl DetailPanel {
                     btn.connect_clicked(move |_| actions::open_document(full.clone()));
                     panel.gallery.insert(&btn, -1);
                 }
-                panel.tabs.page(&panel.gallery.parent().expect("media tab")).set_title(Some(&format!("Media ({})", meta.images.len())));
+                panel.shots.set(meta.images.len());
+                panel.update_media_title();
                 // The manual and counts feed the tabs, the features and Play's menu.
                 panel.render();
             }),
@@ -623,6 +643,19 @@ impl DetailPanel {
             line.append(&gtk::Label::builder().label(&text).xalign(0.0).build());
             self.features.append(&line);
         }
+    }
+
+    /// "Media (n)": screenshots plus articles; hidden when there are none.
+    fn update_media_title(&self) {
+        let Some(media) = self.gallery.parent() else { return };
+        let n = self.shots.get() + self.articles.get();
+        let page = self.tabs.page(&media);
+        page.set_title(Some(&format!("Media ({n})")));
+        page.set_visible(n > 0);
+        // Headings only when both kinds are there.
+        let both = self.shots.get() > 0 && self.articles.get() > 0;
+        self.gallery_head.set_visible(both);
+        self.articles_head.set_visible(both);
     }
 
     /// The Manuals tab, and its count in the tab title.

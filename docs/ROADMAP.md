@@ -351,11 +351,23 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       chips, Play split button, Add to playlist, ⋯), genre tags, tabs
       Overview / Media / Manuals / Setup, real features only; shortcuts
       Enter (play), F (favourite), I (dossier); Enter or double-click on
-      the shown card plays. Awaiting the user's review.
+      the shown card plays. Review fixes: Media counts screenshots and
+      articles (no "Covered in" heading), tabs reset to Overview on a new
+      game, full width in a small tile, a larger title, framed hairline
+      borders after the concept.
 - [ ] **Shell and cards:** a status bar (version, game / platform /
       favourite / playlist counts, key hints), top-bar polish, the denser
       card (cover, title, "year · platform · genre", star on the cover).
 - [ ] **Sidebar and filters:** the browse-by sidebar with counts; Years and
       Regions filters (new `get_games` parameters and section keys);
-      Publishers / Series / Years / Regions value lists.
+      Publishers / Series / Years / Regions value lists. Found 2026-10-01: eXo
+      puts tag-like values in `series` ("Playlist: Remote Multiplayer;
+      Playlist: Sound Canvas; Theme: Fantasy; Warcraft universe"), so a
+      "Tags" entry is possible after all: split `series` on `;`, read the
+      `Playlist:` / `Theme:` prefixes as tags, keep the rest as series.
+
+Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
+gitignored). Borders as drawn there: framed panels inset from the window edge,
+`--hairline` (1 px) outlines in `--line-frame`, outlined controls and tags, a
+thicker accent outline on the selected card.
 - [ ] **Polish:** narrow-window behaviour of all of it, docs.

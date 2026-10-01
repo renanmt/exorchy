@@ -35,6 +35,8 @@
   --radius-pill: 0;
   /* Outlines (cards, panels, entries, buttons); row dividers stay 1 px. */
   --border: 2px;
+  /* UI revamp (tmp/concept 01.png): thin, clearly visible lines. */
+  --hairline: 1px;
 }
 
 window.exorchy {
