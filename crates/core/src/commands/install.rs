@@ -105,7 +105,8 @@ pub async fn download_game(
     // macOS/Linux: the emulator pack rides along. Win9x is resolver-gated so
     // a system install never pays for it; ScummVM queues unless eXo's build
     // or the pack itself is present - a system ScummVM ignores the pin.
-    let emulator_pack: Option<(String, crate::commands::updates::ContentPackInfo)> = if cfg!(windows) {
+    // (collection that owns the pack, pack id, pack)
+    let emulator_pack: Option<(String, String, crate::commands::updates::ContentPackInfo)> = if cfg!(windows) {
         None
     } else if is_win9x_collection {
         let dd = data_dir.clone().unwrap_or_default();
@@ -120,7 +121,7 @@ pub async fn download_game(
             })
             .and_then(|pack_id| {
                 crate::commands::content_packs::installable_pack(source, pack_id)
-                    .map(|info| (pack_id.to_string(), info))
+                    .map(|info| (source.to_string(), pack_id.to_string(), info))
             })
     } else if is_scummvm_collection {
         use crate::commands::scummvm::{pack_id, resolve_scummvm, EngineSource};
@@ -132,7 +133,30 @@ pub async fn download_game(
             None
         } else {
             let id = pack_id(slug);
-            crate::commands::content_packs::installable_pack(source, &id).map(|info| (id, info))
+            crate::commands::content_packs::installable_pack(source, &id).map(|info| (source.to_string(), id, info))
+        }
+    } else if launcher == Some(crate::commands::collections::Launcher::DosBox) {
+        // DOS / Windows 3.x games eXo runs under DOSBox-X (or the user set
+        // to it) bring DOSBox-X along unless one already resolves.
+        let dd = data_dir.clone().unwrap_or_default();
+        let setting = {
+            let conn = db_state.lock()?;
+            queries::get_all_game_config(&conn, id).map_err(|e| e.to_string())?.remove("engine")
+        };
+        let prints = game
+            .dosbox_conf
+            .as_deref()
+            .and_then(|conf| crate::launchers::dosbox::resolve_game_conf(&dd, conf))
+            .and_then(|(path, _)| std::fs::read_to_string(path).ok())
+            .is_some_and(|text| crate::launchers::dosbox::conf_requests_printer(&text));
+        let engine = crate::launchers::dosbox::chosen_engine(setting.as_deref(), game.dosbox_variant.as_deref(), prints);
+        if engine == crate::launchers::dosbox::DosEngine::DosboxX && crate::emulators::resolve_dosbox_x(&dd).is_none() {
+            let id = crate::emulators::DOSBOX_X_PACK_ID;
+            crate::commands::content_packs::pack_collection(id).and_then(|col| {
+                crate::commands::content_packs::installable_pack(&col, id).map(|info| (col, id.to_string(), info))
+            })
+        } else {
+            None
         }
     } else {
         None
@@ -171,7 +195,7 @@ pub async fn download_game(
                     }
                 }
             }
-            if let Some((_, info)) = &emulator_pack {
+            if let Some((_, _, info)) = &emulator_pack {
                 // Same 2.2x factor as the pack installer's own preflight
                 // (archive + extracted copy).
                 needed += (info.size_bytes as f64 * 2.2) as u64;
@@ -207,9 +231,9 @@ pub async fn download_game(
 
     // Queue the emulator pack alongside (see emulator_pack above). "Install
     // already in progress" is the normal second-download case.
-    if let Some((pack_id, _)) = &emulator_pack {
+    if let Some((collection, pack_id, _)) = &emulator_pack {
         if let Err(e) =
-            crate::commands::content_packs::start_pack_install(&app, source, pack_id).await
+            crate::commands::content_packs::start_pack_install(&app, collection, pack_id).await
         {
             log::info!("Emulator pack '{pack_id}' not queued: {e}");
         }

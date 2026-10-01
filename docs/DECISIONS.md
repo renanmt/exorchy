@@ -558,3 +558,54 @@ marks the important thing with `accent`, which the detail panel's Play already u
 now use the accent; the card's "↓ Download" label, on nearly every card, drops to secondary
 text so the accent stays meaningful. `--success` remains for genuine success messages and
 `--danger` for errors.
+
+## 2026-09-30 - DOS and Windows 3.x games run under DOSBox-X where eXo says so, and print to PNG
+
+Every DOS and Windows 3.x game used to run under DOSBox Staging, including the 30 eXo pins to
+its DOSBox-X build (`x` / `x2` in `dosbox.txt` and `dosbox3x.txt`: 19 eXoDOS, 11 eXoWin3x) and the
+13 printing titles (Print Shop, Newsroom, ...), which Staging cannot serve: it has no printer
+(the `jn/printing` branch missed 0.83.0). DOSBox-X was already on disk for anyone with a Win9x
+game, but only the Win9x launcher could reach it.
+
+`launchers/dosbox.rs` now picks the engine per game: the `engine` game setting
+(`staging` / `dosbox-x`) wins, otherwise eXo's pick, which is DOSBox-X for the `x` pins and for
+any conf that enables the printer, Staging for the rest. 12 of the 13 printing titles are `x`
+pins already; Laffer Utilities is pinned to ECE (Windows-only) and comes along through the
+printer rule. 31 catalogue games default to DOSBox-X. The same pipeline builds the command line
+(host paths, LP overlay, options.conf, overrides); for DOSBox-X it skips the Staging translations
+(DOSBox-X reads eXo's ECE `[midi]` keys and `[ide]` sections natively), adds eXo's `-nomenu`,
+and drops the CRT shader keys, which are Staging's.
+
+Printing: eXo's confs say `printoutput=printer`, which in DOSBox-X means a Windows printer.
+eXorchy adds a fragment sending pages to PNG files (DOSBox-X has no PDF output; PNG is its default
+and opens anywhere) in `<game dir>/!prints`, next to the game's saves, so uninstall and backups
+treat printouts like saves. Opening the folder from the panel is left for later; the panel note
+says where pages go.
+
+The `dosbox-x` pack stays listed once, under eXoWin9x: duplicating it under eXoDOS would break
+the one-install-path-per-pack invariant (`manifest_install_paths_are_unique`), whose point is
+that uninstalling a pack from one collection cannot delete another's emulator.
+`content_packs::pack_collection` finds a pack's home; `download_game` and the panel's pack
+button use it, so a DOS game queues and installs the same pack the Win9x games use.
+
+## 2026-10-01 - DOSBox-X opens as a large floating window on Hyprland; Laffer stays on it
+
+DOSBox-X draws at the size its window has when it first appears and never rescales: a tile
+Hyprland resizes later (Super+F, a move to an emptier workspace) shows the picture in the
+top-left corner with black bars, and its own fullscreen is broken on Linux under XWayland and
+Wayland alike (upstream joncampbell123/dosbox-x#1959; on the dev machine `-fullscreen` showed a
+magnified corner of the screen, with and without `SDL_VIDEODRIVER=wayland`). No DOSBox-X setting
+avoids it. What works is a window nothing resizes, so on Hyprland
+`emulators::float_dosbox_x_on_hyprland` (DOS, Windows 3.x and Win9x launches): DOSBox-X gets
+the window class `exorchy-dosbox-x` (SDL's `SDL_VIDEO_*_WMCLASS`), eXorchy adds a session rule
+through `hyprctl eval` that floats and centers exactly that class (the user's config is not
+touched; a Hyprland reload drops it and the next launch adds it again), and DOSBox-X starts
+windowed at the largest 4:3 size fitting 95 % of the focused monitor below its bars. The
+"Launch in fullscreen" settings are ignored for DOSBox-X there, since fullscreen would give
+the broken picture. Elsewhere, or if Hyprland refuses the rule, nothing changes.
+
+Laffer Utilities reaches DOSBox-X only through the printer rule (eXo pins it to ECE). Under
+DOSBox-X its banner printing stops partway (the page holds the first words; the game waits on
+the printer until closed). The user chose to keep it on DOSBox-X rather than go back to Staging,
+which cannot print at all; Game Settings can still switch it. Known issue, not investigated
+further.

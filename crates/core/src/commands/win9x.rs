@@ -53,28 +53,7 @@ pub(crate) fn add_parent_case_aliases(dest_root: &Path) {
 
 // ── Launch ───────────────────────────────────────────────────────────────────
 
-/// How a resolved engine is invoked: a binary on disk, or DOSBox-X's Flatpak
-/// on Linux (no official Linux binaries exist for DOSBox-X).
-pub(crate) enum EngineCmd {
-    Direct(PathBuf),
-    Flatpak(&'static str),
-}
-
-impl EngineCmd {
-    /// Build a Command; `grant` is a directory the Flatpak sandbox must see.
-    pub(crate) fn command(&self, grant: &Path) -> (Command, PathBuf) {
-        match self {
-            EngineCmd::Direct(bin) => (Command::new(bin), bin.clone()),
-            EngineCmd::Flatpak(id) => {
-                let mut cmd = Command::new("flatpak");
-                cmd.arg("run")
-                    .arg(format!("--filesystem={}", grant.display()))
-                    .arg(id);
-                (cmd, PathBuf::from("flatpak"))
-            }
-        }
-    }
-}
+pub(crate) use crate::emulators::EngineCmd;
 
 /// A Command for console helpers (`where`, `powershell`) that does not flash
 /// a console window under a GUI-subsystem exe.
@@ -203,13 +182,8 @@ fn resolve_dosbox_x(app: &AppHandle, torrent_root: &Path, data_dir: &str) -> Opt
     if let Some(bin) = bundled {
         return Some(EngineCmd::Direct(bin));
     }
-    if binary_exists_on_path("dosbox-x") {
-        return Some(EngineCmd::Direct(PathBuf::from("dosbox-x")));
-    }
-    if cfg!(target_os = "linux") && flatpak_dosbox_x_available() {
-        return Some(EngineCmd::Flatpak("com.dosbox_x.DOSBox-X"));
-    }
-    None
+    // PATH, then the Flatpak: the same tail every DOSBox-X game uses.
+    crate::emulators::resolve_dosbox_x(data_dir)
 }
 
 /// 86Box for 86box* games: eXo's own build on Windows, the pack elsewhere,
@@ -1052,9 +1026,16 @@ fn launch_dosbox_x(
 
     // User overrides, applied last. 1024x768 fits every common display
     // (eXo's 1280x960 overflows a MacBook); opengl windows are resizable.
+    // On Hyprland the window floats at the monitor's size instead, windowed:
+    // DOSBox-X cannot rescale a resized window, nor go fullscreen there.
+    let (fullscreen, size) = match crate::emulators::float_dosbox_x_on_hyprland(&mut cmd) {
+        Some(size) => ("false".to_string(), size),
+        None => (fullscreen.to_string(), "1024x768".to_string()),
+    };
     let mut frag = format!(
-        "[sdl]\nfullscreen = {}\nwindowresolution = 1024x768\noutput = opengl\n{}",
+        "[sdl]\nfullscreen = {}\nwindowresolution = {}\noutput = opengl\n{}",
         fullscreen,
+        size,
         ne2000_override()
     );
     if let Some(custom) = per_game_config.get("custom_conf") {

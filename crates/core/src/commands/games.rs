@@ -398,43 +398,76 @@ pub async fn running_game_ids() -> Result<Vec<i64>, String> {
     Ok(launchers::running_game_ids())
 }
 
-/// The two engine facts the UI asks for. Exorchy is Linux-only, where eXo's
-/// DOSBox ECE build (Windows) can never run: both answers are always false and
-/// the panel labels every DOS game "DOSBox Staging".
+/// How a game's emulator is chosen, for Game Settings and the panel. Only
+/// DOS and Windows 3.x games choose (`engine` is None for the rest).
 #[derive(Debug, serde::Serialize)]
 pub struct GameEngineInfo {
+    /// eXo's DOSBox ECE build is Windows-only and never runs here.
     pub ece_available: bool,
     pub uses_ece: bool,
+    /// "staging" | "dosbox-x": what the next launch uses.
+    pub engine: Option<String>,
+    /// eXo's pick for this game: what "eXo's choice" means.
+    pub exo_engine: Option<String>,
+    /// The conf uses eXo's virtual printer.
+    pub prints: bool,
+    /// `engine` resolves on this system right now.
+    pub engine_available: bool,
 }
 
-pub async fn game_engine_info(_id: i64) -> Result<GameEngineInfo, String> {
-    Ok(GameEngineInfo { ece_available: false, uses_ece: false })
-}
-
-/// The conf requests eXo's virtual printer, which DOSBox Staging does not
-/// emulate (eXo's ECE build did, Windows only). A UI note, nothing more.
-pub async fn game_printing_unavailable(
-    db_state: State<'_, DbState>,
-    id: i64,
-) -> Result<bool, String> {
-    let (dosbox_conf, data_dir) = {
+pub async fn game_engine_info(db_state: State<'_, DbState>, id: i64) -> Result<GameEngineInfo, String> {
+    let (game, data_dir, setting) = {
         let conn = db_state.lock()?;
         let game = queries::fetch_game_by_id(&conn, id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Game with id {} not found", id))?;
-        let data_dir = queries::get_config(&conn, "data_dir").map_err(|e| e.to_string())?;
-        (game.dosbox_conf, data_dir)
+        let data_dir = queries::get_config(&conn, "data_dir").map_err(|e| e.to_string())?.unwrap_or_default();
+        let setting = queries::get_all_game_config(&conn, id).map_err(|e| e.to_string())?.remove("engine");
+        (game, data_dir, setting)
     };
-    let (Some(conf), Some(data_dir)) = (dosbox_conf, data_dir) else {
-        return Ok(false);
+    let mut info = GameEngineInfo {
+        ece_available: false,
+        uses_ece: false,
+        engine: None,
+        exo_engine: None,
+        prints: false,
+        engine_available: false,
     };
-    let Some((conf_path, _)) = launchers::dosbox::resolve_game_conf(&data_dir, &conf) else {
-        return Ok(false);
-    };
-    let Ok(text) = std::fs::read_to_string(conf_path) else {
-        return Ok(false);
-    };
-    Ok(launchers::dosbox::conf_requests_printer(&text))
+    let source = game.torrent_source.as_deref().unwrap_or("eXoDOS");
+    if collection_def(source).map(|c| c.launcher) != Some(Launcher::DosBox) {
+        return Ok(info);
+    }
+    tokio::task::spawn_blocking(move || {
+        let prints = game
+            .dosbox_conf
+            .as_deref()
+            .and_then(|conf| launchers::dosbox::resolve_game_conf(&data_dir, conf))
+            .and_then(|(path, _)| std::fs::read_to_string(path).ok())
+            .is_some_and(|text| launchers::dosbox::conf_requests_printer(&text));
+        let variant = game.dosbox_variant.as_deref();
+        let exo = launchers::dosbox::exo_engine(variant, prints);
+        let engine = launchers::dosbox::chosen_engine(setting.as_deref(), variant, prints);
+        info.prints = prints;
+        info.exo_engine = Some(exo.key().into());
+        info.engine = Some(engine.key().into());
+        info.engine_available = match engine {
+            launchers::dosbox::DosEngine::Staging => crate::emulators::resolve_dosbox_staging(&data_dir).is_some(),
+            launchers::dosbox::DosEngine::DosboxX => crate::emulators::resolve_dosbox_x(&data_dir).is_some(),
+        };
+        info
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// The game prints but will run under DOSBox Staging, which has no printer
+/// (only when the user picked Staging over eXo's DOSBox-X). A UI note.
+pub async fn game_printing_unavailable(
+    db_state: State<'_, DbState>,
+    id: i64,
+) -> Result<bool, String> {
+    let info = game_engine_info(db_state, id).await?;
+    Ok(info.prints && info.engine.as_deref() == Some("staging"))
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]

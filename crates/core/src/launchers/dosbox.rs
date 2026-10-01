@@ -58,56 +58,82 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
         let dir = torrent_root.join(format!("{}/{}/{}", src_game_prefix, ld, shortcode));
         (shortcode, ld, game_folder, dir)
     });
-    if !shortcode.is_empty() {
-        let game_dir = match &lp_info {
-            Some((_, _, _, dir)) => dir.clone(),
-            None => torrent_root.join(src_game_prefix).join(shortcode),
-        };
-        rewrite_bat_host_paths(&game_dir, &working_dir);
+    let game_dir = (!shortcode.is_empty()).then(|| match &lp_info {
+        Some((_, _, _, dir)) => dir.clone(),
+        None => torrent_root.join(src_game_prefix).join(shortcode),
+    });
+    if let Some(game_dir) = &game_dir {
+        rewrite_bat_host_paths(game_dir, &working_dir);
     }
 
-    if let Some(ref variant) = game.dosbox_variant {
-        if variant.starts_with("ece") {
-            log::info!(
-                "Game '{}' is tuned for DOSBox ECE '{}' (Windows-only build). \
-                 Running under DOSBox Staging - experience may vary.",
-                game.title, variant
-            );
-        }
+    let conf_text = std::fs::read_to_string(&game_conf).unwrap_or_default();
+    let prints = conf_requests_printer(&conf_text);
+    let engine = chosen_engine(ctx.per_game.get("engine").map(String::as_str), game.dosbox_variant.as_deref(), prints);
+    if engine == DosEngine::Staging && game.dosbox_variant.as_deref().is_some_and(|v| v.starts_with("ece")) {
+        log::info!(
+            "Game '{}' is tuned for DOSBox ECE (Windows-only build). Running under DOSBox Staging - experience may vary.",
+            game.title
+        );
     }
 
     let patched_conf = patch_dosbox_conf(
         &game_conf,
         &working_dir,
         lp_info.as_ref().map(|(sc, ld, gf, dir)| (*sc, *ld, *gf, dir.as_path())),
-        true,
+        // DOSBox-X reads eXo's ECE/X keys ([midi] fluid.*, mt32.*, [ide]) natively.
+        engine == DosEngine::Staging,
     )?;
 
     log::info!(
-        "Launching: {} with config {} (patched: {}, engine: DOSBox Staging)",
+        "Launching: {} with config {} (patched: {}, engine: {})",
         game.title,
         game_conf.display(),
         patched_conf.display(),
+        engine.label(),
     );
 
-    let dosbox_bin = crate::emulators::resolve_dosbox_staging(ctx.data_dir)
-        .ok_or_else(|| crate::emulators::DOSBOX_MISSING_MESSAGE.to_string())?;
-    crate::emulators::warn_if_shaders_missing(&dosbox_bin);
-
-    let mut cmd = Command::new(&dosbox_bin);
+    let launch_dir = launch_conf_dir()?;
+    let (mut cmd, dosbox_bin) = match engine {
+        DosEngine::Staging => {
+            let bin = crate::emulators::resolve_dosbox_staging(ctx.data_dir)
+                .ok_or_else(|| crate::emulators::DOSBOX_MISSING_MESSAGE.to_string())?;
+            crate::emulators::warn_if_shaders_missing(&bin);
+            (Command::new(&bin), bin)
+        }
+        DosEngine::DosboxX => crate::emulators::resolve_dosbox_x(ctx.data_dir)
+            .ok_or_else(|| DOSBOX_X_MISSING_MESSAGE.to_string())?
+            .command_granting(&[&torrent_root, &launch_dir]),
+    };
     cmd.current_dir(&working_dir).arg("-conf").arg(&patched_conf);
     if options_conf.exists() {
         cmd.arg("-conf").arg(&options_conf);
     }
+    // Hyprland: DOSBox-X opens floating at its final size (it cannot rescale).
+    let float_window = (engine == DosEngine::DosboxX).then(|| crate::emulators::float_dosbox_x_on_hyprland(&mut cmd)).flatten();
+    if engine == DosEngine::DosboxX {
+        // eXo's own launch line; the confs set showmenu=false as well.
+        cmd.arg("-nomenu");
+        if prints {
+            if let Some(game_dir) = &game_dir {
+                cmd.arg("-conf").arg(printer_fragment(&launch_dir, id, game_dir)?);
+            }
+        }
+    }
 
     // User preferences, applied LAST and written for both states: Staging
     // defaults glshader to crt-auto, so "off" has to be an explicit value.
+    // The shaders are Staging's; DOSBox-X gets the window setting only.
     {
         let glshader_val = if ctx.crt_auto { "crt-auto" } else { "sharp" };
         let fullscreen_val = if ctx.fullscreen { "true" } else { "false" };
-        let frag = format!(
-            "[sdl]\nfullscreen = {fullscreen_val}\n[render]\nglshader = {glshader_val}\n"
-        );
+        let frag = match engine {
+            DosEngine::Staging => format!("[sdl]\nfullscreen = {fullscreen_val}\n[render]\nglshader = {glshader_val}\n"),
+            // Its fullscreen is broken where it floats (see emulators.rs).
+            DosEngine::DosboxX => match &float_window {
+                Some(size) => format!("[sdl]\nfullscreen = false\nwindowresolution = {size}\n"),
+                None => format!("[sdl]\nfullscreen = {fullscreen_val}\n"),
+            },
+        };
         let conf_path = launch_conf_dir()?.join(format!("global_overrides_{}.conf", id));
         std::fs::write(&conf_path, &frag)
             .map_err(|e| format!("Failed to write global override conf: {e}"))?;
@@ -119,10 +145,10 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
     {
         let game_conf_path = launch_conf_dir()?.join(format!("game_{}.conf", id));
         let mut frag = String::new();
-        if let Some(fs) = ctx.per_game.get("fullscreen") {
+        if let Some(fs) = ctx.per_game.get("fullscreen").filter(|_| float_window.is_none()) {
             frag.push_str(&format!("[sdl]\nfullscreen = {}\n", fs));
         }
-        if let Some(gs) = ctx.per_game.get("glshader") {
+        if let Some(gs) = ctx.per_game.get("glshader").filter(|_| engine == DosEngine::Staging) {
             if gs != "default" {
                 frag.push_str(&format!("[render]\nglshader = {}\n", gs));
             }
@@ -149,6 +175,70 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
     }
 
     Ok(PreparedLaunch { cmd, binary: dosbox_bin })
+}
+
+pub const DOSBOX_X_MISSING_MESSAGE: &str = "This game runs under DOSBox-X, which is not installed yet. \
+    Download it from the game's panel, or install dosbox-x (AUR) or its Flatpak (com.dosbox_x.DOSBox-X).";
+
+/// Which emulator runs a DOS / Windows 3.x game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DosEngine {
+    Staging,
+    DosboxX,
+}
+
+impl DosEngine {
+    /// The `engine` value stored in `game_config` and sent to the UI.
+    pub fn key(self) -> &'static str {
+        match self {
+            DosEngine::Staging => "staging",
+            DosEngine::DosboxX => "dosbox-x",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            DosEngine::Staging => "DOSBox Staging",
+            DosEngine::DosboxX => "DOSBox-X",
+        }
+    }
+}
+
+/// eXo's own pick: DOSBox-X where eXo pins its `x` build (`dosbox.txt` /
+/// `dosbox3x.txt`: `x`, `x2`), and for every conf that prints - Staging has no
+/// printer, and eXo's ECE build that printed is Windows-only. Staging for the
+/// rest, which is what eXo's `staging*`, `dosbox` and `ece*` pins get on Linux.
+pub fn exo_engine(variant: Option<&str>, prints: bool) -> DosEngine {
+    if prints || matches!(variant, Some("x" | "x2")) {
+        DosEngine::DosboxX
+    } else {
+        DosEngine::Staging
+    }
+}
+
+/// The per-game `engine` setting wins; empty or unknown means eXo's pick.
+pub fn chosen_engine(setting: Option<&str>, variant: Option<&str>, prints: bool) -> DosEngine {
+    match setting {
+        Some("staging") => DosEngine::Staging,
+        Some("dosbox-x") => DosEngine::DosboxX,
+        _ => exo_engine(variant, prints),
+    }
+}
+
+/// Where DOSBox-X writes a printing game's pages: PNG files in the game's
+/// own `!prints` folder, beside its saves. eXo's confs say
+/// `printoutput=printer`, which only means something on Windows.
+pub fn printouts_dir(game_dir: &Path) -> PathBuf {
+    game_dir.join("!prints")
+}
+
+fn printer_fragment(launch_dir: &Path, id: i64, game_dir: &Path) -> Result<PathBuf, String> {
+    let out = printouts_dir(game_dir);
+    std::fs::create_dir_all(&out).map_err(|e| format!("Cannot create {}: {e}", out.display()))?;
+    let frag = format!("[printer]\nprintoutput = png\nmultipage = false\ndocpath = {}\n", out.display());
+    let path = launch_dir.join(format!("printer_{id}.conf"));
+    std::fs::write(&path, frag).map_err(|e| format!("Failed to write printer conf: {e}"))?;
+    Ok(path)
 }
 
 /// The conf enables eXo's virtual printer (`printer=true` or
@@ -1394,6 +1484,36 @@ mod tests {
     }
 
     // ── conf_requests_printer ───────────────────────────────────────────────
+
+    #[test]
+    fn exo_picks_dosbox_x_for_its_x_builds_and_for_printing() {
+        use super::{chosen_engine, exo_engine, DosEngine::*};
+        assert_eq!(exo_engine(Some("x"), false), DosboxX);
+        assert_eq!(exo_engine(Some("x2"), false), DosboxX);
+        // Laffer Utilities: pinned to ECE, but it prints.
+        assert_eq!(exo_engine(Some("ece4230"), true), DosboxX);
+        for v in [None, Some("dosbox"), Some("staging0.81.1"), Some("ece4230"), Some("svn"), Some("x98")] {
+            assert_eq!(exo_engine(v, false), Staging, "{v:?}");
+        }
+        // The per-game setting wins both ways; anything else is eXo's pick.
+        assert_eq!(chosen_engine(Some("staging"), Some("x"), true), Staging);
+        assert_eq!(chosen_engine(Some("dosbox-x"), Some("dosbox"), false), DosboxX);
+        assert_eq!(chosen_engine(Some(""), Some("x"), false), DosboxX);
+        assert_eq!(chosen_engine(Some("ece"), Some("dosbox"), false), Staging);
+        assert_eq!(chosen_engine(None, None, false), Staging);
+    }
+
+    #[test]
+    fn printouts_go_to_the_games_own_folder_as_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let game = dir.path().join("eXo/eXoDOS/NewPS");
+        let frag = super::printer_fragment(dir.path(), 7, &game).unwrap();
+        let text = fs::read_to_string(frag).unwrap();
+        assert!(text.starts_with("[printer]\n"));
+        assert!(text.contains("printoutput = png"));
+        assert!(text.contains(&format!("docpath = {}", game.join("!prints").display())));
+        assert!(game.join("!prints").is_dir(), "created before launch");
+    }
 
     #[test]
     fn printer_detection_matches_enabled_not_documentation() {

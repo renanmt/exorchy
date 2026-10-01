@@ -35,7 +35,7 @@ exorchy/
 │   ├── src/host.rs           the host shim: AppHandle, State, events, async_runtime (replaces Tauri)
 │   ├── src/commands/         command functions by responsibility (see below)
 │   ├── src/launchers/        the emulator seam: mod.rs (spine, process tracking, dispatch), dosbox.rs
-│   ├── src/emulators.rs      where DOSBox Staging comes from (pack / system / custom)
+│   ├── src/emulators.rs      where DOSBox Staging (pack / system / custom) and DOSBox-X come from
 │   ├── src/media_sources.rs  the Media Pack torrent joining the shared session
 │   ├── src/vhd.rs            differencing VHDs for 86Box (Windows 9x)
 │   ├── src/omarchy.rs        theme bridge (colors.toml, shell.toml, fc-match, inotify)
@@ -166,15 +166,24 @@ modules subscribe to.
    (`dosbox-<id>.log`), spawns, tracks pid + run key, and emits `game-exited`
    from the reaper. The other launchers call the same function.
 
-`launchers/dosbox.rs::prepare` (DOSBox Staging): `resolve_game_conf` (catalogue
+`launchers/dosbox.rs::prepare` (DOS and Windows 3.x): `resolve_game_conf` (catalogue
 path, case-insensitive walk, then lang-scoped alternates) →
 `rewrite_bat_host_paths` (`.\x\y` → `./x/y` in the game's bats when the target
-exists) → `patch_dosbox_conf` (host-path rewrite with trailing-separator and
-quoting rules, LP overlay mount via a symlink staging dir, ECE→Staging
-translation of `[midi]` keys and DOSBox-X `[ide]` sections) →
-`emulators::resolve_dosbox_staging` → command line `dosbox -conf <patched>
-[-conf options.conf] -conf global_overrides_<id>.conf [-conf game_<id>.conf]`
-with cwd `<root>/eXo`. The field knowledge encoded in these functions is
+exists) → engine: `chosen_engine` = the per-game `engine` setting, else
+`exo_engine` (DOSBox-X for eXo's `x` / `x2` pins and every conf that prints,
+DOSBox Staging otherwise) → `patch_dosbox_conf` (host-path rewrite with
+trailing-separator and quoting rules, LP overlay mount via a symlink staging
+dir; for Staging only, translation of ECE `[midi]` keys and DOSBox-X `[ide]`
+sections, which DOSBox-X reads natively) → `emulators::resolve_dosbox_staging`
+or `emulators::resolve_dosbox_x` (pack AppImage, PATH, Flatpak with the root
+and launch dir granted) → command line `<emulator> -conf <patched> [-conf
+options.conf] [DOSBox-X: -nomenu, -conf printer_<id>.conf] -conf
+global_overrides_<id>.conf [-conf game_<id>.conf]` with cwd `<root>/eXo`. The
+printer fragment sends DOSBox-X's pages to PNG files in `<game dir>/!prints`
+(eXo's confs say `printoutput=printer`, Windows-only); CRT shaders are
+Staging's and are left out for DOSBox-X. `download_game` queues the
+`dosbox-x` pack (owned by eXoWin9x in the manifest, `pack_collection`) with
+the first download of a game that needs it. The field knowledge encoded in these functions is
 covered by the unit tests copied from Exodium; keep them. Every emulator spawn
 gets `SDL_AUDIODRIVER=pulseaudio` when pipewire-pulse's socket exists.
 

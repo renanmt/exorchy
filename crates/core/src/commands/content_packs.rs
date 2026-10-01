@@ -276,6 +276,21 @@ pub async fn install_content_pack(
 /// actually be installed right now (a real source, this platform). Backend
 /// auto-triggers gate on this so a TODO-URL manifest entry stays inert.
 #[allow(dead_code)]
+/// The collection whose manifest entry carries `pack_id`. Emulator packs are
+/// listed once (DOSBox-X under eXoWin9x) and serve every collection that
+/// needs them; the ledger and the progress poll key on this collection.
+pub fn pack_collection(pack_id: &str) -> Option<String> {
+    let manifest = load_manifest().ok()?;
+    let mut ids: Vec<&String> = manifest.collections.iter().filter(|(_, c)| c.content_packs.contains_key(pack_id)).map(|(id, _)| id).collect();
+    ids.sort();
+    ids.first().map(|id| id.to_string())
+}
+
+/// `pack_collection` for the UI.
+pub async fn content_pack_collection(pack_id: String) -> Result<Option<String>, String> {
+    Ok(pack_collection(&pack_id))
+}
+
 pub(crate) fn installable_pack(collection: &str, pack_id: &str) -> Option<ContentPackInfo> {
     let manifest = load_manifest().ok()?;
     let info = manifest

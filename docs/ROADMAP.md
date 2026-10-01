@@ -103,6 +103,13 @@ URLs therefore leaves installed packs alone.
 
 ## Step 3: DOSBox-X for printer and x-variant titles (#15)
 
+**Done 2026-09-30** (branch `dosbox-x-routing`): engine choice, DOSBox-X
+branch, PNG printouts in `!prints`, pack queued with the download, Game
+Settings and panel notes. 31 games default to DOSBox-X (eXoDOS 20 incl.
+Laffer Utilities via the printer rule, eXoWin3x 11). Playtested
+2026-10-01. Still open below: a panel button to open the printouts folder,
+and Laffer's partial printing.
+
 Who is affected:
 - 30 titles eXo assigns to DOSBox-X, counted from `games.dosbox_variant`:
   eXoWin3x `x` (11), eXoDOS `x` (16) and `x2` (3). They run under Staging
@@ -139,8 +146,14 @@ Plan:
       new one.
 - [ ] Launch notes: replace the "cannot print" note with "runs under
       DOSBox-X", and adjust the shader note (DOSBox-X has no Staging shaders).
-- [ ] Playtest: Laffer Utilities, The New Print Shop, one eXoDOS `x`, one
-      `x2` and one eXoWin3x `x` title.
+- [x] Playtest: Laffer Utilities, The New Print Shop, one eXoDOS `x`, one
+      `x2` and one eXoWin3x `x` title. **Done 2026-10-01** on the real
+      profile: The New Print Shop printed two PNG pages, Jet Stream (`x2`)
+      and Disney's The Jungle Book (eXoWin3x `x`) run. Laffer prints only
+      the start of a page and then waits (kept on DOSBox-X, see DECISIONS
+      2026-10-01). The playtest also showed DOSBox-X cannot rescale or go
+      fullscreen on Hyprland; it now opens as a large floating window, also
+      confirmed working.
 - [ ] Keep an eye on Staging `jn/printing`. If it lands, printer titles could
       go back to Staging and only the 30 x-variant titles would keep
       DOSBox-X.
