@@ -2,13 +2,19 @@
    Tokens only; the accent marks what is the game's own and what to press. */
 /* Framed like the concept (tmp/concept 01.png): a box inset from the window
    edge, a hairline outline, a line under the header. */
+.dossier-host { background-color: var(--bg-primary); padding: 8px; }
 .dossier {
-  margin: 8px;
   border: var(--hairline) solid var(--line-frame);
   border-radius: var(--radius);
+  /* The page's own background (opaque: the dossier overlays the grid in a
+     narrow window); only the title bar is tinted. */
+  background-color: var(--bg-primary);
+}
+.dossier .detail-head {
+  border-bottom: var(--hairline) solid var(--line-frame);
+  padding: 8px 8px 8px 10px;
   background-color: var(--bg-secondary);
 }
-.dossier .detail-head { border-bottom: var(--hairline) solid var(--line-frame); padding: 8px 8px 8px 10px; }
 .dossier .title-2 { font-size: 1.5em; }
 .dossier-heading { font-size: 0.85em; font-weight: 600; letter-spacing: 0.12em; color: var(--text-secondary); }
 button.dossier-star { color: var(--text-secondary); }

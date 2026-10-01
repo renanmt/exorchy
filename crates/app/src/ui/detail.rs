@@ -76,7 +76,11 @@ type OpenListener = Rc<dyn Fn(bool)>;
 
 impl DetailPanel {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
-        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["detail-panel", "dossier"]).build();
+        // The split view's sidebar pane has libadwaita's own background; the
+        // host paints the page background around the framed dossier.
+        let host = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["dossier-host"]).build();
+        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).vexpand(true).css_classes(["detail-panel", "dossier"]).build();
+        host.append(&root);
 
         let head = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["detail-head"]).build();
         let favorite = gtk::Button::builder().icon_name("non-starred-symbolic").css_classes(["btn", "icon", "ghost", "dossier-star"]).tooltip_text("Add to favorites (F)").build();
@@ -164,7 +168,7 @@ impl DetailPanel {
         root.append(&scroller);
 
         let panel = Rc::new(DetailPanel {
-            widget: root,
+            widget: host,
             open: Cell::new(false),
             open_listeners: RefCell::new(Vec::new()),
             window: window.clone(),
