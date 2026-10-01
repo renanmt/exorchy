@@ -37,7 +37,7 @@ flowbox.issue-flow > flowboxchild:focus-visible { outline: none; }
 .issue-card .issue-size { margin-top: 2px; }
 .game-card-action.action-resume { color: var(--warning); }
 label.badge.badge-disk { background-color: color-mix(in srgb, var(--om-magenta) 35%, transparent); color: var(--text-strong); }
-label.badge.badge-ondisk { background-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--text-strong); }
+label.badge.badge-ondisk { background-color: var(--accent); color: var(--on-accent); }
 label.badge.badge-lang { background-color: var(--fill-3); color: var(--text-secondary); }
 .jump-bar.wide { min-width: 120px; }
 

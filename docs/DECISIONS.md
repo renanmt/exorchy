@@ -535,3 +535,26 @@ library at the old or the new place, and a re-run continues. Only eXorchy's fold
 user asked for moving only. What remains of it is Locate, offered only while the configured
 folder is missing (a drive mounted elsewhere, a folder moved by hand), both in Settings and in
 the startup gate, so a lost library never needs a factory reset.
+
+## 2026-09-30 - Theme palette resolved like Omarchy; "installed" wears the accent
+
+Themes made before Omarchy's named palette (Aether-generated and older user themes, e.g.
+aetheria) define only `accent`, `foreground`, `background`, `selection_*` and ANSI
+`color0`..`color15`. `Palette` was deserialised with `#[serde(default)]`, so every named key
+they lack (`green`, `muted`, `lighter_background`, `dark_foreground`, ...) silently became
+Tokyo Night's value: such a theme rendered as its own accent and background mixed with
+Tokyo Night's surfaces, muted text and status colours (the "forced green" on installed
+cards). `omarchy::parse_palette` now ports `resolve_theme_colors` / `resolve_theme_mode` from
+`/usr/share/omarchy/bin/omarchy-theme-color` (same rules, same order, same rounding), so
+eXorchy shows what the rest of the desktop shows. The ignored test
+`omarchy_parity_on_installed_themes` compares the result with `omarchy-theme-color --all`
+for every installed theme (29/29 on the dev machine). A missing `accent`, which Omarchy
+leaves unset, falls back to the theme's `blue`.
+
+The installed state (card border, the card's "▶ Play", installed language badges, the
+Reading Room's "On disk") used `--success`, i.e. the theme's ANSI green slot. Themes do not
+promise that slot is green or reads as "good" (aetheria's is a red-pink), and Omarchy's own UI
+marks the important thing with `accent`, which the detail panel's Play already used. Those
+now use the accent; the card's "↓ Download" label, on nearly every card, drops to secondary
+text so the accent stays meaningful. `--success` remains for genuine success messages and
+`--danger` for errors.

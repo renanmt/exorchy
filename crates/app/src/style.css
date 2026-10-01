@@ -204,7 +204,7 @@ gridview.game-grid > child:focus-visible { outline: 2px solid var(--accent); out
   border-radius: var(--radius-lg);
 }
 .game-card:hover { background-color: var(--bg-hover); border-color: var(--line-4); }
-.game-card.installed { border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.game-card.installed { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .game-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-fill); }
 .game-card.selected .game-card-title { color: var(--accent); }
 .game-card-art { background-color: var(--bg-secondary); }
@@ -213,8 +213,8 @@ gridview.game-grid > child:focus-visible { outline: 2px solid var(--accent); out
 .game-card-title { font-weight: 600; color: var(--text-strong); }
 .game-card-meta { color: var(--text-secondary); font-size: 0.85em; }
 .game-card-action { font-size: 0.85em; margin-top: 2px; }
-.game-card-action.action-installed { color: var(--success); font-weight: 600; }
-.game-card-action.action-download { color: var(--accent); }
+.game-card-action.action-installed { color: var(--accent); font-weight: 600; }
+.game-card-action.action-download { color: var(--text-secondary); }
 .game-card-action.action-incomplete { color: var(--warning); }
 .game-card-action.action-offline { color: var(--text-muted); }
 .game-card-action.action-downloading { color: var(--info); }
@@ -233,7 +233,7 @@ label.badge {
   background-color: var(--fill-3); color: var(--text-secondary);
 }
 label.badge.badge-platform { background-color: var(--accent-fill); color: var(--text-strong); }
-label.badge.badge-lang-installed { background-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--text-strong); }
+label.badge.badge-lang-installed { background-color: var(--accent); color: var(--on-accent); }
 label.badge.badge-lang-library { background-color: color-mix(in srgb, var(--warning) 30%, transparent); color: var(--text-strong); }
 
 /* ---- List view ---- */
