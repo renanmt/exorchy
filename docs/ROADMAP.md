@@ -4,12 +4,12 @@ The four P1 items from [UPSTREAM-ISSUES.md](UPSTREAM-ISSUES.md), in the
 order to do them. Written 2026-09-30. Tick items off here as they land, and
 record each non-obvious choice in `DECISIONS.md`.
 
-| Step | What | Upstream | Size | Depends on |
-|---|---|---|---|---|
-| 1 | Make sure the emulator AppImage packs start on Omarchy; ScummVM end to end | #29 | hours | - |
-| 2 | Host our own content and manifest | #32 + handover gap | 1-2 days | - |
-| 3 | Route printer and DOSBox-X titles to DOSBox-X | #15 | 3-5 days | 1 |
-| 4 | Survive a new eXo torrent release | #18 | 1-2 weeks | 2 |
+| Step | What | Upstream | Size | Depends on | Status (2026-10-01) |
+|---|---|---|---|---|---|
+| 1 | Make sure the emulator AppImage packs start on Omarchy; ScummVM end to end | #29 | hours | - | done except one 86Box launch and the optional comment on upstream #29 |
+| 2 | Host our own content and manifest | #32 + handover gap | 1-2 days | - | parked by the user; fully researched |
+| 3 | Route printer and DOSBox-X titles to DOSBox-X | #15 | 3-5 days | 1 | done and playtested (PR #12) |
+| 4 | Survive a new eXo torrent release | #18 | 1-2 weeks | 2 | parked until eXoDOS 7 is closer; fully researched |
 
 Why this order: step 1 is cheap and can block step 3 (same DOSBox-X pack).
 Step 2 removes our dependency on Exodium's release assets and gives step 4
@@ -53,53 +53,96 @@ start.
       `~/.local/share/scummvm`.
 - [ ] Also launch one Win9x `x98` title and one `86box` title. The
       handover lists every non-Staging launch as unverified.
+      **`x98` done 2026-10-01:** Time Commando ran through the Win9x launcher
+      on the DOSBox-X pack and exited cleanly; the user reported it working
+      perfectly. Still owed: one `86box` title.
 - [ ] Comment the result on upstream #29; they asked for exactly this run.
 
 ## Step 2: own hosting (#32, and the manifest gap)
 
-Today 11 pack entries point at `github.com/tvollstaedt/exodium/releases`
-(`content-v4` … `content-v8`): five poster packs, DOSBox-X, 86Box and the four
-ScummVM packs. The seven collection `.torrent` files and the Media Pack
-torrent ship in the package, and `manifest_url` is empty.
+**Status (2026-10-01): parked by the user, to be picked up later.** Everything
+known so far is below; nothing here has been started.
 
-Re-hosting without forcing reinstalls: the pack ledger keys on `version`
-(`commands/content_packs.rs:161`), and downloads are checked against the
-manifest's `sha256`. Mirroring the files byte for byte and changing only the
-URLs therefore leaves installed packs alone.
+### Where the files come from today
 
-- [ ] Licensing first. DOSBox-X, 86Box and ScummVM are GPL. Redistributing
-      Exodium's builds obliges us to provide the corresponding source (or
-      point at the exact upstream tags plus Exodium's build scripts, MIT).
-      Decide which, and put it in the release notes and
-      `ACKNOWLEDGEMENTS.md`.
-- [ ] Create a `content-v1` release on our repo and mirror the Linux
-      x86_64 assets. Verify each file's `sha256` against the manifest before
-      uploading. Leave the macOS and aarch64 variants out.
-- [ ] Rewrite the URLs in `manifest.json` and drop the non-Linux
-      `platforms` entries. Add a test that every pack URL is either on our
-      repo or on the emulator's own project (like DOSBox Staging's
-      official release).
+Exodium has no server. Its content packs are assets of GitHub releases in its
+own repository (`github.com/tvollstaedt/exodium/releases`), tagged
+`content-v3` … `content-v8` rather than version numbers. That is why they are
+easy to miss among Exodium's app releases. `manifest.json` downloads straight
+from them:
+
+| Release | What eXorchy uses from it |
+|---|---|
+| `content-v4` | `posters-eXoDOS-v5.tar.gz` (379 MB), `posters-eXoWin3x-v1.tar.gz` (64 MB) |
+| `content-v5` | `posters-eXoWin9x-v1.tar.gz` (38 MB) |
+| `content-v6` | `dosbox-x-linux-x86_64-v1.tar.gz` (41 MB), `86box-linux-x86_64-v1.tar.gz` (88 MB) |
+| `content-v7` | `scummvm-{2.5.0,2.8.0,2.9.0,2026.1.0}-linux-x86_64-v1.tar.gz` (104 / 135 / 142 / 146 MB), `posters-eXoScummVM-v1.tar.gz` (44 MB) |
+| `content-v8` | `posters-eXoMedia-v1.tar.gz` (170 MB) |
+
+Only DOSBox Staging comes from its own project (the official
+`dosbox-staging-linux-x86_64-v0.83.0.tar.xz`). The seven collection
+`.torrent` files and the Media Pack torrent ship inside our package
+(`packaging/PKGBUILD` copies `torrents/` to `/usr/lib/exorchy/torrents`), and
+`manifest_url` is empty.
+
+**Why bother:** nothing is broken today. The risk is a dependency we do not
+control: if Exodium deletes a release, renames its repo or makes it private,
+box art and the DOSBox-X / 86Box / ScummVM downloads stop working for every
+eXorchy user. The alternative, which is also legitimate, is to keep relying
+on Exodium (MIT, credited in README / ACKNOWLEDGEMENTS / About) and mirror only
+if something breaks. Recommended: mirror; about a day of work.
+
+### Licensing: already solved
+
+DOSBox-X, 86Box and ScummVM are GPL, so redistributing binaries obliges us to
+offer the corresponding source. Exodium already publishes it next to every
+build, so mirroring the source files with the binaries meets the obligation:
+`dosbox-x-2025.02.01-source.tar.gz` (117 MB), `86box-6.0-source.tar.gz`
+(16 MB), `scummvm-{2.5.0,2.8.0,2.9.0,2026.1.0}-source.tar.xz` (124 / 198 /
+210 / 216 MB). `content-v6` and `content-v7` also carry a `SHA256SUMS`. Name
+the sources in the release notes and in `ACKNOWLEDGEMENTS.md`.
+
+**Full copy list:** the Linux x86_64 builds, all posters and the sources come
+to **2.18 GB** (19 files including the two `SHA256SUMS`). Leave out the
+`macos-*` and `linux-aarch64` variants; eXorchy is Omarchy, x86_64 only.
+
+### Re-hosting without forcing reinstalls
+
+The pack ledger keys on `version` (`commands/content_packs.rs:161`), and
+downloads are checked against the manifest's `sha256`. Mirroring the files
+byte for byte and changing only the URLs therefore leaves installed packs
+alone: nobody downloads anything again.
+
+### Plan
+
+- [ ] Create a `content-v1` release on `renanmt/exorchy`. Download each file
+      above from Exodium, check its sha256 against `manifest.json` (and the
+      release's `SHA256SUMS` where there is one), upload it with `gh release
+      upload`. Include the sources.
+- [ ] Rewrite the URLs in `manifest.json` and drop the non-Linux `platforms`
+      entries. Add a test that every pack URL is either on our repo or on the
+      emulator's own project (like DOSBox Staging's official release).
 - [ ] Later, rebuild the posters ourselves (`scripts/gen_thumbnails.py`,
       `gen_previews.py`; same hash scheme), so art fixes such as the
       `Feria D'Arles` cover from #29 do not wait for upstream.
 - [ ] Remote manifest: point `manifest_url` at a stable asset, e.g. a
       `manifest.json` on a fixed `manifest` release tag. `load_manifest`
       (`commands/updates.rs:109`) currently reads only the dev copy and the
-      bundled copy. New order: a cached remote copy in `content/` if its
-      `schema_version` is supported and `generated_at` is newer than the
-      bundled one, else the bundled copy. Fetch at startup, never in
-      offline mode, and fail silently to the cache.
+      bundled copy (its HTTP fetch is a `TODO`). New order: a cached remote
+      copy in `content/` if its `schema_version` is supported and
+      `generated_at` is newer than the bundled one, else the bundled copy.
+      Fetch at startup, never in offline mode, and fall back silently to the
+      cache.
 - [ ] Rule for the remote manifest: it may change pack URLs, hashes and
       versions. It may **not** change a collection's `torrent_infohash`
       unless a catalogue that matches that torrent comes with it (step 4).
       Enforce this in code, not by convention.
-- [ ] Torrents (#32): keep bundling them for now. Add a
-      `content/torrents/` cache that `bundled_torrent_path`
-      (`commands/paths.rs:176`) checks first, plus an infohash check against
-      the manifest on load. That is the hook step 4 uses to deliver a new
-      torrent without an app release.
-- [ ] Docs: ARCHITECTURE (manifest sources), RELEASING (publishing a
-      content release), DECISIONS entry.
+- [ ] Torrents (#32): keep bundling them for now. Add a `content/torrents/`
+      cache that `bundled_torrent_path` (`commands/paths.rs:176`) checks
+      first, plus an infohash check against the manifest on load. That is the
+      hook step 4 can use to deliver a new torrent without an app release.
+- [ ] Docs: ARCHITECTURE (manifest sources), RELEASING (publishing a content
+      release), DECISIONS entry.
 
 ## Step 3: DOSBox-X for printer and x-variant titles (#15)
 
@@ -149,49 +192,117 @@ Plan:
 
 ## Step 4: a new eXo release without losing the library (#18)
 
-What already works: `db::refresh_catalog` (`db/mod.rs:91`) updates rows in
-place, matched on `application_path` and then on title + language. So ids,
-`game_config`, favourites, install state, `last_played` and user playlists
-already survive a catalogue bump. What is missing:
+**Status (2026-10-01): parked by the user until eXoDOS 7 is closer.** The
+pieces can be built and tested with synthetic data any time; real
+verification needs the real torrent.
 
-- [ ] **Better matching.** Add a shortcode + collection pass between the
-      `application_path` pass and the title pass, so a renamed `.bat`
-      keeps its row. The shortcode is the key upstream calls "the only one
-      that survives a torrent rebuild".
-- [ ] **Orphans.** Rows that are no longer in the catalogue are kept and
-      logged only. Add an `orphaned` user column (add it to `USER_COLS`, or
-      the next refresh overwrites it). Hide orphaned games that are not
-      installed from Browse. Keep installed ones launchable with a "no
-      longer in eXoDOS <n>" note. Never offer a download for them: their
-      torrent index is invalid.
-- [ ] **Torrent swap.** When a collection's bundled or cached torrent
-      infohash differs from the recorded `<col>_infohash`
-      (`commands/setup.rs:319`, currently write-if-absent and never read):
-      drop the old torrent from the session along with its fastresume
-      (`torrent/manager.rs:260`); add the new torrent with an empty
-      selection and a seeded empty bitfield (the same trick the first add
-      uses); then update `<col>_infohash`. Installed games keep running from
-      their extracted directories and are not re-verified. Only a reinstall
-      downloads from the new torrent.
-- [ ] **Delivery.** A new catalogue and torrent arrive either with an app
-      release (`CATALOG_VERSION` bump, same as today) or through step 2's
-      remote manifest plus the torrent cache. Decide whether a catalogue
-      may come without an app release. The simple answer is no: ship the
-      catalogue in the package and let the remote manifest only announce
-      "a release supporting eXoDOS <n> is out".
-- [ ] **Detection.** A scheduled GitHub Action fetches the published
-      collection torrents from retro-exo.com, computes the infohashes with
-      the existing bencode code (`TorrentIndex::infohash`), and opens an
-      issue on our repo if one differs from `manifest.json`. It is a
-      backstop only; eXo announces major releases well ahead.
-- [ ] **Dry-run tool.** `examples/catalog_diff.rs`: given the installed DB
-      and a new catalogue, report matched, re-keyed, new and orphaned rows,
-      and which installed games are affected. Run it the day eXoDOS 7
-      appears, before shipping anything.
-- [ ] **Tests** with synthetic fixtures: a renamed `application_path`
-      matched by shortcode, an installed game that vanished (becomes
-      orphaned, stays launchable), changed torrent indices, a user playlist
-      that contains an orphan, and an infohash change that triggers the
-      swap exactly once.
-- [ ] Docs: ARCHITECTURE (catalogue refresh, torrent swap), COLLECTIONS,
-      DECISIONS.
+### What a new eXo release changes
+
+A new torrent with a new infohash. Every file index inside it shifts. Games
+are added, removed and renamed; configs, metadata and art change.
+
+### What eXorchy keeps, and depends on
+
+- **The catalogue** (`games` table): per game, its index into the current
+  torrent (`game_torrent_index`, `gamedata_torrent_index`) and its
+  `application_path` inside eXo's tree, which carries the shortcode
+  (`eXo\eXoDOS\!dos\<shortcode>\<Title>.bat`) and rarely changes.
+- **User data:** `favorited`, `in_library`, `installed`, `last_played`,
+  `game_config` (per-game settings), user playlists, hidden titles.
+- **On disk:** the extracted games and their saves (`!save`, the pristine
+  index for uninstall backups); the torrent session (`session.json` plus a
+  `<infohash>.bitv` per torrent under `~/.local/share/exorchy/librqbit-fastresume`),
+  which knows the old torrent; and the configs unpacked from the bundled
+  `*_configs.zip`.
+
+### What already works
+
+`db::refresh_catalog` (`db/mod.rs:91`), run at startup when the bundled
+catalogue's `CATALOG_VERSION` is newer, updates rows **in place**, matched on
+`application_path`, then on title + language when the path is empty. Ids do
+not change, so favourites, library, install state, last played, per-game
+settings and user playlists already survive. New games are inserted; curated
+playlists and the Reading Room tables are replaced.
+
+### What is missing, in order of importance
+
+1. **Matching.** A game whose `.bat` eXo renames gets no match and becomes a
+   new row, losing its user data. Add a shortcode + collection pass between
+   the `application_path` pass and the title pass; the shortcode is what
+   survives a torrent rebuild.
+2. **Removed games.** Rows the catalogue no longer has are kept but only
+   logged ("torrent indices may be stale"). Add an `orphaned` user column
+   (it must go into `USER_COLS`, or the next refresh overwrites it). Hide
+   orphaned games that are not installed from Browse; keep installed ones in
+   My Library, playable, with a "no longer in eXoDOS <n>" note; never offer a
+   download, since their torrent index is meaningless.
+3. **The torrent switch.** `init_download_manager` records `<col>_infohash`
+   write-if-absent (`commands/setup.rs:319`) and nothing ever reads it. When
+   the bundled or cached torrent's infohash differs from it: remove the old
+   torrent from the session along with its fastresume
+   (`torrent/manager.rs:260`); add the new one with an empty selection and a
+   seeded empty bitfield (the same trick the first add uses, so 600 GB are
+   not hash-checked); then record the new infohash. Installed games keep
+   running from their extracted folders; only a reinstall downloads from the
+   new torrent. Seeding of the old torrent stops.
+4. **Updated configs never reach existing games** (found 2026-10-01).
+   `extract_bundled_configs` (`commands/setup.rs:380`) unpacks a collection's
+   bundled configs once (marker `.<col>_configs_extracted`) and, through
+   `extract_missing_entries`, only for games whose folder does not exist
+   yet. A config fix in eXoDOS 7 would never replace the old config of a
+   game already on disk. Decision needed (see below); the mechanics are a
+   per-collection config version, re-extraction of the changed games, and
+   leaving eXorchy's own layers alone (Game Settings live in `game_config`
+   and the launch fragments, never in eXo's `dosbox.conf`).
+5. **Spotting the release.** A scheduled GitHub Action fetches the published
+   torrents from retro-exo.com, computes their infohashes with the existing
+   bencode code (`TorrentIndex::infohash`) and opens an issue on our repo
+   when one differs from `manifest.json`. A backstop only: eXo announces
+   major releases well ahead.
+6. **A dry-run tool.** `examples/catalog_diff.rs`: given an installed
+   database and a new catalogue, report matched, re-keyed (shortcode pass),
+   new and orphaned rows, and which installed games are affected. The first
+   thing to run the day eXoDOS 7 appears, before shipping anything.
+
+### How the day itself would go
+
+1. Download eXo's new XML files, configs and metadata zips.
+2. Regenerate the catalogue (`generate_db`, adjusted if eXo changed the XML
+   format) after raising `CATALOG_VERSION`; rebuild thumbnails and the poster
+   packs; update the `.torrent` files and `manifest.json` infohashes.
+3. Run the dry run against a real library (the user's own profile, read-only).
+4. Release eXorchy with the new catalogue and torrents.
+5. On the user's machine, the update handles the rest on its own, with no
+   factory reset: catalogue rows updated (gap 1), removed games marked
+   (gap 2), torrent switched (gap 3), configs refreshed (gap 4).
+
+### Decisions for the user (none urgent)
+
+- **How a new catalogue arrives.** Recommended: only with an app release,
+  since a format change needs new code anyway; the remote manifest (step 2)
+  may only announce "a release supporting eXoDOS <n> is out".
+- **How removed-but-installed games look.** Recommended: they stay in My
+  Library with a "no longer in eXoDOS <n>" note, playable.
+- **Configs of installed games** (gap 4). Recommended: replace them on
+  upgrade, since the user's own settings sit in a separate layer. The
+  alternative is a per-game "Update config" offer.
+- **Flagging games eXo changed.** Optional, could come later: an "eXo
+  updated this game" marker on installed games whose archive changed in the
+  new torrent (different size or hash for the same shortcode), with a
+  Re-download action.
+
+### Size
+
+About 1–2 weeks: matching and orphans a few days, the torrent switch a few
+days, configs about a day, detection and the dry run about a day each, plus
+docs (ARCHITECTURE: catalogue refresh and torrent switch; COLLECTIONS;
+DECISIONS).
+
+### Tests (synthetic fixtures)
+
+- [ ] A renamed `application_path` matched by shortcode, user data kept.
+- [ ] An installed game that vanished: orphaned, still launchable, no download.
+- [ ] Changed torrent indices on matched rows.
+- [ ] A user playlist that contains an orphan.
+- [ ] An infohash change that triggers the torrent switch exactly once.
+- [ ] A changed config replaced on upgrade, Game Settings untouched.
