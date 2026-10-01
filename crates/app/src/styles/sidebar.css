@@ -2,7 +2,8 @@
    tmp/concept 01.png: a rule on the right, plain items, the active one with
    an accent bar and tint; counts muted on the right. */
 .sidebar {
-  background-color: var(--bg-primary);
+  /* The dossier title bar's tint (styles/detail.css), as in the concept. */
+  background-color: var(--bg-secondary);
   border-right: var(--hairline) solid var(--line-frame);
   padding: 10px 8px;
 }
