@@ -132,6 +132,7 @@ slate (or Settings → About → Factory reset).
 | Adding a pack / emulator | `manifest.json`, `commands/content_packs.rs` (`unwrapped_source`, xz support) |
 | Adding or debugging a collection | `docs/COLLECTIONS.md`, `commands/win9x.rs`, `commands/scummvm.rs` |
 | Uninstall lost saves? | `user_data.rs` pristine index; `!save/<shortcode>` |
+| Library folder: move, locate, the `$HOME` offer | `commands/library_location.rs`, `ui/library_location.rs` (startup gate), DECISIONS 2026-09-30 |
 | App self-update | `commands/app_update.rs`, `ui/updates.rs`, `docs/RELEASING.md` |
 | What the app looks like | `EXORCHY_SNAPSHOT` (see Commands), then the Read tool on the PNG |
 

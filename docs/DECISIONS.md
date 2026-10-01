@@ -501,3 +501,37 @@ the release workflow publishes the tag's section above the install instructions
 (`packaging/release/changelog-section.sh`) and fails before building when the section is
 missing, so a release cannot go out without notes.
 
+
+## 2026-09-30 - The library gets its own folder, and moves only at startup
+
+Setup used to offer `$HOME` as the data folder, so every install put `eXoDOS/` and `content/`
+straight into the home folder. New installs now get `~/Games/eXorchy`. An existing install
+whose `data_dir` is exactly `$HOME` is asked once, at startup, whether to move those two folders
+there (or elsewhere); "Keep them here" is stored (`library_move_declined`) and never asked again,
+and that layout keeps working because nothing else changed. An imported tree (`root_folder` =
+`.`) is never offered: its data dir is the eXo tree itself.
+
+The location stays one setting (`data_dir`, with `root_folder` under it). A separate setting
+for `content/` was considered and left out: the metadata packs are tens of GB and belong on
+the disk the user picked for games, and a second location is a second thing to move and keep
+consistent. The only other copy of the path is librqbit's `session.json` (each torrent's
+`output_folder`); a move rewrites it, and `evict_mismatched_session_torrents` stays as the
+fallback (it evicts and re-checks every file, which is slow but correct).
+
+A move never runs beside the rest of the app. Installs extract, packs download into
+`content/`, the media fetchers fill their caches and the torrent session writes files, all
+without a single place that could pause them. So Settings → General → Move only validates the
+target and records it (`library_move_target`), then restarts eXorchy (`relaunch_after_exit`,
+the updater's wait-then-start pattern), and `ui/library_location::gate` runs the move before
+the library, and with it anything that touches the folder, starts. On one disk it is a rename
+per folder, rolled back if a later one fails. Across disks it is a copy into
+`.exorchy-move-<name>` next to the target, renamed into place when complete; `data_dir` switches
+only after every folder is in place, and the originals are deleted last (their paths kept in
+`library_move_cleanup` until that succeeds). Every interruption therefore leaves a complete
+library at the old or the new place, and a re-run continues. Only eXorchy's folders move
+(`<root_folder>`, `content`, `.content-downloads`), never anything else in the data folder.
+
+"Change game folder", which pointed at another folder without moving anything, is gone; the
+user asked for moving only. What remains of it is Locate, offered only while the configured
+folder is missing (a drive mounted elsewhere, a folder moved by hand), both in Settings and in
+the startup gate, so a lost library never needs a factory reset.

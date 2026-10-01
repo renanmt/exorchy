@@ -14,7 +14,7 @@ mod general;
 mod hidden;
 mod network;
 pub mod packs;
-mod storage;
+pub(crate) mod storage;
 mod widgets;
 
 use std::cell::{Cell, RefCell};

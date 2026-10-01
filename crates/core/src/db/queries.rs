@@ -878,6 +878,12 @@ pub fn set_config(conn: &Connection, key: &str, value: &str) -> DbResult<()> {
     Ok(())
 }
 
+/// Remove a config key; a missing key is not an error.
+pub fn delete_config(conn: &Connection, key: &str) -> DbResult<()> {
+    conn.execute("DELETE FROM config WHERE key = ?1", params![key])?;
+    Ok(())
+}
+
 // ── Per-game config (game_config table) ─────────────────────────────────────
 
 pub fn set_game_config(conn: &Connection, game_id: i64, key: &str, value: &str) -> DbResult<()> {

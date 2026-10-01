@@ -2,25 +2,28 @@
 //! (CRT shader, fullscreen) and the music preferences.
 
 use adw::prelude::*;
-use exorchy_core::commands::{games, library, setup};
+use exorchy_core::commands::{games, library, library_location, setup};
 
 use super::widgets::{self, Ctx, Row};
 use super::{plural, storage};
 use crate::app;
-use crate::ui::{bus, dialogs};
+use crate::ui::bus;
 
 pub fn build(ctx: &Ctx) -> gtk::Widget {
     let page = widgets::page("General");
 
     // ── Library ──
     let lib = widgets::group("Library", None);
-    let change = widgets::button("Change…");
-    let folder = Row::new("Game folder")
+    let move_btn = widgets::button("Move…");
+    let locate = widgets::button("Locate…");
+    locate.set_visible(false);
+    let folder = Row::new("Library folder")
         .value("Not set")
-        .hint("Points eXorchy at an existing folder - nothing is moved.")
+        .hint("Your games and eXorchy's files. Moving takes them along; eXorchy restarts to do it.")
         .selectable()
         .code()
-        .action(&change);
+        .action(&move_btn);
+    folder.add_action(&locate);
     lib.add(&folder.widget);
     let scan = widgets::BusyButton::new("Scan", "Scanning…");
     let installed = Row::new("Installed games").hint("Re-scan the disk for games that are already there.").action(&scan.widget);
@@ -108,10 +111,29 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
         }
     });
 
-    change.connect_clicked({
+    // Locate is for a library that is gone from its folder, and only then.
+    let core = app::core();
+    app::spawn(async move { library_location::library_status(core.state()).await }, {
+        let (folder, locate) = (folder.clone(), locate.clone());
+        move |status| {
+            if let Ok(Some(s)) = status {
+                if !s.found {
+                    locate.set_visible(true);
+                    folder.set_error("Not found there. Locate it if you moved it or its drive is mounted elsewhere.");
+                }
+            }
+        }
+    });
+    move_btn.connect_clicked({
+        let window = ctx.window.clone();
+        move |_| crate::ui::library_location::move_from_settings(&window)
+    });
+    locate.connect_clicked({
         let ctx = ctx.clone();
-        let folder = folder.clone();
-        move |_| change_data_dir(&ctx, &folder)
+        move |_| {
+            let ctx2 = ctx.clone();
+            crate::ui::library_location::locate_from_settings(&ctx.window, move || library_located(&ctx2))
+        }
     });
 
     page.upcast()
@@ -133,60 +155,22 @@ fn bind_toggle(sw: &widgets::Switch, key: &'static str, on: &'static str, off: &
     });
 }
 
-/// Change points at a folder, it never moves one - so the case worth
-/// catching is an empty target chosen by someone who meant to relocate.
-fn change_data_dir(ctx: &Ctx, folder: &Row) {
-    let ctx = ctx.clone();
-    let folder = folder.clone();
-    let window = ctx.window.clone();
-    dialogs::pick_folder(&window, "Select new data directory", move |selected| {
-        let Some(selected) = selected else { return };
-        let core = app::core();
-        let sel = selected.clone();
-        app::spawn(
-            async move {
-                let current = games::get_config(core.state(), "data_dir".into()).await.ok().flatten().unwrap_or_default();
-                let target_empty = setup::data_dir_is_empty(sel.clone()).await.unwrap_or(false);
-                let current_empty = if current.is_empty() { true } else { setup::data_dir_is_empty(current.clone()).await.unwrap_or(true) };
-                (current, target_empty, current_empty)
-            },
-            move |(current, target_empty, current_empty)| {
-                if target_empty && !current_empty {
-                    let (ctx2, folder2, sel2) = (ctx.clone(), folder.clone(), selected.clone());
-                    dialogs::confirm(
-                        &ctx.window,
-                        "That folder is empty",
-                        &format!("eXorchy will look for games in {selected}, but it does not move anything there. Your downloaded games stay in {current} and keep using that space. Use the empty folder anyway?"),
-                        "Use it anyway",
-                        false,
-                        move || apply_data_dir(&ctx2, &folder2, sel2),
-                    );
-                } else {
-                    apply_data_dir(&ctx, &folder, selected);
-                }
-            },
-        );
-    });
-}
-
-/// Persist the dir and rebuild what derives from it; the rescan's count
-/// answers "did it find my games?".
-fn apply_data_dir(ctx: &Ctx, folder: &Row, selected: String) {
-    folder.set_value(&selected);
+/// The library was found somewhere else: restart what derives from its
+/// folder; the rescan's count answers "is everything there?".
+fn library_located(ctx: &Ctx) {
     storage::reset_cache();
     let core = app::core();
     let ctx = ctx.clone();
     app::spawn(
         async move {
-            games::set_config(core.clone(), core.state(), "data_dir".into(), selected).await?;
             // The managers must point at the new folder before the scan reads them.
             setup::init_download_manager(core.state(), core.state(), core.state()).await?;
             library::scan_installed_games(core.state(), core.state(), Some(true)).await
         },
         move |res: Result<usize, String>| {
             match res {
-                Ok(n) => bus::toast(&format!("{} found in the new folder", plural(n as i64, "game"))),
-                Err(e) => bus::toast_with("No games found in that folder", Some(&e), None),
+                Ok(n) => bus::toast(&format!("Library found: {} installed", plural(n as i64, "game"))),
+                Err(e) => bus::toast_with("The library was found, but the rescan failed", Some(&e), None),
             }
             ctx.close();
             crate::ui::window::reinit_library();
