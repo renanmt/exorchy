@@ -355,9 +355,15 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       articles (no "Covered in" heading), tabs reset to Overview on a new
       game, full width in a small tile, a larger title, framed hairline
       borders after the concept.
-- [ ] **Shell and cards:** a status bar (version, game / platform /
-      favourite / playlist counts, key hints), top-bar polish, the denser
-      card (cover, title, "year · platform · genre", star on the cover).
+- [x] **Shell and cards** (branch `ui-shell`, 2026-10-01): status bar
+      (version, the view's game count, favourites, playlists, collections,
+      key hints; hints hide below 1300 sp, counts below 760 sp), toolbar
+      with a hairline and the tabs as one outlined segmented group (active
+      tab in the accent), hairline search field, denser cards (title and
+      "year · platform · genre", platform badge gone, the status line only
+      for downloads and incomplete installs, star only on favourites or on
+      hover, hairline outline, installed in an accent hairline, selected in
+      a 2 px accent outline). Awaiting the user's review.
 - [ ] **Sidebar and filters:** the browse-by sidebar with counts; Years and
       Regions filters (new `get_games` parameters and section keys);
       Publishers / Series / Years / Regions value lists. Found 2026-10-01: eXo

@@ -50,5 +50,6 @@ pub mod setup;
 pub mod transfers;
 pub mod updates;
 pub mod splash;
+pub mod statusbar;
 pub mod util;
 pub mod window;

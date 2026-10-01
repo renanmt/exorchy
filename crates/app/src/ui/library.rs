@@ -20,6 +20,7 @@ use crate::ui::card::{Card, CARD_WIDTH};
 use crate::ui::detail::DetailPanel;
 use crate::ui::model::GameObject;
 use crate::ui::util::{esc, format_bytes};
+use crate::ui::statusbar::grouped;
 use crate::ui::{bus, covers, downloads};
 
 /// How long typing must pause before the search runs, on top of the search
@@ -87,6 +88,8 @@ pub struct LibraryPage {
     jump_bar: gtk::Box,
     section_keys: RefCell<Vec<String>>,
     status: gtk::Label,
+    /// The footer (ui::statusbar); holds `status`.
+    _status_bar: Rc<crate::ui::statusbar::StatusBar>,
     detail: Rc<DetailPanel>,
     shelves: gtk::Box,
     reading_slot: gtk::Box,
@@ -119,7 +122,7 @@ impl LibraryPage {
         let brand = crate::ui::logo::ascii(1.5);
         brand.add_css_class("brand");
         head.append(&brand);
-        let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).build();
+        let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).css_classes(["tabs"]).build();
         let mut tab_buttons = Vec::new();
         for (id, label) in [("browse", "Browse"), ("library", "My Library"), ("reading", "Reading Room")] {
             let b = gtk::Button::builder().label(label).css_classes(["tab"]).build();
@@ -267,12 +270,20 @@ impl LibraryPage {
         column.append(&toolbar);
         column.append(&split);
         column.append(&bar_slot);
+        let status_bar = crate::ui::statusbar::build(&status);
+        column.append(&status_bar.widget);
 
         // Breakpoints: a narrow tile collapses the panel into an overlay and
         // stacks the toolbar; the layout never demands more than 360×300.
         let widget = adw::BreakpointBin::builder().width_request(360).height_request(300).child(&column).build();
+        // Medium: everything side by side, but the status bar's key hints
+        // only fit from 1300 sp. Added first: the last matching breakpoint wins.
+        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1300.0, adw::LengthUnit::Sp));
+        medium.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
+        widget.add_breakpoint(medium);
         let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1100.0, adw::LengthUnit::Sp));
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
+        narrow.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
         widget.add_breakpoint(narrow);
         let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
@@ -281,6 +292,8 @@ impl LibraryPage {
         tiny.add_setter(&split, "max-sidebar-width", Some(&10_000.0f64.to_value()));
         tiny.add_setter(&toolbar, "orientation", Some(&gtk::Orientation::Vertical.to_value()));
         tiny.add_setter(&toolbar, "spacing", Some(&8i32.to_value()));
+        tiny.add_setter(&status_bar.details, "visible", Some(&false.to_value()));
+        tiny.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
         widget.add_breakpoint(tiny);
 
         let page = Rc::new(LibraryPage {
@@ -304,6 +317,7 @@ impl LibraryPage {
             jump_bar,
             section_keys: RefCell::new(Vec::new()),
             status,
+            _status_bar: status_bar,
             detail,
             shelves,
             reading_slot,
@@ -950,9 +964,9 @@ impl LibraryPage {
         self.status.set_label(&if f.total == 0 {
             if f.query.is_empty() { "No games match these filters.".to_string() } else { format!("No games match “{}”.", f.query) }
         } else if shown < f.total {
-            format!("{shown} of {} games", f.total)
+            format!("{} of {} games", grouped(shown), grouped(f.total))
         } else {
-            format!("{} games", f.total)
+            format!("{} games", grouped(f.total))
         });
     }
 

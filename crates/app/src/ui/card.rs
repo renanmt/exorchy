@@ -197,22 +197,24 @@ impl Card {
 
         self.title.set_label(&game.title);
         self.title.set_tooltip_text(Some(&game.title));
+        // "1991 · DOS · Strategy", as in the concept; the platform drops out
+        // where the shelf already says it.
         let mut meta = Vec::new();
         if let Some(y) = game.year {
             meta.push(y.to_string());
         }
+        if !self.hide_platform.get() {
+            if let Some(p) = platform_tag(game.torrent_source.as_deref()) {
+                meta.push(p.to_string());
+            }
+        }
         if let Some(g) = game.genre.as_deref().filter(|g| !g.is_empty()) {
-            meta.push(g.split(';').next().unwrap_or(g).trim().to_string());
+            meta.push(g.split([';', '/']).next().unwrap_or(g).trim().to_string());
         }
         self.meta.set_label(&meta.join(" · "));
 
         while let Some(c) = self.badges.first_child() {
             self.badges.remove(&c);
-        }
-        if !self.hide_platform.get() {
-            if let Some(p) = platform_tag(game.torrent_source.as_deref()) {
-                self.badges.append(&badge(p, "badge-platform"));
-            }
         }
         let langs = parse_lang_entries(game.available_languages.as_deref());
         for l in &langs {
@@ -350,6 +352,10 @@ impl Card {
             self.action.remove_css_class(c);
         }
         self.action.add_css_class(cls);
+        // The dense card of the concept: the line only says what needs
+        // attention (a download, an incomplete install); installed games
+        // wear the accent outline, the rest say nothing.
+        self.action.set_visible(matches!(cls, "action-downloading" | "action-incomplete"));
     }
 
     fn show_menu(self: &Rc<Self>, x: f64, y: f64) {

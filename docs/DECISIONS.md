@@ -628,3 +628,16 @@ playlist, ⋯), then tags, description and Overview / Media / Manuals / Setup ta
   already shows plays it, like double-click-to-play elsewhere; the list view keeps its
   single-click activation for opening only, or a second click would start games.
 - Tabs are libadwaita's `InlineViewSwitcher`, restyled from a pill group to an underline row.
+
+## 2026-10-01 - UI revamp phase 2: status bar, outlined tabs, dense cards
+
+After `tmp/concept 01.png`. The status bar reuses the library's own count label (reparented) so
+"100 of 10,164 games" / "No games match …" keep one wording, and adds favourites, playlists and
+enabled collections ("collections", not the concept's "platforms": eXorchy's catalogue has five
+platforms, and what the user switches is collections). Cards follow the concept's density: the
+platform moves into the meta line, the status line ("▶ Play", "↓ 7.2 MB", "Not installed") is
+dropped except for downloads and incomplete installs, which need attention; installed games keep
+their accent outline instead. The selected card's 2 px accent ring is a border plus an outline,
+so selecting a card never shifts the grid. The star is the accent's (it was the warning yellow)
+and shows only on favourites, or on hover. Language badges stay: the concept does not show them,
+but they are real information.
