@@ -960,11 +960,11 @@ impl LibraryPage {
 
     fn update_status(&self) {
         let f = self.filters.borrow();
-        let shown = self.store.n_items() as usize;
+        // The view's total; how much of it is loaded is not the user's concern.
         self.status.set_label(&if f.total == 0 {
             if f.query.is_empty() { "No games match these filters.".to_string() } else { format!("No games match “{}”.", f.query) }
-        } else if shown < f.total {
-            format!("{} of {} games", grouped(shown), grouped(f.total))
+        } else if f.total == 1 {
+            "1 game".to_string()
         } else {
             format!("{} games", grouped(f.total))
         });
