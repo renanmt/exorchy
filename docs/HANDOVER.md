@@ -7,7 +7,7 @@ is wired and how enabling works; `docs/PORTING.md` holds the UI conventions;
 next and `docs/UPSTREAM-ISSUES.md` maps every Exodium issue to us. Keep all of
 them current: a future agent starts from them.
 
-## State of the project (2026-09-30, v0.4.0, branch `main`)
+## State of the project (2026-10-02, v0.5.0, branch `main`)
 
 eXorchy is a native GTK4 / libadwaita app in Rust over the backend derived
 from Exodium (MIT). The Tauri/SolidJS UI was deleted at parity (`ce3d70a9`).

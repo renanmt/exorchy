@@ -159,7 +159,7 @@ curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.s
 To install a particular version instead:
 
 ```bash
-curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --version v0.4.0
+curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --version v0.5.0
 ```
 
 Everything that changed is in [CHANGELOG.md](CHANGELOG.md).

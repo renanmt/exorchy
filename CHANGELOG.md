@@ -11,6 +11,58 @@ request that raises the version. The release workflow publishes that section
 and refuses to release a tag that has none.
 -->
 
+## [0.5.0] - 2026-10-02
+
+A new look, modelled on eXorchy's concept art, and a round of fixes.
+
+### Added
+- A left sidebar to browse the library by platform, genre, publisher, series,
+  year, region, tag, play status or playlist. What you pick shows as a chip at
+  the top that you can clear on its own; sort and grid/list sit on the right.
+- The **Game Dossier** replaces the detail panel. The cover, title and actions
+  stay in place while you scroll, the tabs are Overview, Media, Manuals and
+  Setup, and a click on the cover shows it at full size.
+- A status bar along the bottom with the counts for the page you are on and
+  its keyboard shortcuts.
+- **Settings → Appearance → Interface size**: Compact, Medium (the default),
+  Large and Extra large.
+- The Reading Room works like the game library: the same sidebar, with a
+  **Downloaded** entry for what you already have, and the same filter chips.
+  An issue opens in place of the shelves with the whole page in view, and the
+  full-screen button (or F11) gives it the whole screen. Game manuals open the
+  same way.
+- A new splash screen in your theme's colours, shown while eXorchy starts.
+- DOS and Windows 3.x games that eXo runs under DOSBox-X now run under it in
+  eXorchy too, in a large floating window on Hyprland. Games that print save
+  each page as a picture in the game's `!prints` folder.
+- Your game library lives in `~/Games/eXorchy` by default. A library in the
+  old place is offered a move when eXorchy starts, and **Settings → General**
+  can move it whenever you like.
+
+### Changed
+- Theme music no longer starts by itself: press Play in the dossier's Theme
+  row and it plays there, with its own progress bar, and stops when you move
+  to another game. The music bar at the bottom of the window is gone.
+- The selected game has a stronger frame, and Reading Room covers are spaced
+  like game covers.
+- Installed games and the Play button use your theme's accent colour instead
+  of a fixed green, and themes made before Omarchy's named palette (Aether and
+  older ones) now get the right colours.
+
+### Fixed
+- eXorchy could close suddenly when you clicked quickly from game to game
+  while preview videos or theme music were playing.
+- Playlists did nothing: creating one, renaming it or adding a game to it
+  now works.
+- Games whose CD image names its files in a different upper/lower case, such
+  as SimCopter, said the CD was missing.
+- A magazine you have downloaded now opens while eXorchy is offline.
+- The preview video in the dossier no longer changes size between tabs, and
+  **Play preview** works again on a game whose preview you watched before.
+- Cover art in the dossier keeps its proportions, and DOS title screens show
+  at their original 4:3 shape.
+- Sorting by rating now shows its jump bar.
+
 ## [0.4.0] - 2026-09-29
 
 ### Added
