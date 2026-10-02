@@ -808,3 +808,28 @@ about measuring the page column.
 
 Also fixed on the way: a downloaded issue would not open while offline. The store turned away
 every request offline, though the backend answers a cached document without the network.
+
+## 2026-10-02 - Manuals read like the Reading Room; the status bar follows the page
+
+**Manuals.** Game manuals now open like Reading Room issues, not as a dialog over the dossier.
+`pdf::open_document_viewer` hands the viewer to `LibraryPage::show_document`, a "document"
+page beside the tabs:
+- the dossier steps aside while the manual is open, and returns with it on × or Esc;
+- a tab click puts the manual away, leaving the dossier shut;
+- full screen (`pdf::fullscreen_toggle`, F11) and "Fit page" are the same as in the Reading Room.
+
+The full-screen state is now `LibraryPage::set_document_fullscreen`, shared by both readers.
+
+**The status bar.** In the Reading Room it shows that room's state, not the games':
+- how many documents the view holds (the room's own count, moved down from its filter row,
+  as the games count was);
+- how many are downloaded, favourited, and the publications;
+- the reading keys: / Search, F11 Full screen, Esc Back.
+
+The room reports these from its render (`StatusBar::set_reading_counts`); the library switches
+the bar's mode with the tab.
+
+**Snapshots run unanimated.** Broadway's frame clock never finishes a `gtk::Stack`
+transition, so a shot taken after a page switch caught the old page. That was the unresolved
+Reading Room snapshot from the UI revamp. `snapshot::arm` now turns GTK animations off. New
+sequence steps: `doc:<path>` (opens a document as a manual would) and `close_doc`.

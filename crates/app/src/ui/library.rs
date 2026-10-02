@@ -104,7 +104,7 @@ pub struct LibraryPage {
     section_keys: RefCell<Vec<String>>,
     status: gtk::Label,
     /// The footer (ui::statusbar); holds `status`.
-    _status_bar: Rc<crate::ui::statusbar::StatusBar>,
+    status_bar: Rc<crate::ui::statusbar::StatusBar>,
     detail: Rc<DetailPanel>,
     shelves: gtk::Box,
     reading_slot: gtk::Box,
@@ -120,8 +120,18 @@ pub struct LibraryPage {
     /// What steps aside while the Reading Room reads full screen: the
     /// banner, the toolbar, the now-playing bar, the status bar.
     chrome: Vec<gtk::Widget>,
-    reading_fullscreen: Cell<bool>,
+    document_fullscreen: Cell<bool>,
+    /// A game's manual, open in place of the tabs' content.
+    doc_slot: gtk::Box,
+    document: RefCell<Option<OpenDocument>>,
     window: gtk::Window,
+}
+
+/// A manual in the document page, and where to go back to.
+struct OpenDocument {
+    _view: Rc<crate::ui::pdf::DocumentView>,
+    tab: String,
+    dossier_was_open: bool,
 }
 
 impl LibraryPage {
@@ -289,6 +299,8 @@ impl LibraryPage {
         tab_stack.add_named(&browse_row, Some("browse"));
         tab_stack.add_named(&shelves_scroller, Some("library"));
         tab_stack.add_named(&reading_slot, Some("reading"));
+        let doc_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).vexpand(true).hexpand(true).build();
+        tab_stack.add_named(&doc_slot, Some("document"));
 
         // The detail panel is the split view's end sidebar: beside the grid
         // on a wide window, over it (with a scrim) when the window is narrow.
@@ -380,7 +392,7 @@ impl LibraryPage {
             jump_bar,
             section_keys: RefCell::new(Vec::new()),
             status,
-            _status_bar: status_bar,
+            status_bar,
             detail,
             shelves,
             reading_slot,
@@ -391,7 +403,9 @@ impl LibraryPage {
             banner_slot,
             toolbar_slot,
             chrome: vec![chrome_banner, chrome_toolbar, chrome_bar, chrome_status],
-            reading_fullscreen: Cell::new(false),
+            document_fullscreen: Cell::new(false),
+            doc_slot,
+            document: RefCell::new(None),
             window: window.clone(),
         });
 
@@ -601,17 +615,23 @@ impl LibraryPage {
                 page.search.grab_focus();
                 return glib::Propagation::Stop;
             }
-            // Reading: Esc leaves full screen, then the reader; F11 toggles
-            // full screen. The game shortcuts below do not apply here.
-            if page.on_reading_tab() {
-                let reading = crate::ui::reading::reader_open();
+            // Reading (a manual, or an issue in the Reading Room): Esc leaves
+            // full screen, then the document; F11 toggles full screen. The
+            // game shortcuts below do not apply.
+            let manual = page.document_open();
+            if manual || page.on_reading_tab() {
+                let reading = manual || crate::ui::reading::reader_open();
                 if key == gtk::gdk::Key::F11 && reading {
-                    page.set_reading_fullscreen(!page.reading_fullscreen.get());
+                    page.set_document_fullscreen(!page.document_fullscreen.get());
                     return glib::Propagation::Stop;
                 }
                 if key == gtk::gdk::Key::Escape && !focused_entry {
-                    if page.reading_fullscreen.get() {
-                        page.set_reading_fullscreen(false);
+                    if page.document_fullscreen.get() {
+                        page.set_document_fullscreen(false);
+                        return glib::Propagation::Stop;
+                    }
+                    if manual {
+                        page.close_document();
                         return glib::Propagation::Stop;
                     }
                     if reading {
@@ -661,8 +681,8 @@ impl LibraryPage {
         // The window can leave full screen on its own (the compositor's key):
         // the chrome comes back with it.
         self.window.connect_fullscreened_notify(glib::clone!(#[weak(rename_to = page)] self, move |w| {
-            if !w.is_fullscreen() && page.reading_fullscreen.get() {
-                page.set_reading_fullscreen(false);
+            if !w.is_fullscreen() && page.document_fullscreen.get() {
+                page.set_document_fullscreen(false);
             }
         }));
     }
@@ -670,6 +690,8 @@ impl LibraryPage {
     // ── tabs ──
 
     pub fn set_tab(self: &Rc<Self>, id: &str) {
+        // A tab click puts an open manual away (the dossier stays shut).
+        self.drop_document();
         self.tab_stack.set_visible_child_name(id);
         for (tid, b) in self.tab_buttons.borrow().iter() {
             if tid == id {
@@ -682,6 +704,7 @@ impl LibraryPage {
         if id == "reading" {
             self.detail.close();
         }
+        self.status_bar.set_reading(id == "reading");
         self.search.set_placeholder_text(Some(if id == "reading" { "Search the reading room…  (/)" } else { "Search games…  (/)" }));
         // Each tab catches up with a search typed while it was not shown.
         match id {
@@ -699,10 +722,10 @@ impl LibraryPage {
         }
     }
 
-    /// Reading full screen: the window goes full screen and the chrome
+    /// Full-screen reading (a manual, an issue): the window goes full screen and the chrome
     /// steps aside, so the page has the whole screen. Off again, both return.
-    pub fn set_reading_fullscreen(&self, on: bool) {
-        if self.reading_fullscreen.replace(on) == on && self.window.is_fullscreen() == on {
+    pub fn set_document_fullscreen(&self, on: bool) {
+        if self.document_fullscreen.replace(on) == on && self.window.is_fullscreen() == on {
             return;
         }
         for w in &self.chrome {
@@ -713,6 +736,54 @@ impl LibraryPage {
         } else if self.window.is_fullscreen() {
             self.window.unfullscreen();
         }
+    }
+
+    /// Read a game's manual in place of the tab's content, as the Reading
+    /// Room reads an issue. The dossier steps aside and comes back on close.
+    pub fn show_document(self: &Rc<Self>, view: Rc<crate::ui::pdf::DocumentView>) {
+        let previous = self.document.borrow().as_ref().map(|d| (d.tab.clone(), d.dossier_was_open));
+        self.drop_document();
+        let (tab, dossier_was_open) = previous.unwrap_or_else(|| (self.tab_stack.visible_child_name().map(|n| n.to_string()).unwrap_or_else(|| "browse".into()), self.detail.is_open()));
+        self.detail.close();
+        let weak = Rc::downgrade(self);
+        view.connect_close(move || {
+            if let Some(p) = weak.upgrade() {
+                p.close_document();
+            }
+        });
+        self.doc_slot.append(&view.widget);
+        self.document.replace(Some(OpenDocument { _view: view, tab, dossier_was_open }));
+        // Opened over the page, not beside it: a fade, not the tabs' slide.
+        self.tab_stack.set_visible_child_full("document", gtk::StackTransitionType::Crossfade);
+    }
+
+    /// Back to where the manual was opened from, dossier included.
+    pub fn close_document(self: &Rc<Self>) {
+        let Some((tab, reopen)) = self.document.borrow().as_ref().map(|d| (d.tab.clone(), d.dossier_was_open)) else { return };
+        self.drop_document();
+        self.tab_stack.set_visible_child_full(&tab, gtk::StackTransitionType::Crossfade);
+        if reopen {
+            self.detail.reopen();
+        }
+    }
+
+    fn drop_document(&self) {
+        if self.document.take().is_none() {
+            return;
+        }
+        self.set_document_fullscreen(false);
+        while let Some(c) = self.doc_slot.first_child() {
+            self.doc_slot.remove(&c);
+        }
+    }
+
+    fn document_open(&self) -> bool {
+        self.document.borrow().is_some()
+    }
+
+    /// The Reading Room's counts for the status bar.
+    pub fn set_reading_counts(&self, counts: &crate::ui::statusbar::ReadingCounts) {
+        self.status_bar.set_reading_counts(counts);
     }
 
     fn on_reading_tab(&self) -> bool {

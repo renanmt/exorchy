@@ -26,6 +26,7 @@ use super::store::{self, Change};
 use crate::app;
 use crate::ui::util::format_bytes;
 use crate::ui::sidebar::{self as nav, Facet, Nav, Pick, Sidebar};
+use crate::ui::statusbar::ReadingCounts;
 use crate::ui::{bus, covers, dialogs};
 
 // ── Models ───────────────────────────────────────────────────────────────────
@@ -132,7 +133,6 @@ pub struct Room {
     sidebar_split: adw::OverlaySplitView,
     chips: adw::WrapBox,
     sort_drop: gtk::DropDown,
-    count: gtk::Label,
     view_grid: gtk::ToggleButton,
     view_list: gtk::ToggleButton,
     offline_note: gtk::Label,
@@ -173,8 +173,6 @@ impl Room {
         filter_row.append(&filters_button);
         let chips = adw::WrapBox::builder().child_spacing(6).line_spacing(6).hexpand(true).valign(gtk::Align::Center).build();
         filter_row.append(&chips);
-        let count = gtk::Label::builder().css_classes(["muted", "small", "results-count"]).valign(gtk::Align::Center).build();
-        filter_row.append(&count);
         let sort_labels: Vec<&str> = GRID_SORTS.iter().map(|(_, l)| *l).collect();
         let sort_drop = gtk::DropDown::from_strings(&sort_labels);
         sort_drop.add_css_class("drop");
@@ -348,7 +346,6 @@ impl Room {
                 sidebar_split,
                 chips,
                 sort_drop,
-                count,
                 view_grid: view_grid.clone(),
                 view_list: view_list.clone(),
                 offline_note,
@@ -707,14 +704,23 @@ impl Room {
         let query = f.query.clone();
         let sort = self.sort.get();
         let all = store::issues();
+        let downloaded = all.iter().filter(|i| store::issue_on_disk(i)).count();
         self.sidebar.set_total(all.len());
-        self.sidebar.set_count(|e| matches!(e, Nav::Shortcut { .. }), all.iter().filter(|i| store::issue_on_disk(i)).count());
+        self.sidebar.set_count(|e| matches!(e, Nav::Shortcut { .. }), downloaded);
         let mut shown = logic::filter_issues(&all, &Filter { kind, language, publication_id, year: f.year, favorites: f.favorites, query: &query });
         if f.downloaded {
             shown.retain(store::issue_on_disk);
         }
         logic::sort_issues(&mut shown, sort);
-        self.count.set_label(&logic::results_label(shown.len(), kind));
+        // The status bar says what the view holds, as it does for games.
+        if let Some(lib) = crate::ui::window::library() {
+            lib.set_reading_counts(&ReadingCounts {
+                shown: logic::results_label(shown.len(), kind),
+                downloaded,
+                favorites: all.iter().filter(|i| i.favorited).count(),
+                publications: store::publications().len(),
+            });
+        }
         self.flags.set(Flags {
             publication_in_view: sort == Sort::Publication || publication_id.is_some(),
             show_kind: kind == Kind::All,
@@ -833,7 +839,7 @@ impl Room {
     /// Back to the shelves; full screen ends with the reader.
     pub fn close_reader(self: &Rc<Self>) {
         if let Some(lib) = crate::ui::window::library() {
-            lib.set_reading_fullscreen(false);
+            lib.set_document_fullscreen(false);
         }
         self.drop_reader();
         self.pages.set_visible_child_name("browse");

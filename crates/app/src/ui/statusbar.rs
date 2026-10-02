@@ -1,8 +1,13 @@
 //! The status bar under the library (the concept's footer): the app and its
-//! version, how many games the current view holds (the library's own count
-//! label, reparented here so its wording stays in one place), favourites,
-//! playlists and enabled collections, then the keyboard hints. Counts follow
-//! the bus; the hints and counts give way in a small window.
+//! version, then what the page in view is about.
+//! - Games: how many games the current view holds (the library's own count
+//!   label, reparented here so its wording stays in one place), favourites,
+//!   playlists and enabled collections, and the game keys.
+//! - Reading Room (`set_reading`): how many documents the view holds, how
+//!   many are downloaded, favourited, the publications, and the reading keys.
+//!
+//! Game counts follow the bus; the room reports its own. The hints and
+//! counts give way in a small window.
 
 use std::rc::Rc;
 
@@ -18,9 +23,38 @@ pub struct StatusBar {
     pub details: gtk::Box,
     /// The key hints; hidden below the wide layout (they need the room).
     pub hints: gtk::Box,
+    count: gtk::Label,
     favorites: gtk::Label,
     playlists: gtk::Label,
     collections: gtk::Label,
+    game_details: gtk::Box,
+    game_hints: gtk::Box,
+    reading_count: gtk::Label,
+    reading_details: gtk::Box,
+    reading_hints: gtk::Box,
+    downloaded: gtk::Label,
+    reading_favorites: gtk::Label,
+    publications: gtk::Label,
+}
+
+/// What the Reading Room reports for the bar.
+pub struct ReadingCounts {
+    /// "2,195 documents", in the room's own wording.
+    pub shown: String,
+    pub downloaded: usize,
+    pub favorites: usize,
+    pub publications: usize,
+}
+
+fn hint_row(keys: &[(&str, &str)]) -> gtk::Box {
+    let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(14).build();
+    for (key, what) in keys {
+        let hint = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
+        hint.append(&gtk::Label::builder().label(*key).css_classes(["kbd"]).build());
+        hint.append(&gtk::Label::builder().label(*what).css_classes(["muted"]).build());
+        row.append(&hint);
+    }
+    row
 }
 
 /// Build the bar around the library's `count` label.
@@ -37,26 +71,56 @@ pub fn build(count: &gtk::Label) -> Rc<StatusBar> {
     count.set_margin_start(0);
     count.set_margin_bottom(0);
     widget.append(count);
+    let reading_count = gtk::Label::builder().visible(false).build();
+    widget.append(&reading_count);
 
+    // The counts: the games' set and the Reading Room's, one shown at a time.
     let details = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(14).build();
+    let game_details = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(14).build();
     let favorites = gtk::Label::new(None);
     let playlists = gtk::Label::new(None);
     let collections = gtk::Label::new(None);
     for l in [&favorites, &playlists, &collections] {
-        details.append(&separator());
-        details.append(l);
+        game_details.append(&separator());
+        game_details.append(l);
     }
+    let reading_details = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(14).visible(false).build();
+    let downloaded = gtk::Label::new(None);
+    let reading_favorites = gtk::Label::new(None);
+    let publications = gtk::Label::new(None);
+    for l in [&downloaded, &reading_favorites, &publications] {
+        reading_details.append(&separator());
+        reading_details.append(l);
+    }
+    details.append(&game_details);
+    details.append(&reading_details);
     widget.append(&details);
-    let hints = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(14).hexpand(true).halign(gtk::Align::End).build();
-    for (key, what) in [("Enter", "Play"), ("I", "Game info"), ("F", "Favorite"), ("/", "Search"), ("Esc", "Back")] {
-        let hint = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
-        hint.append(&gtk::Label::builder().label(key).css_classes(["kbd"]).build());
-        hint.append(&gtk::Label::builder().label(what).css_classes(["muted"]).build());
-        hints.append(&hint);
-    }
+
+    let hints = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).hexpand(true).halign(gtk::Align::End).build();
+    let game_hints = hint_row(&[("Enter", "Play"), ("I", "Game info"), ("F", "Favorite"), ("/", "Search"), ("Esc", "Back")]);
+    let reading_hints = hint_row(&[("/", "Search"), ("F11", "Full screen"), ("Esc", "Back")]);
+    reading_hints.set_visible(false);
+    hints.append(&game_hints);
+    hints.append(&reading_hints);
     widget.append(&hints);
 
-    let bar = Rc::new(StatusBar { widget, details, hints, favorites, playlists, collections });
+    let bar = Rc::new(StatusBar {
+        widget,
+        details,
+        hints,
+        count: count.clone(),
+        favorites,
+        playlists,
+        collections,
+        game_details,
+        game_hints,
+        reading_count,
+        reading_details,
+        reading_hints,
+        downloaded,
+        reading_favorites,
+        publications,
+    });
     refresh(&bar);
     let weak = Rc::downgrade(&bar);
     let again = move || {
@@ -72,6 +136,26 @@ pub fn build(count: &gtk::Label) -> Rc<StatusBar> {
     bus::on_collections_changed(move |_| a());
     bus::on_library_changed(move |_| again());
     bar
+}
+
+impl StatusBar {
+    /// Games or the Reading Room: which counts and keys the bar shows.
+    pub fn set_reading(&self, reading: bool) {
+        self.count.set_visible(!reading);
+        self.game_details.set_visible(!reading);
+        self.game_hints.set_visible(!reading);
+        self.reading_count.set_visible(reading);
+        self.reading_details.set_visible(reading);
+        self.reading_hints.set_visible(reading);
+    }
+
+    /// The Reading Room's counts, from its own render.
+    pub fn set_reading_counts(&self, c: &ReadingCounts) {
+        self.reading_count.set_label(&c.shown);
+        self.downloaded.set_label(&format!("{} downloaded", grouped(c.downloaded)));
+        self.reading_favorites.set_label(&plural(c.favorites, "favorite", "favorites"));
+        self.publications.set_label(&plural(c.publications, "publication", "publications"));
+    }
 }
 
 fn separator() -> gtk::Label {

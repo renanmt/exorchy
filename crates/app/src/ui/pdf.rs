@@ -1084,17 +1084,53 @@ pub fn present(parent: &gtk::Window, child: &impl IsA<gtk::Widget>, title: &str,
     dialog
 }
 
-/// Open `path` in the viewer: an `adw::Dialog` filling the window (no
-/// second toplevel). `on_page` reports 1-based page changes; `start_page`
-/// is where a PDF opens.
+/// Open a game's manual (or any file) the way the Reading Room opens an
+/// issue: in place of the library's body (`LibraryPage::show_document`),
+/// with full screen at hand. `on_page` reports 1-based page changes;
+/// `start_page` is where a PDF opens. Without a library page (never in
+/// practice) it falls back to a dialog over `parent`.
 pub fn open_document_viewer(parent: &gtk::Window, path: &str, title: &str, on_page: Option<PageCb>, start_page: u32) {
     let kind = kind_of(path);
     let subtitle = format!("Manual · {}", kind_label(kind));
     let view = DocumentView::new(path, title, Some(&subtitle), on_page, start_page);
+    view.actions.append(&fullscreen_toggle());
+    if let Some(lib) = crate::ui::window::library() {
+        lib.show_document(view);
+        return;
+    }
     let dialog = present(parent, &view.widget, title, Box::new(view.clone()));
     view.connect_close(move || {
         dialog.close();
     });
+}
+
+/// Full screen for reading: the window goes full screen and the app's
+/// chrome steps aside (`LibraryPage::set_document_fullscreen`). The toggle
+/// follows the window, which can leave full screen on its own.
+pub fn fullscreen_toggle() -> gtk::ToggleButton {
+    let b = gtk::ToggleButton::builder().icon_name("view-fullscreen-symbolic").css_classes(["btn", "icon"]).tooltip_text("Full screen (F11)").build();
+    b.connect_toggled(|b| {
+        if let Some(lib) = crate::ui::window::library() {
+            lib.set_document_fullscreen(b.is_active());
+        }
+    });
+    let watching = Cell::new(false);
+    b.connect_map(move |b| {
+        let Some(window) = b.root().and_downcast::<gtk::Window>() else { return };
+        b.set_active(window.is_fullscreen());
+        if watching.replace(true) {
+            return;
+        }
+        let weak = b.downgrade();
+        window.connect_fullscreened_notify(move |w| {
+            if let Some(b) = weak.upgrade() {
+                if b.is_active() != w.is_fullscreen() {
+                    b.set_active(w.is_fullscreen());
+                }
+            }
+        });
+    });
+    b
 }
 
 #[cfg(test)]

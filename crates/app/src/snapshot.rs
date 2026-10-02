@@ -18,6 +18,11 @@ pub fn arm(window: &adw::ApplicationWindow) {
         _ => (spec.clone(), 3000),
     };
     let window = window.clone();
+    // Broadway's frame clock never finishes a stack's transition, so a shot
+    // after a page switch caught the old page: snapshots run unanimated.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_enable_animations(false);
+    }
     // EXORCHY_SNAPSHOT_SIZE=<w>x<h> sizes the window first (tile simulation).
     if let Some((w, h)) = std::env::var("EXORCHY_SNAPSHOT_SIZE").ok().and_then(|v| {
         let (w, h) = v.split_once('x')?;
@@ -52,6 +57,7 @@ pub fn arm(window: &adw::ApplicationWindow) {
         let steps: Vec<String> = seq.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
         let base = delay_ms.saturating_sub(1500) + 400;
         for (i, step) in steps.into_iter().enumerate() {
+            let window = window.clone();
             glib::timeout_add_local_once(Duration::from_millis(base + 250 * i as u64), move || {
                 let Some(lib) = crate::ui::window::library() else { return };
                 let panel = lib.detail();
@@ -118,10 +124,17 @@ pub fn arm(window: &adw::ApplicationWindow) {
                     // The Reading Room's full screen (the reader's button / F11).
                     "fullscreen" => {
                         if let Some(lib) = crate::ui::window::library() {
-                            lib.set_reading_fullscreen(true);
+                            lib.set_document_fullscreen(true);
                         }
                     }
                     "wait" => {}
+                    "close_doc" => lib.close_document(),
+                    // doc:<path> opens a document as a dossier's manual would.
+                    s if s.starts_with("doc:") => {
+                        let path = &s[4..];
+                        let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        crate::ui::pdf::open_document_viewer(window.upcast_ref(), path, &name, None, 1);
+                    }
                     _ => log::warn!("unknown sequence step {step}"),
                 }
             });

@@ -390,7 +390,9 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       Languages, Favorites) with one chip per filter; an opened issue
       replaces the room's body and starts in "Fit page"; a full-screen
       reading mode (button, F11, Esc leaves); the tab closes a game's
-      dossier; a downloaded issue opens offline.
+      dossier; a downloaded issue opens offline. Game manuals open the same
+      way (in place, Fit page, full screen; the dossier returns on close);
+      the status bar shows the room's counts and keys there.
 
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,

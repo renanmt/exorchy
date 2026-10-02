@@ -327,39 +327,10 @@ impl Reader {
             );
         }));
         view.actions.append(&remove);
-        view.actions.append(&fullscreen_toggle());
+        view.actions.append(&crate::ui::pdf::fullscreen_toggle());
         view.connect_close(glib::clone!(#[weak(rename_to = reader)] self, move || reader.close()));
         self.stack.add_named(&view.widget, Some("doc"));
         self.stack.set_visible_child_name("doc");
         self.view.replace(Some(view));
     }
-}
-
-/// Full screen for reading: the window goes full screen and the app's
-/// chrome steps aside (`LibraryPage::set_reading_fullscreen`). The toggle
-/// follows the window, which can leave full screen on its own.
-fn fullscreen_toggle() -> gtk::ToggleButton {
-    let b = gtk::ToggleButton::builder().icon_name("view-fullscreen-symbolic").css_classes(["btn", "icon"]).tooltip_text("Full screen (F11)").build();
-    b.connect_toggled(|b| {
-        if let Some(lib) = crate::ui::window::library() {
-            lib.set_reading_fullscreen(b.is_active());
-        }
-    });
-    let watching = Cell::new(false);
-    b.connect_map(move |b| {
-        let Some(window) = b.root().and_downcast::<gtk::Window>() else { return };
-        b.set_active(window.is_fullscreen());
-        if watching.replace(true) {
-            return;
-        }
-        let weak = b.downgrade();
-        window.connect_fullscreened_notify(move |w| {
-            if let Some(b) = weak.upgrade() {
-                if b.is_active() != w.is_fullscreen() {
-                    b.set_active(w.is_fullscreen());
-                }
-            }
-        });
-    });
-    b
 }
