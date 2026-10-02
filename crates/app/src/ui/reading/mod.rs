@@ -4,9 +4,10 @@
 //! - `logic`  pure filters, sort orders, sections, wording (unit tested)
 //! - `store`  catalogue, on-disk set, fetch jobs with their 1 Hz poll
 //! - `card`   an issue as a grid card or a list row
-//! - `reader` the issue reader dialog (fetch panel → document viewer) and
-//!   the media notice
-//! - `room`   the tab itself and the detail panel's "Covered in" section
+//! - `reader` the issue reader (fetch panel → document viewer, full screen),
+//!   shown in place of the room's body, and the media notice
+//! - `room`   the tab itself (on the shared `ui::sidebar`) and the dossier's
+//!   "Covered in" section
 //!
 //! The document viewer proper lives in `ui::pdf`.
 
@@ -31,7 +32,7 @@ thread_local! {
 
 /// The Reading Room tab. Built once per library page.
 pub fn build(window: &gtk::Window) -> gtk::Widget {
-    let room = Room::new(window);
+    let room = Room::new();
     ROOM.with(|r| *r.borrow_mut() = Some(room.clone()));
 
     // Developer aids (see snapshot.rs): EXORCHY_SNAPSHOT_READING switches to
@@ -57,28 +58,52 @@ pub fn build(window: &gtk::Window) -> gtk::Widget {
     }
     // EXORCHY_SNAPSHOT_ISSUE=<key> opens the reader on that issue.
     if let Some(key) = std::env::var("EXORCHY_SNAPSHOT_ISSUE").ok().filter(|k| !k.is_empty()) {
-        let window = window.clone();
         glib::timeout_add_local_once(Duration::from_millis(2500), move || {
             if let Some(issue) = store::issue(&key) {
-                reader::open(&window, issue, None);
+                open_issue(issue, None);
             }
         });
     }
     room.widget.clone().upcast()
 }
 
+fn room() -> Option<Rc<Room>> {
+    ROOM.with(|r| r.borrow().clone())
+}
+
 /// The top bar's search box, when the library forwards it to this tab.
-#[allow(dead_code)]
 pub fn set_query(q: &str) {
-    if let Some(room) = ROOM.with(|r| r.borrow().clone()) {
+    if let Some(room) = room() {
         room.set_query(q);
+    }
+}
+
+/// Read an issue: the Reading Room comes forward (a dossier closes) and
+/// the reader takes its body. From the room, and from a dossier's articles.
+pub fn open_issue(issue: exorchy_core::models::Issue, start_page: Option<i64>) {
+    if let Some(lib) = crate::ui::window::library() {
+        lib.set_tab("reading");
+    }
+    if let Some(room) = room() {
+        room.show_reader(issue, start_page);
+    }
+}
+
+/// An issue is open in the reader.
+pub fn reader_open() -> bool {
+    room().is_some_and(|r| r.reader_open())
+}
+
+pub fn close_reader() {
+    if let Some(room) = room() {
+        room.close_reader();
     }
 }
 
 /// A game's magazine articles for the dossier's Media tab: eXo's article
 /// index (review, preview, ...) with the page each one starts on. Invisible
 /// until (and unless) articles arrive; `on_count` reports how many.
-pub fn game_articles_widget(game_id: i64, window: &gtk::Window, on_count: impl Fn(usize) + 'static) -> gtk::Widget {
-    room::game_articles_widget(game_id, window, on_count)
+pub fn game_articles_widget(game_id: i64, on_count: impl Fn(usize) + 'static) -> gtk::Widget {
+    room::game_articles_widget(game_id, on_count)
 }
 

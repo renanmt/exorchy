@@ -316,7 +316,8 @@ fn start_fetch(key: &str, install: bool) {
             return;
         }
     }
-    if bus::offline() {
+    // Offline nothing is fetched, but a document already on disk still opens.
+    if bus::offline() && (install || !is_on_disk(key)) {
         put(key, ReadingStatus { error: Some("offline".into()), ..plain("none") });
         return;
     }

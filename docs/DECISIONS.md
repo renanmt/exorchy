@@ -771,3 +771,40 @@ squashed. `covers::Size::Boxed(base)` sizes the texture from the art itself
 - extreme shapes are clamped to 0.6–1.8.
 
 The library cards keep their crop to fill.
+
+## 2026-10-02 - The Reading Room works like Browse; the reader replaces its body
+
+The Reading Room had its own filters: kind and language chips, a publication menu and a
+search entry, in two rows. Now it works the way Browse does.
+
+**One sidebar for both pages.** `ui/sidebar.rs` became generic over a `Facet` category type.
+A page supplies its entries (`Nav::All`, `Favorites`, `Category`, `Shortcut`) and a `Loader`
+for a category's values. Browse keeps its entries and loads them from the database, as
+before. The Reading Room's entries are All Reading, Downloaded, Types, Publications, Years,
+Languages and Favorites; `logic::facet_rows` counts their values from the in-memory catalogue.
+- Picks keep one value per type and show one removable chip each, as in Browse.
+- Sort and grid/list sit on the right of the filter row; the header's search filters the room.
+- The room collapses its sidebar behind a Filters button at the same breakpoint as Browse.
+
+**Where "Downloaded" goes.** It is a shortcut entry right under All Reading, with its count:
+it is the reading-room counterpart of My Library, and a whole page for one value would be
+one click too many. In the game sidebar, Play Status is a category page instead.
+
+**The reader.** An opened issue is no longer a dialog. The reader replaces the room's whole
+area (sidebar included) until × or Esc.
+- `reading::open_issue` is the one way in: from the room, and from a dossier's articles. It
+  brings the Reading Room tab forward, and that tab closes any open game dossier.
+- Its full-screen button (and F11) calls `LibraryPage::set_reading_fullscreen`. The window
+  goes full screen and the banner, toolbar, now-playing bar and status bar hide. Esc leaves
+  full screen first, and leaving full screen by any other way brings the chrome back.
+- Game manuals still open as a dialog over the dossier: they belong to the game, not to the
+  room.
+
+**Fit page by default.** The PDF viewer now has a fit mode (`Fit::Page / Width / Free`) and
+starts in Page, so a document opens with a whole page in view. While in Page or Width it
+follows viewport resizes, full screen included; a manual zoom lets go of it. The refit after a
+resize is queued to idle: resizing the pages from inside GTK's allocation pass made GTK warn
+about measuring the page column.
+
+Also fixed on the way: a downloaded issue would not open while offline. The store turned away
+every request offline, though the backend answers a cached document without the network.

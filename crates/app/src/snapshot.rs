@@ -115,6 +115,13 @@ pub fn arm(window: &adw::ApplicationWindow) {
                             panel.show(g);
                         }
                     }
+                    // The Reading Room's full screen (the reader's button / F11).
+                    "fullscreen" => {
+                        if let Some(lib) = crate::ui::window::library() {
+                            lib.set_reading_fullscreen(true);
+                        }
+                    }
+                    "wait" => {}
                     _ => log::warn!("unknown sequence step {step}"),
                 }
             });

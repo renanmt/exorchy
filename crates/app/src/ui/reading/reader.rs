@@ -1,7 +1,8 @@
-//! The issue reader: an in-window dialog that shows the fetch (cover,
-//! phase, progress, cancel / retry) until the document is on disk, then the
-//! document viewer at the remembered page. Also the media notice: opening
-//! an issue joins a second torrent, said once before the first fetch.
+//! The issue reader: shown in place of the Reading Room's body (the room
+//! mounts `Reader::widget`). It shows the fetch (cover, phase, progress,
+//! cancel / retry) until the document is on disk, then the document viewer
+//! at the remembered page, with a full-screen toggle. Also the media notice:
+//! opening an issue joins a second torrent, said once before the first fetch.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -14,7 +15,7 @@ use gtk::glib;
 use super::logic::{failure_detail, kind_label};
 use super::store::{self, Change, PHASE_QUEUED};
 use crate::app;
-use crate::ui::pdf::{self, DocumentView};
+use crate::ui::pdf::DocumentView;
 use crate::ui::util::format_bytes;
 use crate::ui::{bus, covers, dialogs};
 
@@ -89,11 +90,10 @@ pub mod notice {
 
 // ── The reader ───────────────────────────────────────────────────────────────
 
-struct Reader {
-    window: gtk::Window,
-    issue: Issue,
+pub struct Reader {
+    pub issue: Issue,
     start_page: Option<i64>,
-    dialog: RefCell<Option<adw::Dialog>>,
+    on_close: Rc<dyn Fn()>,
     stack: gtk::Stack,
     headline: gtk::Label,
     detail: gtk::Label,
@@ -117,12 +117,10 @@ fn subtitle_of(issue: &Issue) -> String {
     parts.join(" · ")
 }
 
-/// Open `issue` for reading: fetch it if needed, then show it. An article
-/// link names a `start_page`; otherwise the last page read.
-pub fn open(window: &gtk::Window, issue: Issue, start_page: Option<i64>) {
-    if issue.runnable {
-        return;
-    }
+/// The reader for `issue`: fetches it if needed, then shows it. An article
+/// link names a `start_page`; otherwise the last page read. `on_close` runs
+/// on its close button (and Esc, which the room routes here).
+pub fn build(issue: Issue, start_page: Option<i64>, on_close: Rc<dyn Fn()>) -> Rc<Reader> {
     // The fetch panel: header like the viewer's, then cover and state.
     let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).css_classes(["doc-viewer"]).hexpand(true).vexpand(true).build();
     let header = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["doc-header"]).build();
@@ -163,10 +161,9 @@ pub fn open(window: &gtk::Window, issue: Issue, start_page: Option<i64>) {
     stack.add_named(&root, Some("fetch"));
 
     let reader = Rc::new(Reader {
-        window: window.clone(),
         issue: issue.clone(),
         start_page,
-        dialog: RefCell::new(None),
+        on_close,
         stack: stack.clone(),
         headline,
         detail,
@@ -192,8 +189,6 @@ pub fn open(window: &gtk::Window, issue: Issue, start_page: Option<i64>) {
     reader.close_btn.connect_clicked(glib::clone!(#[weak] reader, move |_| reader.close()));
     reader.retry_btn.connect_clicked(glib::clone!(#[weak] reader, move |_| store::request_issue(&reader.issue.key)));
 
-    let dialog = pdf::present(window, &stack, &issue.title, Box::new(reader.clone()));
-    reader.dialog.replace(Some(dialog.clone()));
     let key = issue.key.clone();
     let id = store::on_change(glib::clone!(#[weak] reader, move |change| {
         if matches!(change, Change::Issue(k) if *k == key) {
@@ -201,24 +196,29 @@ pub fn open(window: &gtk::Window, issue: Issue, start_page: Option<i64>) {
         }
     }));
     reader.listener.set(Some(id));
-    dialog.connect_closed(glib::clone!(#[weak] reader, move |_| {
-        if let Some(id) = reader.listener.take() {
-            store::remove_listener(id);
-        }
-        // A fetch still running is abandoned deliberately: nobody is reading.
-        if store::is_busy(&reader.issue.key) {
-            store::abort(&reader.issue.key);
-        }
-    }));
 
     reader.update();
     store::request_issue(&issue.key);
+    reader
 }
 
 impl Reader {
+    pub fn widget(&self) -> gtk::Widget {
+        self.stack.clone().upcast()
+    }
+
     fn close(&self) {
-        if let Some(d) = self.dialog.borrow().as_ref() {
-            d.close();
+        (self.on_close)();
+    }
+
+    /// The room took the reader down: stop listening, and abandon a fetch
+    /// still running - nobody is reading.
+    pub fn shutdown(&self) {
+        if let Some(id) = self.listener.take() {
+            store::remove_listener(id);
+        }
+        if store::is_busy(&self.issue.key) {
+            store::abort(&self.issue.key);
         }
     }
 
@@ -327,10 +327,39 @@ impl Reader {
             );
         }));
         view.actions.append(&remove);
+        view.actions.append(&fullscreen_toggle());
         view.connect_close(glib::clone!(#[weak(rename_to = reader)] self, move || reader.close()));
         self.stack.add_named(&view.widget, Some("doc"));
         self.stack.set_visible_child_name("doc");
         self.view.replace(Some(view));
-        let _ = &self.window;
     }
+}
+
+/// Full screen for reading: the window goes full screen and the app's
+/// chrome steps aside (`LibraryPage::set_reading_fullscreen`). The toggle
+/// follows the window, which can leave full screen on its own.
+fn fullscreen_toggle() -> gtk::ToggleButton {
+    let b = gtk::ToggleButton::builder().icon_name("view-fullscreen-symbolic").css_classes(["btn", "icon"]).tooltip_text("Full screen (F11)").build();
+    b.connect_toggled(|b| {
+        if let Some(lib) = crate::ui::window::library() {
+            lib.set_reading_fullscreen(b.is_active());
+        }
+    });
+    let watching = Cell::new(false);
+    b.connect_map(move |b| {
+        let Some(window) = b.root().and_downcast::<gtk::Window>() else { return };
+        b.set_active(window.is_fullscreen());
+        if watching.replace(true) {
+            return;
+        }
+        let weak = b.downgrade();
+        window.connect_fullscreened_notify(move |w| {
+            if let Some(b) = weak.upgrade() {
+                if b.is_active() != w.is_fullscreen() {
+                    b.set_active(w.is_fullscreen());
+                }
+            }
+        });
+    });
+    b
 }

@@ -97,7 +97,7 @@ pub struct LibraryPage {
     /// The sidebar beside Browse; an overlay behind `filters_button` in a
     /// window too narrow for both.
     sidebar_split: adw::OverlaySplitView,
-    sidebar: Rc<crate::ui::sidebar::Sidebar>,
+    sidebar: Rc<crate::ui::sidebar::Sidebar<crate::ui::sidebar::Category>>,
     /// The list view is chosen (else the grid).
     list_mode: Cell<bool>,
     jump_bar: gtk::Box,
@@ -117,6 +117,10 @@ pub struct LibraryPage {
     /// Full-width notices above the toolbar (the update banner).
     pub banner_slot: gtk::Box,
     pub toolbar_slot: gtk::Box,
+    /// What steps aside while the Reading Room reads full screen: the
+    /// banner, the toolbar, the now-playing bar, the status bar.
+    chrome: Vec<gtk::Widget>,
+    reading_fullscreen: Cell<bool>,
     window: gtk::Window,
 }
 
@@ -325,6 +329,8 @@ impl LibraryPage {
         column.append(&bar_slot);
         let status_bar = crate::ui::statusbar::build(&status);
         column.append(&status_bar.widget);
+        let (chrome_banner, chrome_toolbar, chrome_bar, chrome_status) =
+            (banner_slot.clone().upcast::<gtk::Widget>(), toolbar.clone().upcast::<gtk::Widget>(), bar_slot.clone().upcast::<gtk::Widget>(), status_bar.widget.clone().upcast::<gtk::Widget>());
 
         // Breakpoints: a narrow tile collapses the panel into an overlay and
         // stacks the toolbar; the layout never demands more than 360×300.
@@ -384,6 +390,8 @@ impl LibraryPage {
             bar_slot,
             banner_slot,
             toolbar_slot,
+            chrome: vec![chrome_banner, chrome_toolbar, chrome_bar, chrome_status],
+            reading_fullscreen: Cell::new(false),
             window: window.clone(),
         });
 
@@ -593,6 +601,28 @@ impl LibraryPage {
                 page.search.grab_focus();
                 return glib::Propagation::Stop;
             }
+            // Reading: Esc leaves full screen, then the reader; F11 toggles
+            // full screen. The game shortcuts below do not apply here.
+            if page.on_reading_tab() {
+                let reading = crate::ui::reading::reader_open();
+                if key == gtk::gdk::Key::F11 && reading {
+                    page.set_reading_fullscreen(!page.reading_fullscreen.get());
+                    return glib::Propagation::Stop;
+                }
+                if key == gtk::gdk::Key::Escape && !focused_entry {
+                    if page.reading_fullscreen.get() {
+                        page.set_reading_fullscreen(false);
+                        return glib::Propagation::Stop;
+                    }
+                    if reading {
+                        crate::ui::reading::close_reader();
+                        return glib::Propagation::Stop;
+                    }
+                }
+                if key != gtk::gdk::Key::comma {
+                    return glib::Propagation::Proceed;
+                }
+            }
             if key == gtk::gdk::Key::Escape && (page.detail.is_open() || page.split.shows_sidebar()) {
                 page.detail.close();
                 return glib::Propagation::Stop;
@@ -628,6 +658,13 @@ impl LibraryPage {
             glib::Propagation::Proceed
         }));
         self.window.add_controller(keys);
+        // The window can leave full screen on its own (the compositor's key):
+        // the chrome comes back with it.
+        self.window.connect_fullscreened_notify(glib::clone!(#[weak(rename_to = page)] self, move |w| {
+            if !w.is_fullscreen() && page.reading_fullscreen.get() {
+                page.set_reading_fullscreen(false);
+            }
+        }));
     }
 
     // ── tabs ──
@@ -641,6 +678,11 @@ impl LibraryPage {
                 b.remove_css_class("active");
             }
         }
+        // The Reading Room has no dossier: a game's closes on the way in.
+        if id == "reading" {
+            self.detail.close();
+        }
+        self.search.set_placeholder_text(Some(if id == "reading" { "Search the reading room…  (/)" } else { "Search games…  (/)" }));
         // Each tab catches up with a search typed while it was not shown.
         match id {
             "library" => self.refresh_shelves(),
@@ -655,6 +697,26 @@ impl LibraryPage {
                 }
             }
         }
+    }
+
+    /// Reading full screen: the window goes full screen and the chrome
+    /// steps aside, so the page has the whole screen. Off again, both return.
+    pub fn set_reading_fullscreen(&self, on: bool) {
+        if self.reading_fullscreen.replace(on) == on && self.window.is_fullscreen() == on {
+            return;
+        }
+        for w in &self.chrome {
+            w.set_visible(!on);
+        }
+        if on {
+            self.window.fullscreen();
+        } else if self.window.is_fullscreen() {
+            self.window.unfullscreen();
+        }
+    }
+
+    fn on_reading_tab(&self) -> bool {
+        self.tab_stack.visible_child_name().as_deref() == Some("reading")
     }
 
     /// The Reading Room mounts its own widget here.
@@ -710,7 +772,7 @@ impl LibraryPage {
 
     /// A sidebar pick: one value per type, replacing that type's value;
     /// All Games clears every filter.
-    fn apply_pick(self: &Rc<Self>, pick: crate::ui::sidebar::Pick) {
+    fn apply_pick(self: &Rc<Self>, pick: crate::ui::sidebar::Pick<crate::ui::sidebar::Category>) {
         use crate::ui::sidebar::{Category, Pick};
         {
             let mut f = self.filters.borrow_mut();

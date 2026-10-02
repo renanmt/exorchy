@@ -318,8 +318,20 @@ fn spawn_renderer(
 
 // ── PDF pages ────────────────────────────────────────────────────────────────
 
+/// How the zoom follows the viewport: a whole page in view (the default),
+/// the column's width, or wherever the reader zoomed to.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Fit {
+    Page,
+    Width,
+    Free,
+}
+
 struct PdfPages {
     tx: mpsc::Sender<Req>,
+    fit: Cell<Fit>,
+    /// A refit is queued for after the current size pass.
+    fit_queued: Cell<bool>,
     n_pages: i32,
     sizes: Vec<(f64, f64)>,
     /// Logical page heights at the current zoom, in page order.
@@ -515,7 +527,39 @@ impl PdfPages {
         });
     }
 
+    /// A zoom the reader chose: the fit mode lets go.
     fn set_zoom(self: &Rc<Self>, zoom: f64) {
+        self.fit.set(Fit::Free);
+        self.apply_zoom(zoom);
+    }
+
+    /// Refit after a viewport resize. The size notifications arrive in the
+    /// middle of GTK's allocation, where resizing the pages is not allowed.
+    fn queue_fit(self: &Rc<Self>) {
+        if self.fit.get() != Fit::Page || self.fit_queued.replace(true) {
+            return;
+        }
+        let weak = Rc::downgrade(self);
+        glib::idle_add_local_once(move || {
+            if let Some(p) = weak.upgrade() {
+                p.fit_queued.set(false);
+                if p.fit.get() == Fit::Page {
+                    p.fit_page();
+                }
+            }
+        });
+    }
+
+    fn set_fit(self: &Rc<Self>, fit: Fit) {
+        self.fit.set(fit);
+        match fit {
+            Fit::Page => self.fit_page(),
+            Fit::Width => self.apply_zoom(1.0),
+            Fit::Free => {}
+        }
+    }
+
+    fn apply_zoom(self: &Rc<Self>, zoom: f64) {
         let zoom = (zoom * 100.0).round() / 100.0;
         self.zoom.set(zoom.clamp(MIN_ZOOM, MAX_ZOOM));
         self.relayout();
@@ -528,7 +572,7 @@ impl PdfPages {
         let idx = (self.current.get() - 1).clamp(0, self.n_pages.max(1) - 1) as usize;
         let (pw, ph) = self.sizes.get(idx).copied().unwrap_or((612.0, 792.0));
         let zoom = vh / (cw * ph / pw.max(1.0));
-        self.set_zoom(zoom.min(1.0));
+        self.apply_zoom(zoom.min(1.0));
     }
 
     fn search(self: &Rc<Self>) {
@@ -703,7 +747,12 @@ impl DocumentView {
                     glib::idle_add_local_once(move || {
                         if let Some(p) = weak.upgrade() {
                             p.column_width.set(p.scroller.hadjustment().page_size().max(0.0) as i32);
-                            p.relayout();
+                            // Documents open with a whole page in view.
+                            if p.fit.get() == Fit::Page {
+                                p.fit_page();
+                            } else {
+                                p.relayout();
+                            }
                             let weak = Rc::downgrade(&p);
                             glib::idle_add_local_once(move || {
                                 if let Some(p) = weak.upgrade() {
@@ -793,6 +842,8 @@ impl DocumentView {
 
         let pages = Rc::new(PdfPages {
             tx,
+            fit: Cell::new(Fit::Page),
+            fit_queued: Cell::new(false),
             n_pages: n,
             sizes: opened.sizes,
             heights: RefCell::new(vec![0; n as usize]),
@@ -825,14 +876,20 @@ impl DocumentView {
         root.append(&pages.hits_bar);
         root.append(&pages.scroller);
 
+        // "Fit page" follows the viewport's height too (a resize, full screen).
+        pages.scroller.vadjustment().connect_page_size_notify(glib::clone!(#[weak] pages, move |_| pages.queue_fit()));
         // Scrolling picks the pages to render; a width change relays out.
         pages.scroller.vadjustment().connect_value_changed(glib::clone!(#[weak] pages, move |_| pages.schedule()));
         pages.scroller.hadjustment().connect_page_size_notify(glib::clone!(#[weak] pages, move |h| {
             let w = h.page_size().max(0.0) as i32;
             if (w - pages.column_width.get()).abs() > 2 && w > 0 {
                 pages.column_width.set(w);
-                pages.relayout();
-                pages.keep_page();
+                if pages.fit.get() == Fit::Page {
+                    pages.queue_fit();
+                } else {
+                    pages.relayout();
+                    pages.keep_page();
+                }
             }
         }));
         pages.scroller.connect_scale_factor_notify(glib::clone!(#[weak] pages, move |_| pages.relayout()));
@@ -849,8 +906,8 @@ impl DocumentView {
         }));
         zoom_out.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.set_zoom(pages.zoom.get() - ZOOM_STEP)));
         zoom_in.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.set_zoom(pages.zoom.get() + ZOOM_STEP)));
-        fit_w.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.set_zoom(1.0)));
-        fit_p.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.fit_page()));
+        fit_w.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.set_fit(Fit::Width)));
+        fit_p.connect_clicked(glib::clone!(#[weak] pages, move |_| pages.set_fit(Fit::Page)));
         pages.zoom_label.set_tooltip_text(Some("100% spans the column"));
         pages.search_entry.connect_activate(glib::clone!(#[weak] pages, move |_| pages.search()));
         pages.search_entry.connect_search_changed(glib::clone!(#[weak] pages, move |e| {
@@ -876,7 +933,7 @@ impl DocumentView {
                 Key::End => pages.scroll_to_page(pages.n_pages),
                 Key::plus | Key::equal | Key::KP_Add => pages.set_zoom(pages.zoom.get() + ZOOM_STEP),
                 Key::minus | Key::KP_Subtract => pages.set_zoom(pages.zoom.get() - ZOOM_STEP),
-                Key::_0 | Key::KP_0 if ctrl => pages.set_zoom(1.0),
+                Key::_0 | Key::KP_0 if ctrl => pages.set_fit(Fit::Width),
                 Key::f if ctrl => {
                     pages.search_entry.grab_focus();
                 }

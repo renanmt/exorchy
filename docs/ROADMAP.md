@@ -385,6 +385,12 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       (its section keys were integers read as text); frame lines stronger
       (`--line-frame` 26 %), so the dossier frame shows beside the tinted
       header.
+- [x] **Reading Room review 2026-10-02:** laid out like Browse: the
+      shared sidebar (All Reading, Downloaded, Types, Publications, Years,
+      Languages, Favorites) with one chip per filter; an opened issue
+      replaces the room's body and starts in "Fit page"; a full-screen
+      reading mode (button, F11, Esc leaves); the tab closes a game's
+      dossier; a downloaded issue opens offline.
 
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,

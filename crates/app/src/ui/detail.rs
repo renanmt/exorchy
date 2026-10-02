@@ -332,7 +332,7 @@ impl DetailPanel {
             }
             if let Some(id) = game.id {
                 let panel = Rc::downgrade(self);
-                self.articles_slot.append(&crate::ui::reading::game_articles_widget(id, &self.window, move |n| {
+                self.articles_slot.append(&crate::ui::reading::game_articles_widget(id, move |n| {
                     if let Some(p) = panel.upgrade().filter(|p| p.game.borrow().as_ref().and_then(|g| g.id) == Some(id)) {
                         p.articles.set(n);
                         p.update_media_title();

@@ -1,8 +1,10 @@
-//! The library's left sidebar (the concept's navigation): All Games, then
-//! the categories to browse by. Most categories list their values with
-//! counts on a page of their own (`values`, which the library shows in place
-//! of the grid); picking a value narrows the grid to it. Favorites filters
-//! directly. The sidebar knows nothing of the grid: it reports picks.
+//! The left sidebar (the concept's navigation), shared by the games library
+//! and the Reading Room: an "All" entry, shortcuts, then the categories to
+//! browse by. A category lists its values with counts on a page of its own
+//! (`values`, which the page shows in place of its grid); picking a value
+//! narrows the grid to it. Favorites and shortcuts filter directly. The
+//! sidebar knows nothing of the grid: it reports picks, and a page's
+//! `Loader` supplies a category's values.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -33,6 +35,17 @@ pub enum Category {
     Tags,
     Status,
     Playlists,
+}
+
+/// A category type a sidebar browses by: what its entry says.
+pub trait Facet: Copy + PartialEq + std::fmt::Debug + 'static {
+    fn label(self) -> &'static str;
+}
+
+impl Facet for Category {
+    fn label(self) -> &'static str {
+        Category::label(self)
+    }
 }
 
 impl Category {
@@ -84,34 +97,87 @@ pub const STATUS: [(&str, &str); 4] = [("installed", "Installed"), ("library", "
 
 /// What the user picked.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Pick {
+pub enum Pick<C> {
     All,
     Favorites,
-    /// `value` is what the backend filters on (a collection id, a status
-    /// key); `label` what the chip shows.
-    Value { category: Category, value: String, label: String },
+    /// `value` is what the page filters on (a collection id, a status key);
+    /// `label` what the chip shows.
+    Value { category: C, value: String, label: String },
 }
 
-pub struct Sidebar {
+/// A sidebar entry.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Nav<C> {
+    /// Everything; carries the total.
+    All(&'static str),
+    Favorites,
+    /// Opens the category's values page.
+    Category(C),
+    /// One value picked directly ("Downloaded"); carries a count.
+    Shortcut { category: C, value: &'static str, label: &'static str },
+}
+
+/// An entry, its button and its count label (All and shortcuts).
+type NavButton<C> = (Nav<C>, gtk::Button, Option<gtk::Label>);
+
+/// (label, value, count) rows for a values page.
+pub type Rows = Vec<(String, String, usize)>;
+/// Supplies a category's values; answers through the callback, now or later.
+pub type Loader<C> = Rc<dyn Fn(C, Box<dyn FnOnce(Rows)>)>;
+/// A button on one category's values page ("Manage playlists…").
+pub struct PageAction<C> {
+    pub category: C,
+    pub label: &'static str,
+    pub on_click: Rc<dyn Fn(&gtk::Button)>,
+}
+
+pub struct Sidebar<C: Facet> {
     pub nav: gtk::Box,
-    /// The values page; the library shows it in place of the grid.
+    /// The values page; the page shows it in place of its grid.
     pub values: gtk::Box,
-    all_count: gtk::Label,
-    buttons: RefCell<Vec<(Option<Category>, bool, gtk::Button)>>,
+    /// Each entry, its button and its count label (All and shortcuts).
+    buttons: RefCell<Vec<NavButton<C>>>,
     title: gtk::Label,
     list: gtk::StringList,
     filter_entry: gtk::SearchEntry,
-    /// "Manage playlists…", on the Playlists page only.
-    manage: gtk::Button,
+    /// The values page's own button, for its one category.
+    action: Option<(C, gtk::Button)>,
+    loader: Loader<C>,
     /// Shown label -> (value, count) for the category on the values page.
     entries: RefCell<HashMap<String, (String, usize)>>,
-    showing: Cell<Option<Category>>,
+    showing: Cell<Option<C>>,
     generation: Cell<u64>,
-    on_pick: Rc<dyn Fn(Pick)>,
+    on_pick: Rc<dyn Fn(Pick<C>)>,
     on_values: Rc<dyn Fn()>,
 }
 
-pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -> Rc<Sidebar> {
+/// The games library's sidebar.
+pub fn build(on_pick: impl Fn(Pick<Category>) + 'static, on_values: impl Fn() + 'static) -> Rc<Sidebar<Category>> {
+    let nav = vec![
+        (Nav::All("All Games"), "view-grid-symbolic"),
+        (Nav::Category(Category::Platforms), "computer-symbolic"),
+        (Nav::Category(Category::Genres), "folder-symbolic"),
+        (Nav::Category(Category::Publishers), "system-users-symbolic"),
+        (Nav::Category(Category::Series), "view-list-symbolic"),
+        (Nav::Category(Category::Years), "x-office-calendar-symbolic"),
+        (Nav::Category(Category::Regions), "mark-location-symbolic"),
+        (Nav::Category(Category::Tags), "bookmark-new-symbolic"),
+        (Nav::Category(Category::Status), "object-select-symbolic"),
+        (Nav::Category(Category::Playlists), "view-list-bullet-symbolic"),
+        (Nav::Favorites, "starred-symbolic"),
+    ];
+    let manage = PageAction { category: Category::Playlists, label: "Manage playlists…", on_click: Rc::new(crate::ui::playlists::manage) };
+    build_with(nav, Rc::new(load_game_values), Some(manage), on_pick, on_values)
+}
+
+/// A sidebar over any categories: `nav` in order with their icons.
+pub fn build_with<C: Facet>(
+    nav_entries: Vec<(Nav<C>, &'static str)>,
+    loader: Loader<C>,
+    action: Option<PageAction<C>>,
+    on_pick: impl Fn(Pick<C>) + 'static,
+    on_values: impl Fn() + 'static,
+) -> Rc<Sidebar<C>> {
     // Fixed width (Settings' navigation has the same): the rows' labels
     // expand inside it, and without an explicit
     // `hexpand(false)` that would spread to the sidebar and split a wide
@@ -124,9 +190,13 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     let title = gtk::Label::builder().xalign(0.0).hexpand(true).css_classes(["sidebar-values-title"]).build();
     let filter_entry = gtk::SearchEntry::builder().placeholder_text("Filter…").css_classes(["search"]).width_chars(22).build();
     head.append(&title);
-    let manage = gtk::Button::builder().label("Manage playlists…").css_classes(["btn"]).visible(false).build();
-    manage.connect_clicked(crate::ui::playlists::manage);
-    head.append(&manage);
+    let action = action.map(|a| {
+        let b = gtk::Button::builder().label(a.label).css_classes(["btn"]).visible(false).build();
+        let on_click = a.on_click.clone();
+        b.connect_clicked(move |b| on_click(b));
+        head.append(&b);
+        (a.category, b)
+    });
     head.append(&filter_entry);
     values.append(&head);
     let list = gtk::StringList::new(&[]);
@@ -143,12 +213,12 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     let sidebar = Rc::new(Sidebar {
         nav,
         values,
-        all_count: gtk::Label::builder().css_classes(["sidebar-count"]).build(),
         buttons: RefCell::new(Vec::new()),
         title,
         list,
         filter_entry,
-        manage,
+        action,
+        loader,
         entries: RefCell::new(HashMap::new()),
         showing: Cell::new(None),
         generation: Cell::new(0),
@@ -186,59 +256,75 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     });
 
     // Navigation.
-    let entries: [(Option<Category>, bool, &str, &str); 11] = [
-        (None, false, "view-grid-symbolic", "All Games"),
-        (Some(Category::Platforms), false, "computer-symbolic", "Platforms"),
-        (Some(Category::Genres), false, "folder-symbolic", "Genres"),
-        (Some(Category::Publishers), false, "system-users-symbolic", "Publishers"),
-        (Some(Category::Series), false, "view-list-symbolic", "Series"),
-        (Some(Category::Years), false, "x-office-calendar-symbolic", "Years"),
-        (Some(Category::Regions), false, "mark-location-symbolic", "Regions"),
-        (Some(Category::Tags), false, "bookmark-new-symbolic", "Tags"),
-        (Some(Category::Status), false, "object-select-symbolic", "Play Status"),
-        (Some(Category::Playlists), false, "view-list-bullet-symbolic", "Playlists"),
-        (None, true, "starred-symbolic", "Favorites"),
-    ];
-    for (category, favorites, icon, label) in entries {
+    for (entry, icon) in nav_entries {
         let inner = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).build();
         inner.append(&gtk::Image::from_icon_name(icon));
+        let label = match &entry {
+            Nav::All(l) => l,
+            Nav::Favorites => "Favorites",
+            Nav::Category(c) => c.label(),
+            Nav::Shortcut { label, .. } => label,
+        };
         inner.append(&gtk::Label::builder().label(label).xalign(0.0).hexpand(true).build());
-        if category.is_none() && !favorites {
-            inner.append(&sidebar.all_count);
+        let count = matches!(entry, Nav::All(_) | Nav::Shortcut { .. }).then(|| gtk::Label::builder().css_classes(["sidebar-count"]).build());
+        if let Some(c) = &count {
+            inner.append(c);
         }
         let b = gtk::Button::builder().child(&inner).css_classes(["sidebar-item"]).build();
         let weak = Rc::downgrade(&sidebar);
+        let clicked = entry.clone();
         b.connect_clicked(move |_| {
             let Some(s) = weak.upgrade() else { return };
-            match (category, favorites) {
-                (Some(c), _) => s.show_category(c),
-                (None, true) => {
-                    s.set_active(None, true);
+            match &clicked {
+                Nav::Category(c) => s.show_category(*c),
+                Nav::Favorites => {
+                    s.highlight(|n| *n == Nav::Favorites);
                     (s.on_pick)(Pick::Favorites);
                 }
-                (None, false) => {
-                    s.set_active(None, false);
+                Nav::All(_) => {
+                    s.highlight(|n| matches!(n, Nav::All(_)));
                     (s.on_pick)(Pick::All);
+                }
+                Nav::Shortcut { category, value, label } => {
+                    s.highlight(|n| n == &clicked);
+                    (s.on_pick)(Pick::Value { category: *category, value: value.to_string(), label: label.to_string() });
                 }
             }
         });
         sidebar.nav.append(&b);
-        sidebar.buttons.borrow_mut().push((category, favorites, b));
+        sidebar.buttons.borrow_mut().push((entry, b, count));
     }
     sidebar.set_active(None, false);
     sidebar
 }
 
-impl Sidebar {
-    /// The total next to All Games.
+impl<C: Facet> Sidebar<C> {
+    /// The total next to the "All" entry.
     pub fn set_total(&self, n: usize) {
-        self.all_count.set_label(&grouped(n));
+        self.set_count(|e| matches!(e, Nav::All(_)), n);
     }
 
-    /// Highlight a category (None + !favorites = All Games).
-    pub fn set_active(&self, category: Option<Category>, favorites: bool) {
-        for (c, f, b) in self.buttons.borrow().iter() {
-            if *c == category && *f == favorites {
+    /// The count beside a shortcut (or All).
+    pub fn set_count(&self, which: impl Fn(&Nav<C>) -> bool, n: usize) {
+        for (e, _, count) in self.buttons.borrow().iter() {
+            if let (true, Some(c)) = (which(e), count) {
+                c.set_label(&grouped(n));
+            }
+        }
+    }
+
+    /// Highlight a category (None + !favorites = the "All" entry).
+    pub fn set_active(&self, category: Option<C>, favorites: bool) {
+        match (category, favorites) {
+            (Some(c), _) => self.highlight(|n| *n == Nav::Category(c)),
+            (None, true) => self.highlight(|n| *n == Nav::Favorites),
+            (None, false) => self.highlight(|n| matches!(n, Nav::All(_))),
+        }
+    }
+
+    fn highlight(&self, pred: impl Fn(&Nav<C>) -> bool) {
+        for (e, b, _) in self.buttons.borrow().iter() {
+            if pred(e) {
                 b.add_css_class("active");
             } else {
                 b.remove_css_class("active");
@@ -247,7 +333,7 @@ impl Sidebar {
     }
 
     /// Load a category's values onto the values page and ask to show it.
-    pub fn show_category(self: &Rc<Self>, category: Category) {
+    pub fn show_category(self: &Rc<Self>, category: C) {
         self.set_active(Some(category), false);
         self.showing.set(Some(category));
         self.title.set_label(category.label());
@@ -255,50 +341,18 @@ impl Sidebar {
         (self.on_values)();
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
-        self.manage.set_visible(category == Category::Playlists);
-        if category == Category::Playlists {
-            let core = app::core();
-            let weak = Rc::downgrade(self);
-            app::spawn(async move { playlists::get_playlists(core.state()).await }, move |r| {
-                let Some(s) = weak.upgrade() else { return };
-                if s.generation.get() != generation {
-                    return;
-                }
-                let rows = r.unwrap_or_default().into_iter().map(|p| (p.name, p.id.to_string(), p.game_count as usize)).collect();
-                s.fill(rows);
-            });
-            return;
+        if let Some((c, b)) = &self.action {
+            b.set_visible(*c == category);
         }
-        if category == Category::Status {
-            let rows: Vec<(String, String, usize)> = STATUS.iter().map(|(v, l)| (l.to_string(), v.to_string(), 0)).collect();
-            self.fill(rows);
-            return;
-        }
-        let Some(facet) = category.facet() else { return };
-        let core = app::core();
         let weak = Rc::downgrade(self);
-        app::spawn(
-            async move {
-                let values = games::get_facet_values(core.state(), facet.to_string()).await.unwrap_or_default();
-                // Platforms are collections: show their names, filter on ids.
-                let names: HashMap<String, String> = if facet == "collection" {
-                    setup::get_available_collections(core.state()).await.unwrap_or_default().into_iter().map(|c| (c.id, c.display_name)).collect()
-                } else {
-                    HashMap::new()
-                };
-                (values, names)
-            },
-            move |(values, names)| {
+        (self.loader)(
+            category,
+            Box::new(move |rows| {
                 let Some(s) = weak.upgrade() else { return };
-                if s.generation.get() != generation {
-                    return;
+                if s.generation.get() == generation {
+                    s.fill(rows);
                 }
-                let rows = values
-                    .into_iter()
-                    .map(|v| (names.get(&v.value).cloned().unwrap_or_else(|| v.value.clone()), v.value, v.count))
-                    .collect();
-                s.fill(rows);
-            },
+            }),
         );
     }
 
@@ -312,9 +366,42 @@ impl Sidebar {
                 label
             })
             .collect();
-        self.title.set_label(&format!("{}  ·  {}", self.showing.get().map(Category::label).unwrap_or(""), grouped(labels.len())));
+        self.title.set_label(&format!("{}  ·  {}", self.showing.get().map(|c| c.label()).unwrap_or(""), grouped(labels.len())));
         self.entries.replace(map);
         let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
         self.list.splice(0, self.list.n_items(), &refs);
     }
+}
+
+/// The games library's values: facets from the catalogue, the play
+/// statuses, the playlists.
+fn load_game_values(category: Category, done: Box<dyn FnOnce(Rows)>) {
+    if category == Category::Playlists {
+        let core = app::core();
+        app::spawn(async move { playlists::get_playlists(core.state()).await }, move |r| {
+            done(r.unwrap_or_default().into_iter().map(|p| (p.name, p.id.to_string(), p.game_count as usize)).collect());
+        });
+        return;
+    }
+    if category == Category::Status {
+        done(STATUS.iter().map(|(v, l)| (l.to_string(), v.to_string(), 0)).collect());
+        return;
+    }
+    let Some(facet) = category.facet() else { return };
+    let core = app::core();
+    app::spawn(
+        async move {
+            let values = games::get_facet_values(core.state(), facet.to_string()).await.unwrap_or_default();
+            // Platforms are collections: show their names, filter on ids.
+            let names: HashMap<String, String> = if facet == "collection" {
+                setup::get_available_collections(core.state()).await.unwrap_or_default().into_iter().map(|c| (c.id, c.display_name)).collect()
+            } else {
+                HashMap::new()
+            };
+            (values, names)
+        },
+        move |(values, names)| {
+            done(values.into_iter().map(|v| (names.get(&v.value).cloned().unwrap_or_else(|| v.value.clone()), v.value, v.count)).collect());
+        },
+    );
 }
