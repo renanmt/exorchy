@@ -12,17 +12,6 @@ const ART: &str = include_str!("../../assets/logo.txt");
 /// The wordmark with `unit` px per art pixel (one character is `unit` wide
 /// and `2 * unit` tall). `unit` should keep `2 * unit` whole so the rows
 /// butt without seams.
-/// The motto beside the toolbar's wordmark, as the concept stacks its
-/// "PLAY / PRESERVE / EXPLORE": small, spaced capitals, one phrase a line.
-pub fn tagline() -> gtk::Label {
-    gtk::Label::builder()
-        .label("RETRO GAMES.\nFOREVER.")
-        .xalign(0.0)
-        .valign(gtk::Align::Center)
-        .css_classes(["brand-tagline"])
-        .build()
-}
-
 pub fn ascii(unit: f64) -> gtk::Box {
     let rows: Vec<Vec<char>> = ART.lines().map(|l| l.trim_end().chars().collect()).collect();
     let cols = rows.iter().map(Vec::len).max().unwrap_or(0);
@@ -62,4 +51,15 @@ pub fn ascii(unit: f64) -> gtk::Box {
         logo.append(&area);
     }
     logo
+}
+
+/// The motto beside the toolbar's wordmark, as the concept stacks its
+/// "PLAY / PRESERVE / EXPLORE": small, spaced capitals, one phrase a line.
+pub fn tagline() -> gtk::Label {
+    gtk::Label::builder()
+        .label("RETRO GAMES.\nFOREVER.")
+        .xalign(0.0)
+        .valign(gtk::Align::Center)
+        .css_classes(["brand-tagline"])
+        .build()
 }
