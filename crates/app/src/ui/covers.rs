@@ -22,11 +22,33 @@ pub const MEDIA_SOURCE: &str = "eXoMedia";
 type Done = Box<dyn FnOnce(Option<gdk::Texture>)>;
 
 /// Target pixel size of a decoded cover. `Fill` crops to exactly (w, h);
-/// `Fit` scales to fit inside (w, h), keeping the aspect ratio.
+/// `Fit` scales to fit inside (w, h), keeping the aspect ratio; `Boxed(w)`
+/// keeps the art's own shape at a box-like size around width `w`, with DOS
+/// screens shown as a CRT showed them (`boxed_size`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Size {
     Fill(u32, u32),
     Fit(u32, u32),
+    Boxed(u32),
+}
+
+/// The display size of a cover of `w`×`h` px in `Boxed(base)`. eXo's
+/// covers are box scans (portrait, about 4:5) or title screens; a 320×200
+/// DOS screen is stored at 1.6:1 but a CRT drew it at 4:3, so that shape
+/// is shown at 4:3. Portrait art is `base` wide, as a box stood on a shelf;
+/// landscape art gets a little more width so it is not a thumbnail beside
+/// the boxes. Extreme shapes are clamped.
+pub fn boxed_size(w: u32, h: u32, base: u32) -> (u32, u32) {
+    if w == 0 || h == 0 {
+        return (base, base * 5 / 4);
+    }
+    let mut ratio = w as f64 / h as f64;
+    if (1.55..=1.65).contains(&ratio) {
+        ratio = 4.0 / 3.0;
+    }
+    let ratio = ratio.clamp(0.6, 1.8);
+    let width = if ratio <= 1.0 { base as f64 } else { base as f64 * 1.3 };
+    (width.round() as u32, (width / ratio).round() as u32)
 }
 
 struct Covers {
@@ -155,6 +177,10 @@ pub fn load_scaled(path: &Path, size: Size) -> Option<gdk::Texture> {
     let scaled = match size {
         Size::Fill(w, h) => img.resize_to_fill(w, h, image::imageops::FilterType::Triangle),
         Size::Fit(w, h) => img.resize(w, h, image::imageops::FilterType::Triangle),
+        Size::Boxed(base) => {
+            let (w, h) = boxed_size(img.width(), img.height(), base);
+            img.resize_exact(w, h, image::imageops::FilterType::Triangle)
+        }
     };
     let rgba = scaled.to_rgba8();
     let (w, h) = rgba.dimensions();
@@ -189,4 +215,22 @@ fn load(path: PathBuf, size: Size, done: Done) {
             cb(texture.clone());
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::boxed_size;
+
+    #[test]
+    fn boxed_covers_keep_their_shape() {
+        // A box scan keeps its proportions at the base width.
+        assert_eq!(boxed_size(316, 400, 150), (150, 190));
+        // A 320x200 DOS screen (stored 400x250) is drawn at a CRT's 4:3.
+        assert_eq!(boxed_size(400, 250, 150), (195, 146));
+        // A 4:3 screen stays 4:3.
+        assert_eq!(boxed_size(400, 300, 150), (195, 146));
+        // A banner is clamped rather than drawn as a sliver.
+        assert_eq!(boxed_size(800, 100, 150), (195, 108));
+        assert_eq!(boxed_size(0, 0, 150), (150, 187));
+    }
 }

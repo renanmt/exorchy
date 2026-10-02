@@ -97,7 +97,9 @@ impl DetailPanel {
 
         // Hero: the cover beside who and what the game is, and what to do.
         let hero = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["dossier-hero"]).build();
-        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).width_request(crate::theme::scaled(150)).height_request(crate::theme::scaled(210)).can_shrink(true).valign(gtk::Align::Start).css_classes(["detail-cover"]).build();
+        // Sized by the art itself (`covers::Size::Boxed`): the frame hugs a
+        // box scan or a title screen alike, never letterboxed.
+        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).can_shrink(false).halign(gtk::Align::Start).valign(gtk::Align::Start).css_classes(["detail-cover"]).build();
         hero.append(&cover);
         let side = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).hexpand(true).build();
         let kind = gtk::Label::builder().xalign(0.0).css_classes(["dossier-kind"]).build();
@@ -418,7 +420,7 @@ impl DetailPanel {
         self.generation.set(generation);
         self.cover.set_paintable(gtk::gdk::Paintable::NONE);
         let panel = Rc::downgrade(self);
-        covers::request(game.torrent_source.as_deref(), game.thumbnail_key.as_deref(), covers::Size::Fit(panel_width() as u32 - 32, 320), move |t| {
+        covers::request(game.torrent_source.as_deref(), game.thumbnail_key.as_deref(), covers::Size::Boxed(crate::theme::scaled(150) as u32), move |t| {
             let Some(panel) = panel.upgrade() else { return };
             if panel.generation.get() != generation {
                 return;

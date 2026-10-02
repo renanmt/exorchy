@@ -754,3 +754,20 @@ Theme music:
 - The now-playing bar at the bottom belongs to the ♪ shuffle (and the list walk), which isn't
   tied to a game. It never shows for a dossier theme, and the ♪ starts the shuffle while a
   dossier theme is the loaded track. "Continue the shuffle" (`music_continuous`) stays.
+
+## 2026-10-02 - The dossier cover takes the art's own shape
+
+The dossier drew every cover inside a fixed 150 × 210 frame, scaled to fit. eXo's posters are
+two shapes:
+- box scans, portrait at about 4:5;
+- title screens, often a 320 × 200 DOS screen stored at 1.6:1, which a CRT displayed at 4:3.
+
+So box art floated in empty bands inside a too-tall frame, and title screens were small and
+squashed. `covers::Size::Boxed(base)` sizes the texture from the art itself
+(`covers::boxed_size`), and the picture shows it at that size, so the frame hugs it:
+- portrait art is `base` wide (`scaled(150)`), like a box on a shelf;
+- landscape art is 1.3 × `base` wide;
+- a 1.55–1.65 ratio is drawn at 4:3, the shape it had on screen in the 90s;
+- extreme shapes are clamped to 0.6–1.8.
+
+The library cards keep their crop to fill.
