@@ -872,3 +872,21 @@ at its own size, never larger than the window minus a margin, and closes on a cl
 - A long sequence delays the shot until 1.1 s after its last step.
 - The capture waits for a fresh paint, since a dialog presented since the last frame was
   missing from it.
+
+## 2026-10-02 - Cue sheets that name a track in another case
+
+SimCopter (eXoWin9x) asked for its CD. Its cue sheet says `FILE "OUT-SIMCOPTER.BIN"`, but the
+archive unpacks `out-simcopter.bin`. On Windows that is the same file. On Linux DOSBox-X found
+nothing and mounted an empty drive: its log says `CDROM: Image loaded No. of data tracks=0,
+audio tracks=-1`.
+
+The fix is `launchers/cue.rs::alias_cue_tracks`, which runs before every DOSBox launch (the DOS
+conf patcher and the Win9x DOSBox-X path). It reads the cue sheets the conf `IMGMOUNT`s:
+`.\`-relative ones under the eXo folder, absolute ones as written, both matched ignoring case.
+For any track file whose spelling exists on disk only in another case, it adds a symlink with
+the cue's spelling beside the real file.
+- eXo's files are not rewritten, so a verify or re-extract still matches the archive.
+- It is idempotent: once the link exists there is nothing to do.
+- It needs no per-game list: any title with the same mismatch is covered.
+
+Among the installed games only SimCopter had it. Titles not yet extracted could not be checked.

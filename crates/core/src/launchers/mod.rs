@@ -6,6 +6,7 @@
 //! from Exorchy) spawn through `spawn_emulator_and_track` themselves and
 //! report `Launched`. A new kind is one module and one match arm.
 
+pub(crate) mod cue;
 pub(crate) mod dosbox;
 
 use std::collections::HashMap;
