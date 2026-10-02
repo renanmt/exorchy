@@ -6,16 +6,19 @@
   background-color: var(--bg-primary);
   color: var(--text-strong);
   box-shadow: none;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: var(--hairline) solid var(--line-frame);
 }
-.settings-view .settings-side { background-color: var(--bg-secondary); }
+.settings-view .settings-side { background-color: var(--bg-secondary); border-right: var(--hairline) solid var(--line-frame); }
 .settings-view preferencespage { background-color: var(--bg-primary); }
 .settings-view preferencespage > scrolledwindow > viewport > clamp > box { padding: 14px 24px 24px 24px; }
 
 /* Sidebar navigation */
 list.settings-nav { background: none; padding: 8px; }
+/* Like the library's sidebar: plain rows, the selected one with an accent
+   bar and tint (tmp/concept 01.png). */
 list.settings-nav > row.settings-nav-item {
-  border-radius: var(--radius);
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
   padding: 11px 14px;
   margin: 2px 0;
   font-size: 1.1em;
@@ -23,7 +26,7 @@ list.settings-nav > row.settings-nav-item {
   background: none;
 }
 list.settings-nav > row.settings-nav-item:hover { color: var(--text-primary); background-color: var(--fill-1); }
-list.settings-nav > row.settings-nav-item:selected { color: var(--text-strong); background-color: var(--accent-fill); }
+list.settings-nav > row.settings-nav-item:selected { color: var(--accent); background-color: var(--accent-glow); border-left-color: var(--accent); font-weight: 600; }
 list.settings-nav > row.settings-nav-item image { color: var(--text-muted); -gtk-icon-size: 20px; }
 list.settings-nav > row.settings-nav-item:selected image { color: var(--accent); }
 
@@ -31,12 +34,14 @@ list.settings-nav > row.settings-nav-item:selected image { color: var(--accent);
 .settings-view preferencesgroup > box > label.title { color: var(--text-strong); font-weight: 600; text-transform: uppercase; font-size: 0.82em; letter-spacing: 0.06em; }
 .settings-view preferencesgroup > box > label.description { color: var(--text-muted); font-size: 0.9em; }
 .settings-view preferencesgroup.danger-zone > box > label.title { color: var(--danger); }
+/* Groups as outlined frames, not filled panels. */
 .settings-view preferencesgroup list.boxed-list {
-  background-color: var(--bg-card);
-  border: var(--border) solid var(--line-2);
-  border-radius: var(--radius-lg);
+  background-color: transparent;
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  box-shadow: none;
 }
-.settings-view preferencesgroup list.boxed-list > row { background: none; border-bottom: 1px solid var(--line-1); }
+.settings-view preferencesgroup list.boxed-list > row { background: none; border-bottom: var(--hairline) solid var(--line-frame); }
 .settings-view preferencesgroup list.boxed-list > row:last-child { border-bottom: none; }
 .settings-view preferencesgroup list.boxed-list > row.settings-row:hover { background-color: var(--fill-1); }
 .settings-view preferencesgroup list.boxed-list > row.settings-row:active { background-color: var(--fill-2); }

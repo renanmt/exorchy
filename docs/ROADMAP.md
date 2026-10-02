@@ -377,4 +377,11 @@ Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,
 `--hairline` (1 px) outlines in `--line-frame`, outlined controls and tags, a
 thicker accent outline on the selected card.
-- [ ] **Polish:** narrow-window behaviour of all of it, docs.
+- [x] **Polish** (branch `ui-polish`, 2026-10-01): the shared controls
+      follow the concept everywhere (hairline buttons, outlined dropdowns,
+      chips and toggle chips checked like the active tab), hairline rules on
+      the filter row and jump bar, Settings with the library sidebar's
+      navigation (accent bar) and outlined group frames. Narrow windows:
+      sidebar hidden below 1100 sp, status bar hints below 1300 sp and counts
+      below 760 sp, dossier full width in the small layout. Awaiting the
+      user's review (the Reading Room could not be captured headlessly).

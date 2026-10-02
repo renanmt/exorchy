@@ -660,3 +660,13 @@ installed). The new filters ride in `BrowseFilter` inside `GameFilter`; the libr
 `get_games_browse` / `get_section_keys_browse` with one `GameQuery` instead of growing the
 positional `get_games`, which other callers keep using. Facet counts are over primary rows of the
 visible catalogue, independent of the other filters.
+
+## 2026-10-01 - UI revamp polish: the concept's controls everywhere
+
+The revamp's hairline language (`--hairline`, `--line-frame`) now lives in the shared controls,
+so every page gets it without per-module rules: `button.btn` (all buttons), `dropdown.drop`
+(outlined, transparent), `button.chip` / `button.shelf-btn` (outlined, near-square; checked =
+accent text, accent outline, `--accent-glow` tint, the active tab's look instead of a filled
+block), the filter row and jump bar rules. Settings follows the library sidebar (accent bar on
+the selected page) and draws its groups as outlined frames instead of filled panels. The older
+2 px `--border` stays for what was not redesigned.
