@@ -169,16 +169,6 @@ pub fn toggle_favorite(id: i64, done: impl FnOnce(Result<bool, String>) + 'stati
     app::spawn(async move { games::toggle_favorite(core.state(), id).await }, done);
 }
 
-/// Open a manual or image with the desktop's default application.
-pub fn open_document(path: String) {
-    let core = app::core();
-    app::spawn(async move { games::open_document(core.clone(), core.state(), path).await }, |res| {
-        if let Err(e) = res {
-            bus::toast_with("Couldn't open the document", Some(&e), None);
-        }
-    });
-}
-
 /// "Add to playlist…": the playlist picker (`ui::playlists`).
 pub fn add_to_playlist(parent: &impl IsA<gtk::Widget>, game: &Game) {
     crate::ui::playlists::pick_for_game(parent, game);

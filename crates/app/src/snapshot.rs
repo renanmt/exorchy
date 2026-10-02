@@ -64,7 +64,8 @@ pub fn arm(window: &adw::ApplicationWindow) {
                 let game = panel.selected_game();
                 log::info!("sequence step {step}: open={} game={:?}", panel.is_open(), game.as_ref().and_then(|g| g.id));
                 if let Some(label) = step.strip_prefix("click:") {
-                    let root = lib.widget.clone();
+                    // The whole window: dialogs live beside the library page.
+                    let root: gtk::Widget = window.clone().upcast();
                     let hit = find(&root, &|w| w.is::<gtk::Button>() && find(w, &|l| l.downcast_ref::<gtk::Label>().is_some_and(|l| l.label() == label)).is_some());
                     match hit.and_downcast::<gtk::Button>() {
                         Some(b) => b.emit_clicked(),
@@ -129,6 +130,36 @@ pub fn arm(window: &adw::ApplicationWindow) {
                     }
                     "wait" => {}
                     "close_doc" => lib.close_document(),
+                    "cover" => panel.view_cover(),
+                    // type:<text> fills the focused field and presses Enter.
+                    s if s.starts_with("type:") => {
+                        let focus = gtk::prelude::RootExt::focus(&window);
+                        let focused = focus.as_ref().and_then(|f| f.downcast_ref::<gtk::Entry>().cloned().or_else(|| f.parent().and_downcast::<gtk::Entry>()));
+                        // Broadway's window may hold no focus: the last mapped
+                        // entry is the topmost dialog's.
+                        let entry = focused.or_else(|| {
+                            let mut last = None;
+                            let mut stack: Vec<gtk::Widget> = vec![window.clone().upcast()];
+                            while let Some(w) = stack.pop() {
+                                if w.is::<gtk::Entry>() && w.is_visible() {
+                                    last = w.downcast_ref::<gtk::Entry>().cloned();
+                                }
+                                let mut c = w.last_child();
+                                while let Some(x) = c {
+                                    c = x.prev_sibling();
+                                    stack.push(x);
+                                }
+                            }
+                            last
+                        });
+                        match entry {
+                            Some(e) => {
+                                e.set_text(&s[5..]);
+                                e.emit_activate();
+                            }
+                            None => log::warn!("snapshot: no focused entry for {s}"),
+                        }
+                    }
                     // doc:<path> opens a document as a dossier's manual would.
                     s if s.starts_with("doc:") => {
                         let path = &s[4..];
@@ -156,17 +187,42 @@ pub fn arm(window: &adw::ApplicationWindow) {
             }
         });
     }
-    glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
+    // A long sequence pushes the shot back: its last step gets the same
+    // 1.1 s to settle as a lone step has (a dialog needs about that).
+    let steps = std::env::var("EXORCHY_SNAPSHOT_SEQUENCE").map(|s| s.split(',').filter(|x| !x.trim().is_empty()).count() as u64).unwrap_or(0);
+    let shot_ms = if steps > 1 { delay_ms.max(delay_ms.saturating_sub(1100) + 250 * (steps - 1) + 1100) } else { delay_ms };
+    glib::timeout_add_local_once(Duration::from_millis(shot_ms), move || {
         if std::env::var_os("EXORCHY_DUMP_TREE").is_some() {
             dump(window.upcast_ref::<gtk::Widget>(), 0);
         }
-        match render(&window, &path) {
-            Ok(()) => log::info!("Snapshot written to {path}"),
-            Err(e) => log::error!("Snapshot failed: {e}"),
+        // The capture reuses the last painted frame: a dialog presented since
+        // is missing from it. Paint once more, then capture (or capture
+        // anyway if no frame comes).
+        let done = std::rc::Rc::new(std::cell::Cell::new(false));
+        let shoot = {
+            let (window, path, done) = (window.clone(), path.clone(), done.clone());
+            move || {
+                if done.replace(true) {
+                    return;
+                }
+                match render(&window, &path) {
+                    Ok(()) => log::info!("Snapshot written to {path}"),
+                    Err(e) => log::error!("Snapshot failed: {e}"),
+                }
+                if let Some(app) = window.application() {
+                    app.quit();
+                }
+            }
+        };
+        let shoot = std::rc::Rc::new(shoot);
+        if let Some(clock) = window.frame_clock() {
+            let s = shoot.clone();
+            clock.connect_after_paint(move |_| s());
+            window.queue_draw();
+            clock.request_phase(gtk::gdk::FrameClockPhase::PAINT);
         }
-        if let Some(app) = window.application() {
-            app.quit();
-        }
+        let s = shoot.clone();
+        glib::timeout_add_local_once(Duration::from_millis(500), move || s());
     });
 }
 

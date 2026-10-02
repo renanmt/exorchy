@@ -29,6 +29,7 @@ pub mod actions;
 pub mod backdrop;
 pub mod game_settings;
 pub mod hidden;
+pub mod image_viewer;
 pub mod launch_notes;
 pub mod library_location;
 pub mod media;

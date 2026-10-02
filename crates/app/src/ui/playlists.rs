@@ -51,7 +51,10 @@ pub fn pick_for_game(parent: &impl IsA<gtk::Widget>, game: &Game) {
 /// The management dialog: rename / delete the user's playlists, create new
 /// ones, see the curated ones. For the library page's playlist filter.
 pub fn manage(parent: &impl IsA<gtk::Widget>) {
-    let d = build(parent, "Playlists", None, None);
+    // Over the window, whatever button asked: a dialog anchored to a widget
+    // deep in a page can be left undrawn.
+    let root = parent.as_ref().root().map(|r| r.upcast::<gtk::Widget>()).unwrap_or_else(|| parent.as_ref().clone());
+    let d = build(&root, "Playlists", None, None);
     reload(&d);
 }
 
@@ -81,6 +84,13 @@ fn build(parent: &impl IsA<gtk::Widget>, title: &str, subtitle: Option<&str>, ga
         member: RefCell::new(HashSet::new()),
         touched: Cell::new(false),
         reverting: Cell::new(false),
+    });
+    // The dialog's state lives as long as the dialog: every handler holds it
+    // weakly, so without this owner it was dropped when the opener returned
+    // - nothing rendered and no button worked.
+    let owner = RefCell::new(Some(d.clone()));
+    d.dialog.connect_closed(move |_| {
+        owner.take();
     });
     new_btn.connect_clicked(glib::clone!(#[weak] d, move |_| {
         d.touched.set(true);

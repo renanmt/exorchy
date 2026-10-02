@@ -21,6 +21,9 @@ button.dossier-star { color: var(--text-secondary); }
 button.dossier-star.is-favorite { color: var(--accent); }
 
 .dossier-hero { margin-top: 14px; }
+/* The hero stays above the scrolling body; a line once content passes under it. */
+.dossier-pinned { padding: 0 16px 12px 16px; border-bottom: var(--hairline) solid transparent; }
+.dossier-pinned.scrolled { border-bottom-color: var(--line-frame); }
 .dossier-hero .detail-cover { border: var(--hairline) solid var(--line-frame); border-radius: var(--radius); }
 /* Outlined secondary controls. */
 .dossier button.btn:not(.primary):not(.ghost),

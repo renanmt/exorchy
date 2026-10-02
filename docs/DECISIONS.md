@@ -833,3 +833,42 @@ the bar's mode with the tab.
 transition, so a shot taken after a page switch caught the old page. That was the unresolved
 Reading Room snapshot from the UI revamp. `snapshot::arm` now turns GTK animations off. New
 sequence steps: `doc:<path>` (opens a document as a manual would) and `close_doc`.
+
+## 2026-10-02 - Playlists fixed; the dossier pins its hero; art at full size
+
+**Playlists were dead.** Both playlist dialogs (`playlists::pick_for_game`, `manage`) built their
+state as an `Rc<PlaylistDialog>` and let it drop when the opener returned. Every handler held
+it weakly, so the list never rendered and neither "New playlist…" nor the rows did anything.
+The dialog now owns its state until it closes. The whole flow was verified in a test profile,
+driving the real widgets:
+- a playlist created from a dossier's "Add to playlist", holding the game;
+- another created from Manage;
+- both on the sidebar's Playlists page with their counts;
+- picking one narrows the grid and shows its chip;
+- the status bar counts them.
+
+**The preview video kept changing size.** A `ScrolledWindow`'s viewport gives a child taller
+than the view its *minimum* height by default. So under a long tab the video, a can-shrink
+`Picture`, fell to its 200 px floor, and under a short tab the spare height grew it. The
+dossier's viewport now uses `ScrollablePolicy::Natural`: everything in the body takes its
+natural height, and the video's size depends only on the panel's width.
+
+**The hero stays pinned.** The cover, title and actions sit above the scroller, so only what
+follows them scrolls. A line appears under the hero once content passes beneath it.
+
+**Art at full size.** `ui/image_viewer.rs` shows an image in a dialog centred over the window,
+at its own size, never larger than the window minus a margin, and closes on a click or Esc.
+- The cover opens it (the zoom cursor shows this). It uses the metadata pack's own
+  "Box - Front" scan when the pack is installed, else the poster, else the bundled preview.
+- Art shorter than 480 px (scaled) is enlarged to that, so a 120 px preview does not open as
+  a stamp.
+- The gallery thumbnails open the same viewer instead of an external program.
+- It decodes the file as is: the cover loader's `Fit` also scales up, which took seconds on a
+  small preview.
+
+**Snapshot tooling.** Found while proving the above:
+- `click:` searches the whole window, so dialogs can be clicked.
+- New steps: `type:<text>` (fills the focused or topmost entry and presses Enter) and `cover`.
+- A long sequence delays the shot until 1.1 s after its last step.
+- The capture waits for a fresh paint, since a dialog presented since the last frame was
+  missing from it.

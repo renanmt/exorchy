@@ -393,6 +393,10 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       dossier; a downloaded issue opens offline. Game manuals open the same
       way (in place, Fit page, full screen; the dossier returns on close);
       the status bar shows the room's counts and keys there.
+- [x] **Dossier and playlists 2026-10-02:** playlists work again (their
+      dialogs dropped their own state); the dossier's hero stays pinned
+      while the body scrolls; the preview video keeps one size across tabs;
+      the cover (and gallery) open at full size in a centred dialog.
 
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,

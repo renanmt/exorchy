@@ -59,6 +59,9 @@ pub struct DetailPanel {
     shots: Cell<usize>,
     articles: Cell<usize>,
     manual_path: RefCell<Option<String>>,
+    /// The metadata pack's images for this game (full size), for the
+    /// cover's full-resolution view.
+    gallery_images: RefCell<Vec<String>>,
     scroller: gtk::ScrolledWindow,
     /// Below the cover; `ui::media` fills it.
     pub media_slot: gtk::Box,
@@ -115,7 +118,10 @@ impl DetailPanel {
         side.append(&actions);
         side.append(&secondary);
         hero.append(&side);
-        body.append(&hero);
+        // The hero stays put while the rest scrolls under it.
+        let pinned = gtk::Box::builder().orientation(gtk::Orientation::Vertical).css_classes(["dossier-pinned"]).build();
+        pinned.append(&hero);
+        root.append(&pinned);
 
         let status = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(["muted", "small"]).visible(false).build();
         body.append(&status);
@@ -169,6 +175,20 @@ impl DetailPanel {
         tabs.add_titled(&setup, Some("setup"), "Setup");
 
         let scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).child(&body).build();
+        // Natural heights for everything in the body: by default a viewport
+        // gives a taller-than-view child its minimum, so the preview video
+        // shrank to its floor under a long tab and grew under a short one.
+        if let Some(vp) = scroller.child().and_downcast::<gtk::Viewport>() {
+            vp.set_vscroll_policy(gtk::ScrollablePolicy::Natural);
+        }
+        // A line under the pinned hero once the body scrolls beneath it.
+        scroller.vadjustment().connect_value_changed(glib::clone!(#[weak] pinned, move |a| {
+            if a.value() > 0.5 {
+                pinned.add_css_class("scrolled");
+            } else {
+                pinned.remove_css_class("scrolled");
+            }
+        }));
         root.append(&scroller);
 
         let panel = Rc::new(DetailPanel {
@@ -206,6 +226,7 @@ impl DetailPanel {
             shots: Cell::new(0),
             articles: Cell::new(0),
             manual_path: RefCell::new(None),
+            gallery_images: RefCell::new(Vec::new()),
             scroller,
             media_slot,
             note_slot,
@@ -215,6 +236,12 @@ impl DetailPanel {
         });
         close.connect_clicked(glib::clone!(#[weak] panel, move |_| panel.close()));
         panel.favorite.connect_clicked(glib::clone!(#[weak] panel, move |_| panel.toggle_favorite()));
+        // The cover opens at full resolution.
+        panel.cover.set_cursor_from_name(Some("zoom-in"));
+        panel.cover.set_tooltip_text(Some("View full size"));
+        let click = gtk::GestureClick::new();
+        click.connect_released(glib::clone!(#[weak] panel, move |_, _, _, _| panel.view_cover()));
+        panel.cover.add_controller(click);
         launch_notes::attach(&panel);
         panel
     }
@@ -454,8 +481,19 @@ impl DetailPanel {
         }));
     }
 
+    /// The cover at full resolution, centred over the window.
+    pub fn view_cover(&self) {
+        let Some(game) = self.game.borrow().clone() else { return };
+        let path = crate::ui::image_viewer::best_cover(&self.gallery_images.borrow(), game.torrent_source.as_deref(), game.thumbnail_key.as_deref());
+        match path {
+            Some(p) => crate::ui::image_viewer::show(&self.window, &p, &game.title),
+            None => bus::toast("No cover art for this game"),
+        }
+    }
+
     fn load_metadata(self: &Rc<Self>, game: &Game) {
         self.gallery.remove_all();
+        self.gallery_images.replace(Vec::new());
         self.gallery_head.set_visible(false);
         self.manual_path.replace(None);
         let core = app::core();
@@ -474,6 +512,7 @@ impl DetailPanel {
                 }
                 let Ok(meta) = res else { return };
                 panel.manual_path.replace(meta.manual_path.clone());
+                panel.gallery_images.replace(meta.images.clone());
                 panel.gallery.remove_all();
                 for (thumb, full) in meta.thumbnails.iter().zip(meta.images.iter()) {
                     let pic = gtk::Picture::builder().content_fit(gtk::ContentFit::Cover).height_request(crate::theme::scaled(96)).css_classes(["gallery-thumb"]).build();
@@ -486,8 +525,8 @@ impl DetailPanel {
                         }
                     });
                     let btn = gtk::Button::builder().child(&pic).css_classes(["gallery-btn"]).build();
-                    let full = full.clone();
-                    btn.connect_clicked(move |_| actions::open_document(full.clone()));
+                    let (full, w, title) = (full.clone(), panel.window.clone(), panel.game.borrow().as_ref().map(|g| g.title.clone()).unwrap_or_default());
+                    btn.connect_clicked(move |_| crate::ui::image_viewer::show(&w, std::path::Path::new(&full), &title));
                     panel.gallery.insert(&btn, -1);
                 }
                 panel.shots.set(meta.images.len());
