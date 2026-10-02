@@ -15,6 +15,10 @@ use gtk::glib;
 use crate::app;
 use crate::ui::statusbar::grouped;
 
+/// The width of the app's left columns: this sidebar and Settings'
+/// navigation are the same bar, so they share it.
+pub const SIDEBAR_WIDTH: i32 = 280;
+
 /// A category the sidebar browses by.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Category {
@@ -101,10 +105,11 @@ pub struct Sidebar {
 }
 
 pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -> Rc<Sidebar> {
-    // Fixed width: the rows' labels expand inside it, and without an explicit
+    // Fixed width (Settings' navigation has the same): the rows' labels
+    // expand inside it, and without an explicit
     // `hexpand(false)` that would spread to the sidebar and split a wide
     // window's spare room with the grid.
-    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(220).hexpand(false).css_classes(["sidebar"]).build();
+    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(SIDEBAR_WIDTH).hexpand(false).css_classes(["sidebar"]).build();
 
     // Values page: a heading, a filter field, the virtualised list.
     let values = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).css_classes(["sidebar-values"]).build();
