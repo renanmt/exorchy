@@ -21,7 +21,7 @@ Exodium's SolidJS web UI in a Tauri webview and is being rebuilt natively
 | Database | SQLite via `rusqlite` (WAL), pre-built catalogue shipped gzipped | ~6 MB catalogue instead of eXo's 5 GB metadata zip |
 | Torrent | `librqbit` 9.0.0-rc.0 (fork pin, see DECISIONS) with selective file downloads | stream one game at a time |
 | Emulators | DOSBox Staging 0.83.0 fetched as an emulator pack (or the system binary); DOSBox-X / 86Box / ScummVM packs for the other collections | AUR-only on Arch |
-| Media | GStreamer (previews, music), poppler-glib (manuals, magazines), `image` (covers) | native players instead of the webview's |
+| Media | GStreamer `playbin` through our own `gtk::MediaStream` (`ui/media/playbin.rs`; GTK's built-in backend is playbin3, which aborts), poppler-glib (manuals, magazines), `image` (covers) | native players instead of the webview's |
 | Theme | Omarchy `colors.toml` + `shell.toml`, watched with inotify, applied as GTK CSS custom properties | live theme switching |
 
 ## Repository layout
@@ -54,7 +54,7 @@ exorchy/
 │   ├── src/ui/               window, splash, setup, library, card, detail, model, covers, downloads,
 │   │                         actions, bus, dialogs, util + the feature modules (settings, reading,
 │   │                         media, playlists, game_settings, onboarding)
-│   └── assets/               splash.jpg, exorchy.png (icon), logo.txt (ASCII wordmark), collections/<col>.jpg
+│   └── assets/               splash_computer.png (splash graphic), splash.jpg (README key art), exorchy.png (icon), logo.txt (ASCII wordmark), collections/<col>.jpg
 ├── metadata/                 bundled XML (gz), configs zips, variant indexes, media index, exorchy.db.gz
 ├── torrents/                 every eXo .torrent (DOS packs, Win3x, Win9x, ScummVM, Media Pack)
 ├── manifest.json             content packs + emulator packs per collection
@@ -271,9 +271,16 @@ seeding consent, packs, transfer polling, `ensure_dosbox_staging`,
 returns the live page. Single instance comes from GApplication: a second
 `exorchy` activates the running one, which presents its window.
 
-The splash (`ui/splash.rs`) shows `assets/splash.jpg` on its own dark
-backdrop for at least 1.6 s and until the app knows what to render, then
-fades; it is an overlay inside the window, never a second toplevel.
+The splash (`ui/splash.rs`) is its own small window (3:2, `scaled(600)` wide),
+floated and centred on Hyprland by a runtime rule (`hyprctl eval`, matched on
+its title "eXorchy splash"; the user's config is untouched). It is built from
+widgets in the theme's colours: `assets/splash_computer.png` (its violet
+hue-rotated to the theme by a rule `theme.rs` generates), the pixel wordmark
+(`logo::ascii`), "THE EXODOS LAUNCHER FOR OMARCHY" and the slogan
+(`styles/splash.css`). The main window is built hidden; after at least 5 s,
+once the app knows what to render, `Splash::release` presents it (Hyprland
+tiles it) and the splash fades and closes. Snapshot runs skip the splash;
+`EXORCHY_SNAPSHOT_SPLASH=<png>` captures it.
 
 The wordmark (`ui/logo.rs`) is `assets/logo.txt`, half-block ASCII art, drawn
 as pixel art: one `DrawingArea` per text row, each character two square
@@ -302,15 +309,30 @@ recently played, installed, favourites and user playlists. `LibraryPage`
 exposes `toolbar_slot`, `bar_slot` and `set_reading_widget()` for the feature
 modules.
 
-### Detail panel (`ui/detail.rs`)
+### Detail panel: the game dossier (`ui/detail.rs`, `styles/detail.css`)
 
-A `gtk::Revealer` (slide left, `PANEL_WIDTH` 560 px) showing one game:
-title, variant chips (one variant at a time; every refresh keys on ids, never
-on the game object), the action bar Play / Stop / Download / Cancel / ★ / ⋯,
-the info table, the gallery (box scans, screenshots from the metadata
-pack), the manual button, and `media_slot` (a box the media module fills
-with the preview player / music controls). Hooks: `on_shown(cb)`,
-`current()`, `refresh_by_id`, `refresh_download`, `refresh_running`.
+The split view's end sidebar (`PANEL_WIDTH` 560 px; it overlays the grid in
+narrow windows) showing one game as a dossier:
+- header: favourite star (F), "GAME DOSSIER", close (Esc);
+- hero: cover beside the platform (accent), title, year · genre · developer,
+  language chips (one variant at a time; every refresh keys on ids, never on
+  the game object), the primary action (Play as an `adw::SplitButton` whose
+  menu holds Game settings and the manual; Stop / Download / Cancel /
+  progress otherwise), then Add to playlist and ⋯ (hide, reset, uninstall);
+- the launch note (`note_slot`), then `media_slot` (preview video and theme
+  row; deliberately not in a tab, since the video pauses the theme music and
+  a hidden tab would play it unseen), genre tags, description;
+- tabs (`adw::ViewStack` + `adw::InlineViewSwitcher` styled as an underline
+  row): Overview (facts beside Features, which are only true facts: emulator,
+  printing, players, manual, language versions, CRT shaders; then eXo's
+  notes), Media (screenshots, count in the title; "Covered in" press
+  articles), Manuals (hidden without one), Setup (emulator and whose choice
+  it is, collection, status, Game settings, Reset).
+Hooks: `on_shown(cb)`, `refresh_by_id`, `refresh_download`,
+`refresh_running`, `shows(id)`, `reopen()`, `play_shown()`,
+`favorite_shown()`. Keys (library.rs): Enter plays the shown game, F stars
+it, I shows or hides the dossier; Enter or a double-click on the grid card
+the dossier already shows plays it.
 
 ### Covers (`ui/covers.rs`)
 
@@ -339,11 +361,14 @@ network choice).
 | `ui/settings.rs` | `settings::open(parent, section)` from the gear button and Ctrl+,: a full-body page in place of the library (`window::show_page`), back arrow or Esc returns. An `adw::NavigationSplitView` of General, Collections, Hidden titles, Emulators, Appearance, Storage, Network, Packs, About; below 720 sp it collapses to list → section with back arrows and every row stacks (`widgets::follow_narrow`); content is clamped to 960 px |
 | `ui/transfers.rs` | `transfers::open(parent)` from the toolbar's connection badge (`library.activity_button`): a full-body page like Settings. Downloading (games, content packs, Reading Room, preview/theme fetches), Queued (media fetches waiting for a slot), Torrents (`games::get_session_torrents`: every session torrent with its own rates, peers, upload); 1 s poll, rows updated in place |
 | `ui/library_location.rs` | `library_location::gate(window, stack, show_library)` from `window.rs` once setup is done, before the torrent session starts: runs a move Settings requested (progress page), asks where a missing library went (Locate / Continue without it), offers once to move a library still in `$HOME` to `~/Games/eXorchy` (refusal kept in `library_move_declined`). `move_from_settings` / `locate_from_settings` back Settings → General → Library folder; Move records the target and restarts the app, it never moves while the app runs |
+| `ui/image_viewer.rs` | `image_viewer::show(window, path, title)`: an image at its own size in a dialog centred over the window (shrunk to fit, small art enlarged to a minimum); `best_cover` picks the metadata pack's Box - Front scan, else the poster. The dossier's cover and gallery open it. `styles/image_viewer.css` |
+| `ui/sidebar.rs` | Generic over a `Facet` category type (`Sidebar<C>`, `build_with(nav, loader, action, on_pick, on_values)`: `Nav::All` / `Favorites` / `Category` / `Shortcut`, values from a `Loader`); the Reading Room builds its own on it. `sidebar::build(on_pick, on_values)` from `library.rs`: the left bar of Browse (All Games with count, Platforms, Genres, Publishers, Series, Years, Regions, Tags, Play Status, Playlists, Favorites), the only place filters are picked (no dropdowns, as in the concept). A category lists its values with counts (`games::get_facet_values`; playlists from `get_playlists`, with "Manage playlists…") on the `values` page the library shows in its view stack. `LibraryPage::apply_pick` keeps one value per type and `rebuild_chips` shows one removable chip per active type; sort and grid/list sit on the right of the filter row. The bar lives in an `adw::OverlaySplitView` that collapses below 1100 sp (scaled) into an overlay behind a Filters button. Tags and series both come from eXo's `series` field (`queries::is_tag`). Width `sidebar_width()` is shared with Settings' navigation. `styles/sidebar.css` |
+| `ui/statusbar.rs` | `statusbar::build(&library.status)` from `library.rs`: the footer of the concept (version, the library's own count label reparented into it, favourite / playlist / collection counts refreshed on the bus, key hints Enter / I / F / / / Esc). Breakpoints in `library.rs`: the hints hide below 1300 sp, the counts below 760 sp; `styles/statusbar.css` |
 | `ui/updates.rs` | `updates::install(window, library.banner_slot)`: checks GitHub for a newer release (`app_update::check_app_update`, 8 s after start then every 6 h, unless `update_check` = "0" or offline; `update_skipped` holds a dismissed tag) and shows a banner above the toolbar. Update (only for the pacman-installed `/usr/bin/exorchy`) confirms, opens Omarchy's floating terminal running that release's `install.sh --version`, waits for this process to exit and starts eXorchy again (`app_update::launch_app_update`); the app quits. Settings → General switches the check, About shows the status with Check now / Update |
 | `ui/backdrop.rs` | `backdrop::install(window)` gives `window.rs` the picture it layers under the page stack (the overlay measures the pages, not the picture). Settings → Appearance chooses / removes the image (copied into the data folder, config `background_image`) and sets its opacity (`background_opacity`, 5–100 %); the window then wears `has-backdrop` and `styles/backdrop.css` turns the full-width bars and pages translucent |
 | `ui/hidden.rs` | hidden-id set for the card and ⋯ menus (Hide / Unhide title, Remove from Recently played), Undo toast, the adult switch; `bus::notify_visibility_changed()` makes the library refetch Browse, genres and shelves (see COLLECTIONS.md) |
-| `ui/reading.rs` | `reading::build(window)` → `library.set_reading_widget()`; the Reading Room tab and the PDF reader (`ui/pdf.rs`, poppler) |
-| `ui/media.rs` | `media::install(window, library, bar_slot)`: fills `detail.media_slot` (preview video, theme music) and the now-playing bar under the library |
+| `ui/reading/` | `reading::build(window)` → `library.set_reading_widget()`. The room is laid out like Browse: the shared sidebar (All Reading, Downloaded shortcut with its count, Types, Publications, Years, Languages, Favorites; values from `logic::facet_rows`), one chip per active filter, count / sort / grid-list on the right, the header's search (`reading::set_query`). `reading::open_issue(issue, page)` (the room, a dossier's articles) brings the tab forward and the reader (`reader.rs`) replaces the room's body until closed (× or Esc). The tab closes any open dossier. Game manuals open the same way (`pdf::open_document_viewer` → `LibraryPage::show_document`, a "document" page beside the tabs; the dossier steps aside and returns on close). In the room the status bar shows the room's counts and keys (`StatusBar::set_reading`, `set_reading_counts`). Full screen (the reader's button, F11) is `LibraryPage::set_document_fullscreen`: the window goes full screen and the banner, toolbar and status bar hide. Documents render in `ui/pdf.rs` (poppler), opening in "Fit page", a mode that follows viewport resizes (`Fit::Page/Width/Free`) |
+| `ui/media.rs` | `media::install(window, library)`: fills `detail.media_slot` (preview video, the Theme row that plays a game's theme in place). There is no bottom player |
 | `ui/playlists.rs` | `playlists::pick_for_game(parent, game)` from the ⋯ menu; create / rename / delete |
 | `ui/game_settings.rs` | `game_settings::open(parent, game)` from the ⋯ menu; shader, fullscreen, cycles, custom conf, ScummVM options |
 | `ui/onboarding.rs` | `onboarding::run(window)` after the library is up: seeding consent (online only), welcome modal once (`welcome_seen`) |
@@ -367,7 +392,12 @@ with `color-mix()`, and sets libadwaita's own variables (`--accent-bg-color`,
 `--window-bg-color`, ...) so stock widgets follow too. The provider is
 swapped live on every `theme-changed`; `adw::StyleManager` is forced to
 dark or light from the palette's mode; the font comes from `shell.toml`'s
-base size (px → pt) and the monospace family through `gtk-font-name`.
+base size (px → pt) times `theme::ui_scale()` (Settings → Appearance →
+Interface size, config `ui_scale`, read in `main.rs` before any widget exists;
+default 1.2 "Medium"; 1.4 "Large" is the proportions of the user's design, `tmp/concept 01.png`) and the monospace family through `gtk-font-name`.
+Every fixed pixel size in the revamped UI (cards, covers, sidebar, dossier,
+list columns, breakpoints) goes through `theme::scaled`, and the concept's
+paddings are in `em`, so the whole interface scales together.
 `style.css` carries Tokyo Night fallbacks for the `--om-*` keys so the app
 renders before the first theme lands. No rule outside `theme.rs` names a
 colour; each feature module keeps its rules in `styles/<module>.css`.

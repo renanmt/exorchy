@@ -68,12 +68,63 @@ pub async fn get_games(
         favorites_only: favorites_only.unwrap_or(false),
         playlist_id,
         with_music: with_music.unwrap_or(false),
+        browse: Default::default(),
     };
 
     let total = queries::count_games_filtered(&conn, &f).map_err(|e| e.to_string())?;
     let games = queries::fetch_games_filtered(&conn, page, per_page, &f).map_err(|e| e.to_string())?;
 
     Ok(GameList { games, total })
+}
+
+/// Everything the library's grid asks with: the classic filters plus the
+/// sidebar's browse-by value and the filter bar's year / region.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct GameQuery {
+    pub query: String,
+    pub genre: String,
+    pub sort_by: String,
+    pub collection: String,
+    pub favorites_only: bool,
+    pub playlist_id: Option<i64>,
+    pub with_music: bool,
+    pub browse: queries::BrowseFilter,
+}
+
+impl GameQuery {
+    fn filter(&self) -> queries::GameFilter<'_> {
+        queries::GameFilter {
+            query: &self.query,
+            genre: &self.genre,
+            sort_by: &self.sort_by,
+            collection: &self.collection,
+            favorites_only: self.favorites_only,
+            playlist_id: self.playlist_id,
+            with_music: self.with_music,
+            browse: self.browse.clone(),
+        }
+    }
+}
+
+/// `get_games` with the full `GameQuery`.
+pub async fn get_games_browse(state: State<'_, DbState>, page: usize, per_page: usize, q: GameQuery) -> Result<GameList, String> {
+    let conn = state.lock()?;
+    let f = q.filter();
+    let total = queries::count_games_filtered(&conn, &f).map_err(|e| e.to_string())?;
+    let games = queries::fetch_games_filtered(&conn, page.max(1), per_page.min(10000), &f).map_err(|e| e.to_string())?;
+    Ok(GameList { games, total })
+}
+
+/// `get_section_keys` with the full `GameQuery`.
+pub async fn get_section_keys_browse(state: State<'_, DbState>, q: GameQuery) -> Result<Vec<String>, String> {
+    let conn = state.lock()?;
+    queries::get_section_keys(&conn, &q.filter()).map_err(|e| e.to_string())
+}
+
+/// A browse category's values with counts, for the sidebar.
+pub async fn get_facet_values(state: State<'_, DbState>, facet: String) -> Result<Vec<queries::FacetValue>, String> {
+    let conn = state.lock()?;
+    queries::facet_values(&conn, &facet).map_err(|e| e.to_string())
 }
 
 pub async fn get_genres(state: State<'_, DbState>, collection: Option<String>) -> Result<Vec<String>, String> {
@@ -106,6 +157,7 @@ pub async fn get_section_keys(
         favorites_only: favorites_only.unwrap_or(false),
         playlist_id,
         with_music: with_music.unwrap_or(false),
+        browse: Default::default(),
     };
     let result = queries::get_section_keys(&conn, &f).map_err(|e| e.to_string());
     log::debug!("get_section_keys: sort_by={:?} collection={:?} → {:?} keys", sort_by, collection, result.as_ref().map(|v| v.len()));

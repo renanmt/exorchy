@@ -148,8 +148,9 @@ fn build(window: &gtk::Window, section: &str, on_close: Rc<dyn Fn()>) -> gtk::Wi
     let split = adw::NavigationSplitView::builder()
         .sidebar(&sidebar)
         .content(&content)
-        .min_sidebar_width(230.0)
-        .max_sidebar_width(280.0)
+        // The library sidebar's width, at every window size.
+        .min_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
+        .max_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
         .show_content(true)
         .build();
     let view = adw::BreakpointBin::builder()

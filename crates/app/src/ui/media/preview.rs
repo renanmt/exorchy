@@ -16,13 +16,16 @@ use gtk::prelude::*;
 use adw::prelude::*;
 
 use crate::app;
-use crate::ui::detail::PANEL_WIDTH;
+use crate::ui::detail::panel_width;
 
 use super::store::{self, Change, PauseReason, Track, PHASE_PROBING, PHASE_QUEUED};
+use super::playbin::PlaybinStream;
 
 /// The panel settles on a game before any torrent read starts: clicking
 /// through the grid would otherwise queue a read per card.
 const SETTLE_MS: u64 = 400;
+/// How often the theme row's position line updates.
+const THEME_TICK_MS: u64 = 250;
 /// How long the cover keeps the panel to itself before the preview starts.
 const VIDEO_START_DELAY_MS: u64 = 2000;
 const FADE_MS: u64 = 600;
@@ -58,7 +61,7 @@ pub struct Preview {
     theme_name: gtk::Label,
     theme_retry: gtk::Button,
     // Hero controller.
-    stream: RefCell<gtk::MediaFile>,
+    stream: RefCell<PlaybinStream>,
     game_id: Cell<Option<i64>>,
     phase: Cell<Phase>,
     error: RefCell<Option<String>>,
@@ -79,7 +82,11 @@ pub struct Preview {
     /// restart nor re-request them.
     owner: RefCell<Option<Game>>,
     settle_timer: Cell<Option<glib::SourceId>>,
-    auto_theme_for: Cell<Option<i64>>,
+    theme_progress: gtk::Box,
+    theme_pos: gtk::Label,
+    theme_seek: gtk::Scale,
+    theme_dur: gtk::Label,
+    theme_tick: RefCell<Option<glib::SourceId>>,
     /// A fetch phase was observed for this game: the user spent the wait
     /// looking at the cover, and the ready video starts at once.
     video_just_fetched: Cell<bool>,
@@ -91,7 +98,7 @@ impl Preview {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
         let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).visible(false).css_classes(["media-slot"]).build();
 
-        let stream = gtk::MediaFile::new();
+        let stream = PlaybinStream::new_video();
         let picture = gtk::Picture::builder().paintable(&stream).content_fit(gtk::ContentFit::Contain).height_request(200).can_shrink(true).css_classes(["media-picture"]).build();
         let frame = gtk::Overlay::builder().child(&picture).visible(false).css_classes(["media-frame"]).build();
         let controls = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).halign(gtk::Align::End).valign(gtk::Align::End).margin_end(8).margin_bottom(8).css_classes(["media-controls"]).build();
@@ -128,6 +135,18 @@ impl Preview {
         theme_row.append(&theme_name);
         theme_row.append(&theme_retry);
         root.append(&theme_row);
+        // The playing theme's position, in place under its row.
+        let theme_progress = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).visible(false).css_classes(["theme-progress", "player-seek"]).build();
+        let theme_pos = gtk::Label::builder().label("--:--").css_classes(["player-time"]).build();
+        let theme_seek = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.1);
+        theme_seek.set_hexpand(true);
+        theme_seek.set_draw_value(false);
+        theme_seek.set_sensitive(false);
+        let theme_dur = gtk::Label::builder().label("--:--").css_classes(["player-time"]).build();
+        theme_progress.append(&theme_pos);
+        theme_progress.append(&theme_seek);
+        theme_progress.append(&theme_dur);
+        root.append(&theme_progress);
 
         let p = Rc::new(Preview {
             window: window.clone(),
@@ -163,7 +182,11 @@ impl Preview {
             shown: RefCell::new(None),
             owner: RefCell::new(None),
             settle_timer: Cell::new(None),
-            auto_theme_for: Cell::new(None),
+            theme_progress,
+            theme_pos,
+            theme_seek,
+            theme_dur,
+            theme_tick: RefCell::new(None),
             video_just_fetched: Cell::new(false),
             video_phase_game: Cell::new(None),
             lightbox: RefCell::new(None),
@@ -196,6 +219,14 @@ impl Preview {
                 store::request_theme(id);
             }
         }));
+        p.theme_seek.connect_change_value(|_, _, v| {
+            if let Some(s) = store::stream() {
+                if s.is_seekable() {
+                    s.seek((v * 1_000_000.0) as i64);
+                }
+            }
+            glib::Propagation::Proceed
+        });
         p.theme_btn.connect_clicked(glib::clone!(#[weak] p, move |_| {
             let Some(owner) = p.owner.borrow().clone() else { return };
             let Some(track) = Track::of_game(&owner) else { return };
@@ -224,7 +255,7 @@ impl Preview {
         self.owner.borrow().as_ref().and_then(|g| g.id)
     }
 
-    fn stream(&self) -> gtk::MediaFile {
+    fn stream(&self) -> PlaybinStream {
         self.stream.borrow().clone()
     }
 
@@ -283,7 +314,7 @@ impl Preview {
         if let Some(id) = self.owner_id() {
             store::release_video(id);
         }
-        self.drop_auto_theme();
+        self.drop_theme();
         if let Some(d) = self.lightbox.borrow_mut().take() {
             d.force_close();
         }
@@ -291,9 +322,10 @@ impl Preview {
         self.video_just_fetched.set(false);
     }
 
-    fn drop_auto_theme(&self) {
-        if let Some(id) = self.auto_theme_for.take() {
-            store::withdraw_auto_theme(id);
+    /// The game's theme stops with its dossier.
+    fn drop_theme(&self) {
+        if let Some(id) = self.owner_id() {
+            store::leave_theme(id);
         }
     }
 
@@ -307,34 +339,17 @@ impl Preview {
                 return;
             }
             store::request_video(id);
-            // Autoplay on: it becomes the wanted track; off: fetched so the
-            // row can offer it. The key is re-read: the settings page writes
-            // it and there is no change event.
+            // A video fetched on an earlier visit raises no change event:
+            // load it here, as a fresh fetch would.
+            if store::video_state(id).is_some_and(|v| v.phase == "ready") {
+                p.sync_video();
+            }
+            // The theme is fetched so the row can offer it; it plays only
+            // when the Play button is pressed.
             store::refresh_prefs();
-            let core = app::core();
-            app::spawn(
-                async move { games::get_config(core.state(), "music_autoplay".into()).await },
-                glib::clone!(#[weak] p, move |res| {
-                    if p.owner_id() != Some(id) || store::music_unsupported() {
-                        return;
-                    }
-                    let autoplay = res.ok().flatten().map(|v| v == "1").unwrap_or(true);
-                    let view = store::view();
-                    // Already the active track: leave the player alone.
-                    if view.current.as_ref().map(|t| t.game_id) == Some(id) || view.wanted.as_ref().map(|t| t.game_id) == Some(id) {
-                        return;
-                    }
-                    // Autoplay never overrules the listener's × or pause.
-                    let dismissed = view.user_paused || view.bar_hidden;
-                    let Some(track) = p.owner.borrow().as_ref().and_then(Track::of_game) else { return };
-                    if autoplay && !dismissed {
-                        store::play_theme(track, true);
-                        p.auto_theme_for.set(Some(id));
-                    } else {
-                        store::request_theme(id);
-                    }
-                }),
-            );
+            if !store::music_unsupported() {
+                store::request_theme(id);
+            }
         }))));
     }
 
@@ -360,6 +375,31 @@ impl Preview {
         self.render();
     }
 
+    /// This game's theme is the loaded track (playing or paused).
+    fn holds_this_theme(&self) -> bool {
+        let view = store::view();
+        self.owner_id().is_some() && view.mode == store::Mode::Theme && view.current.as_ref().map(|t| t.game_id) == self.owner_id()
+    }
+
+    fn render_theme_progress(&self, ready: bool) {
+        let show = ready && self.holds_this_theme();
+        self.theme_progress.set_visible(show);
+        if !show {
+            if let Some(t) = self.theme_tick.take() {
+                t.remove();
+            }
+            return;
+        }
+        let (pos, seek, dur) = (self.theme_pos.clone(), self.theme_seek.clone(), self.theme_dur.clone());
+        tick_theme(&pos, &seek, &dur);
+        if self.theme_tick.borrow().is_none() {
+            self.theme_tick.replace(Some(glib::timeout_add_local(Duration::from_millis(THEME_TICK_MS), move || {
+                tick_theme(&pos, &seek, &dur);
+                glib::ControlFlow::Continue
+            })));
+        }
+    }
+
     fn is_playing_this_theme(&self) -> bool {
         let view = store::view();
         self.owner_id().is_some() && view.current.as_ref().map(|t| t.game_id) == self.owner_id() && view.playing
@@ -367,7 +407,7 @@ impl Preview {
 
     // ── Hero controller (heroVideo.ts) ───────────────────────────────────
 
-    fn wire_stream(self: &Rc<Self>, stream: &gtk::MediaFile) {
+    fn wire_stream(self: &Rc<Self>, stream: &PlaybinStream) {
         let weak = Rc::downgrade(self);
         stream.connect_playing_notify(move |s| {
             let Some(p) = weak.upgrade() else { return };
@@ -393,15 +433,16 @@ impl Preview {
         });
     }
 
-    /// GTK keeps a stream in its error state for good: a new source after an
-    /// error gets a fresh element, and the picture follows.
-    fn fresh_stream(self: &Rc<Self>) -> gtk::MediaFile {
+    /// Every source gets a fresh element, and the picture follows: GTK keeps
+    /// a failed stream in its error state for good.
+    fn fresh_stream(self: &Rc<Self>) -> PlaybinStream {
         let current = self.stream();
-        if current.error().is_none() {
+        if current.file().is_none() && current.error().is_none() {
             return current;
         }
         current.pause();
-        let next = gtk::MediaFile::new();
+        current.clear();
+        let next = PlaybinStream::new_video();
         self.wire_stream(&next);
         self.picture.set_paintable(Some(&next));
         *self.stream.borrow_mut() = next.clone();
@@ -556,7 +597,12 @@ impl Preview {
 
     /// The replay button: a gesture, so it starts with the real preference.
     fn replay(self: &Rc<Self>, muted: bool) {
-        if self.game_id.get().is_none() {
+        // Offered but never loaded into the hero: load it and start now.
+        if self.game_id.get().is_none() || self.game_id.get() != self.owner_id() {
+            let Some(id) = self.owner_id() else { return };
+            let Some(path) = store::video_state(id).filter(|v| v.phase == "ready").and_then(|v| v.path) else { return };
+            self.show_preview(id, path, muted, 0);
+            self.render();
             return;
         }
         self.clear_timer();
@@ -674,7 +720,7 @@ impl Preview {
         let title = self.owner.borrow().as_ref().map(|g| g.title.clone()).unwrap_or_default();
         let stream = self.stream();
         let video = gtk::Video::builder().media_stream(&stream).autoplay(false).hexpand(true).vexpand(true).css_classes(["media-lightbox-video"]).build();
-        let dialog = adw::Dialog::builder().title(&title).content_width((PANEL_WIDTH * 2).max(960)).content_height(640).child(&video).css_classes(["media-lightbox"]).build();
+        let dialog = adw::Dialog::builder().title(&title).content_width((panel_width() * 2).max(960)).content_height(640).child(&video).css_classes(["media-lightbox"]).build();
         dialog.connect_closed(glib::clone!(#[weak(rename_to = p)] self, move |_| {
             p.lightbox.replace(None);
             p.set_lightbox(false, false);
@@ -787,8 +833,35 @@ impl Preview {
             self.theme_name.set_label("");
         }
 
+        self.render_theme_progress(mready);
+
         let anything = frames || pill.is_some() || failed || hero_error.is_some() || self.play_ready.is_visible() || self.theme_row.is_visible();
         self.root.set_visible(anything);
+    }
+}
+
+/// `m:ss`, or `--:--` while the element has no duration to report.
+fn format_time(micros: Option<i64>) -> String {
+    match micros {
+        Some(us) if us >= 0 => {
+            let whole = us / 1_000_000;
+            format!("{}:{:02}", whole / 60, whole % 60)
+        }
+        _ => "--:--".into(),
+    }
+}
+
+/// The theme row's position line follows the music element.
+fn tick_theme(pos: &gtk::Label, seek: &gtk::Scale, dur: &gtk::Label) {
+    let Some(stream) = store::stream() else { return };
+    let (position, duration) = (stream.timestamp(), stream.duration());
+    let known = duration > 0;
+    pos.set_label(&format_time(if known || position > 0 { Some(position) } else { None }));
+    dur.set_label(&format_time(known.then_some(duration)));
+    seek.set_sensitive(known && stream.is_seekable());
+    if known {
+        seek.set_range(0.0, duration as f64 / 1_000_000.0);
+        seek.set_value(position as f64 / 1_000_000.0);
     }
 }
 

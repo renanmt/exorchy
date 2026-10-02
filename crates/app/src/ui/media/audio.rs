@@ -1,9 +1,7 @@
-//! The music player's audio element: one `gtk::MediaFile` (GStreamer) that
-//! lives for the app's lifetime, driven by the store's `PortOp`s. Fades: a
-//! start ramps up from silence, a pause ramps down and only then pauses the
-//! element - a track cut off at full volume is a pop, not a pause. A stream
-//! that reported an error is replaced on the next source: GTK keeps a media
-//! stream in its error state for good.
+//! The music player's audio element: a `PlaybinStream` (GStreamer), driven
+//! by the store's `PortOp`s. Fades: a start ramps up from silence, a pause ramps down and only then pauses the
+//! element - a track cut off at full volume is a pop, not a pause. Each new
+//! source gets a fresh element (see `fresh_stream`).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -13,6 +11,7 @@ use gtk::glib;
 use gtk::prelude::*;
 
 use super::store::{self, PortOp};
+use super::playbin::PlaybinStream;
 
 const FADE_IN_MS: u64 = 600;
 const FADE_OUT_MS: u64 = 250;
@@ -22,7 +21,7 @@ const FADE_TICK_MS: u64 = 40;
 const FADE_IN_FALLBACK_MS: u64 = 400;
 
 pub struct AudioPort {
-    stream: RefCell<gtk::MediaFile>,
+    stream: RefCell<PlaybinStream>,
     fade: RefCell<Option<glib::SourceId>>,
     fallback: Cell<Option<glib::SourceId>>,
     /// The listener's volume preference; every ramp ends there.
@@ -34,7 +33,7 @@ pub struct AudioPort {
 impl AudioPort {
     pub fn new() -> Rc<Self> {
         let port = Rc::new(AudioPort {
-            stream: RefCell::new(gtk::MediaFile::new()),
+            stream: RefCell::new(PlaybinStream::new_audio()),
             fade: RefCell::new(None),
             fallback: Cell::new(None),
             fade_target: Cell::new(0.8),
@@ -45,11 +44,11 @@ impl AudioPort {
         port
     }
 
-    pub fn stream(&self) -> gtk::MediaFile {
+    pub fn stream(&self) -> PlaybinStream {
         self.stream.borrow().clone()
     }
 
-    fn wire(self: &Rc<Self>, stream: &gtk::MediaFile) {
+    fn wire(self: &Rc<Self>, stream: &PlaybinStream) {
         let weak = Rc::downgrade(self);
         stream.connect_ended_notify(move |s| {
             if s.is_ended() {
@@ -85,15 +84,16 @@ impl AudioPort {
         });
     }
 
-    /// The element failed on its last source: GTK keeps it in the error
-    /// state, so the next source gets a fresh one.
-    fn fresh_stream(self: &Rc<Self>) -> gtk::MediaFile {
+    /// Every source gets a fresh element: GTK keeps a stream that failed in
+    /// its error state for good. The old element is stopped and dropped.
+    fn fresh_stream(self: &Rc<Self>) -> PlaybinStream {
         let current = self.stream.borrow().clone();
-        if current.error().is_none() {
+        if current.file().is_none() && current.error().is_none() {
             return current;
         }
         current.pause();
-        let next = gtk::MediaFile::new();
+        current.clear();
+        let next = PlaybinStream::new_audio();
         self.wire(&next);
         *self.stream.borrow_mut() = next.clone();
         next

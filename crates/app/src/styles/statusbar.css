@@ -1,0 +1,18 @@
+/* The footer (ui/statusbar.rs), as in tmp/concept 01.png. */
+.statusbar {
+  background-color: var(--bg-primary);
+  border-top: var(--hairline) solid var(--line-frame);
+  padding: 0.85em 1.2em;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+.statusbar-brand { color: var(--accent); font-weight: 600; }
+.statusbar-sep { color: var(--line-frame); }
+.statusbar .kbd {
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  padding: 0 6px;
+  color: var(--text-primary);
+  background-color: var(--fill-1);
+  font-size: 0.9em;
+}

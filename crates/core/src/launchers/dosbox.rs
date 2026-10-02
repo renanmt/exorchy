@@ -784,6 +784,8 @@ pub(crate) fn patch_dosbox_conf(
         .and_then(|p| p.file_name())
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "conf".to_string());
+    // CD images whose cue names a track in another case mount empty.
+    super::cue::alias_cue_tracks(&patched, working_dir);
     let patched_path = working_dir.join(format!(".exorchy_launch_{}.conf", tag));
     std::fs::write(&patched_path, &patched)
         .map_err(|e| format!("Failed to write patched config: {}", e))?;

@@ -7,9 +7,13 @@ record each non-obvious choice in `DECISIONS.md`.
 | Step | What | Upstream | Size | Depends on | Status (2026-10-01) |
 |---|---|---|---|---|---|
 | 1 | Make sure the emulator AppImage packs start on Omarchy; ScummVM end to end | #29 | hours | - | done except one 86Box launch and the optional comment on upstream #29 |
-| 2 | Host our own content and manifest | #32 + handover gap | 1-2 days | - | parked by the user; fully researched |
+| 2 | Host our own content and manifest | #32 + handover gap | 1 session | - | parked by the user; fully researched |
 | 3 | Route printer and DOSBox-X titles to DOSBox-X | #15 | 3-5 days | 1 | done and playtested (PR #12) |
-| 4 | Survive a new eXo torrent release | #18 | 1-2 weeks | 2 | parked until eXoDOS 7 is closer; fully researched |
+| 4 | Survive a new eXo torrent release | #18 | 2-3 sessions | 2 | parked until eXoDOS 7 is closer; fully researched |
+
+Sizes are counted in working sessions with Claude, not person-days: the code
+itself is quick, and what takes time is the user's review and playtests in
+between (corrected 2026-10-01; earlier drafts said days and weeks).
 
 Why this order: step 1 is cheap and can block step 3 (same DOSBox-X pack).
 Step 2 removes our dependency on Exodium's release assets and gives step 4
@@ -90,7 +94,7 @@ control: if Exodium deletes a release, renames its repo or makes it private,
 box art and the DOSBox-X / 86Box / ScummVM downloads stop working for every
 eXorchy user. The alternative, which is also legitimate, is to keep relying
 on Exodium (MIT, credited in README / ACKNOWLEDGEMENTS / About) and mirror only
-if something breaks. Recommended: mirror; about a day of work.
+if something breaks. Recommended: mirror; one working session.
 
 ### Licensing: already solved
 
@@ -306,10 +310,9 @@ playlists and the Reading Room tables are replaced.
 
 ### Size
 
-About 1–2 weeks: matching and orphans a few days, the torrent switch a few
-days, configs about a day, detection and the dry run about a day each, plus
-docs (ARCHITECTURE: catalogue refresh and torrent switch; COLLECTIONS;
-DECISIONS).
+Two to three working sessions plus the user's checks: matching and orphans,
+the torrent switch, configs, detection and the dry run, docs (ARCHITECTURE:
+catalogue refresh and torrent switch; COLLECTIONS; DECISIONS).
 
 ### Tests (synthetic fixtures)
 
@@ -319,3 +322,95 @@ DECISIONS).
 - [ ] A user playlist that contains an orphan.
 - [ ] An infohash change that triggers the torrent switch exactly once.
 - [ ] A changed config replaced on upgrade, Game Settings untouched.
+
+## UI revamp (before 0.5)
+
+The user's design (2026-10-01, "Concept A — Archive" mockup): a left
+navigation sidebar, a filter bar, denser cover cards, a "Game Dossier" detail
+panel with tabs, and a status bar with counts and keyboard hints. The
+mockup's colours are one theme; everything is built on the Omarchy tokens,
+so it takes each theme's colours. Its content is placeholder: invented
+covers, console platform codes, and a features list (save states, rewind,
+achievements) that is not true for DOS games.
+
+Decisions (user, 2026-10-01):
+- The sidebar **browses**: Publishers, Series, Years, Regions list their
+  values with counts, picking one shows its games; Platforms, Genres, Play
+  status and Favorites filter directly. "Tags" is left out (no such data);
+  catalogue has 5 platforms, 2,100 publishers, 2,306 series, 49 years,
+  13 regions, 11 play modes.
+- The **A–Z jump bar stays**.
+- **No decoration**: no taglines, no pixel illustration.
+- The **Game Dossier first**.
+
+Phases, each its own PR checked with snapshots at wide and narrow widths
+(the sidebar collapses and the dossier overlays in a half-screen tile):
+
+- [x] **Game Dossier** (branch `ui-dossier`, 2026-10-01): header with
+      favourite and close, hero row (cover, platform, title, meta, language
+      chips, Play split button, Add to playlist, ⋯), genre tags, tabs
+      Overview / Media / Manuals / Setup, real features only; shortcuts
+      Enter (play), F (favourite), I (dossier); Enter or double-click on
+      the shown card plays. Review fixes: Media counts screenshots and
+      articles (no "Covered in" heading), tabs reset to Overview on a new
+      game, full width in a small tile, a larger title, framed hairline
+      borders after the concept.
+- [x] **Shell and cards** (branch `ui-shell`, 2026-10-01): status bar
+      (version, the view's game count, favourites, playlists, collections,
+      key hints; hints hide below 1300 sp, counts below 760 sp), toolbar
+      with a hairline and the tabs as one outlined segmented group (active
+      tab in the accent), hairline search field, denser cards (title and
+      "year · platform · genre", platform badge gone, the status line only
+      for downloads and incomplete installs, star only on favourites or on
+      hover, hairline outline, installed in an accent hairline, selected in
+      a 2 px accent outline). Awaiting the user's review.
+- [x] **Sidebar and filters** (branch `ui-sidebar`, 2026-10-01): the
+      sidebar browses by Platforms, Genres, Publishers, Series, Years,
+      Regions, Tags (122 from eXo's `series` field) and Play Status, with
+      counts; Favorites filters. The filter bar has Platforms (replacing the
+      collection chips), Genres, Years, Regions and Playlists dropdowns and
+      a chip for a sidebar pick. Backend: `BrowseFilter` in `GameFilter`,
+      `get_games_browse` / `get_section_keys_browse` / `get_facet_values`.
+      Awaiting the user's review.
+
+- [x] **Review round 2026-10-02:** the filter dropdowns are gone; the
+      sidebar picks (Playlists joined it), one removable chip per filter
+      type, sort and grid/list on the right; the sidebar collapses into an
+      overlay behind a Filters button in narrow windows. Interface size is a
+      setting (Compact 1.0, Medium 1.2 = the default, Large 1.4, Extra
+      large 1.6; restart to apply). Theme music never autoplays: Play in
+      the dossier plays it in place with its own position line, and it
+      stops when the dossier leaves the game; the bottom bar is the ♪
+      shuffle's only. Fixed: "Top rated" had no jump bar
+      (its section keys were integers read as text); frame lines stronger
+      (`--line-frame` 26 %), so the dossier frame shows beside the tinted
+      header.
+- [x] **Reading Room review 2026-10-02:** laid out like Browse: the
+      shared sidebar (All Reading, Downloaded, Types, Publications, Years,
+      Languages, Favorites) with one chip per filter; an opened issue
+      replaces the room's body and starts in "Fit page"; a full-screen
+      reading mode (button, F11, Esc leaves); the tab closes a game's
+      dossier; a downloaded issue opens offline. Game manuals open the same
+      way (in place, Fit page, full screen; the dossier returns on close);
+      the status bar shows the room's counts and keys there.
+- [x] **Dossier and playlists 2026-10-02:** playlists work again (their
+      dialogs dropped their own state); the dossier's hero stays pinned
+      while the body scrolls; the preview video keeps one size across tabs;
+      the cover (and gallery) open at full size in a centred dialog.
+- [x] **Release polish 2026-10-02:** the bottom player and the toolbar's ♪
+      are gone (themes play in the dossier); Reading Room cards share the
+      games' spacing; a stronger selected-card frame; the "RETRO GAMES. /
+      FOREVER." motto beside the wordmark.
+
+Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
+gitignored). Borders as drawn there: framed panels inset from the window edge,
+`--hairline` (1 px) outlines in `--line-frame`, outlined controls and tags, a
+thicker accent outline on the selected card.
+- [x] **Polish** (branch `ui-polish`, 2026-10-01): the shared controls
+      follow the concept everywhere (hairline buttons, outlined dropdowns,
+      chips and toggle chips checked like the active tab), hairline rules on
+      the filter row and jump bar, Settings with the library sidebar's
+      navigation (accent bar) and outlined group frames. Narrow windows:
+      sidebar hidden below 1100 sp, status bar hints below 1300 sp and counts
+      below 760 sp, dossier full width in the small layout. Awaiting the
+      user's review (the Reading Room could not be captured headlessly).

@@ -1000,6 +1000,8 @@ fn launch_dosbox_x(
             }
         });
         let patched = extract_zip_mounts(&patched, exo_dir);
+        // CD images whose cue names a track in another case mount empty.
+        crate::launchers::cue::alias_cue_tracks(&patched, exo_dir);
         let patched_path =
             super::paths::launch_conf_dir()?.join(format!("win9x_play_{}.conf", id));
         std::fs::write(&patched_path, &patched)

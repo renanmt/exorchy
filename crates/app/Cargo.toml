@@ -27,3 +27,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 # poppler-glib (Omarchy ships it with the GTK stack).
 poppler-rs = "0.26"
 adw = { package = "libadwaita", version = "0.9", features = ["v1_9"] }
+# Theme music and preview videos play through our own `gtk::MediaStream` over the
+# classic `playbin` (ui/media/playbin.rs): GTK's built-in backend is fixed on
+# playbin3, whose decodebin3 aborts the process on a track change (GStreamer 1.28).
+gst = { package = "gstreamer", version = "0.25" }
+gst-app = { package = "gstreamer-app", version = "0.25" }
+gst-video = { package = "gstreamer-video", version = "0.25" }

@@ -37,6 +37,10 @@ impl Kind {
         }
     }
 
+    pub fn from_id(id: &str) -> Kind {
+        Kind::ALL.into_iter().find(|k| k.id() == Some(id)).unwrap_or(Kind::All)
+    }
+
     /// Singular and plural noun for the results count.
     pub fn nouns(self) -> (&'static str, &'static str) {
         match self {
@@ -66,6 +70,10 @@ impl Language {
             Language::En => Some("EN"),
             Language::De => Some("DE"),
         }
+    }
+
+    pub fn from_id(id: &str) -> Language {
+        Language::ALL.into_iter().find(|l| l.id() == Some(id)).unwrap_or(Language::All)
     }
 
     pub fn label(self) -> &'static str {
@@ -287,6 +295,7 @@ pub struct Filter<'a> {
     pub kind: Kind,
     pub language: Language,
     pub publication_id: Option<i64>,
+    pub year: Option<i64>,
     pub favorites: bool,
     pub query: &'a str,
 }
@@ -304,6 +313,7 @@ pub fn filter_issues(rows: &[Issue], filter: &Filter) -> Vec<Issue> {
             filter.kind.id().is_none_or(|k| issue.kind == k)
                 && filter.language.id().is_none_or(|l| issue.language == l)
                 && filter.publication_id.is_none_or(|p| issue.publication_id == p)
+                && filter.year.is_none_or(|y| issue.year == Some(y))
                 && (!filter.favorites || issue.favorited)
                 && (needle.is_empty() || matches_query(issue, &needle))
         })
@@ -311,50 +321,95 @@ pub fn filter_issues(rows: &[Issue], filter: &Filter) -> Vec<Issue> {
         .collect()
 }
 
-pub struct PublicationGroup {
-    /// Section header; `None` where the filter already implies the group.
-    pub label: Option<String>,
-    pub rows: Vec<Publication>,
+/// What the Reading Room's sidebar browses by. `Status` has no page of its
+/// own: its one value, "Downloaded", is a sidebar shortcut.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Category {
+    Types,
+    Publications,
+    Years,
+    Languages,
+    Status,
 }
 
-/// Publications under the active kind and language, in menu order. The
-/// German series form one group of their own only while both languages are
-/// in view; under a single language they sit in their kind like any other.
-pub fn publication_groups(rows: &[Publication], kind: Kind, language: Language) -> Vec<PublicationGroup> {
-    let in_language: Vec<&Publication> =
-        rows.iter().filter(|p| language.id().is_none_or(|l| p.language == l)).collect();
-    let (german, rest): (Vec<&Publication>, Vec<&Publication>) = if language == Language::All {
-        in_language.iter().partition(|p| p.language == "DE")
-    } else {
-        (Vec::new(), in_language.clone())
-    };
-    let mut groups = Vec::new();
-    let kinds: Vec<Kind> = if kind == Kind::All {
-        Kind::ALL.iter().copied().filter(|k| *k != Kind::All).collect()
-    } else {
-        vec![kind]
-    };
-    for k in kinds {
-        let mut in_kind: Vec<Publication> = rest.iter().filter(|p| Some(p.kind.as_str()) == k.id()).map(|p| (*p).clone()).collect();
-        if in_kind.is_empty() {
-            continue;
+impl Category {
+    pub fn label(self) -> &'static str {
+        match self {
+            Category::Types => "Types",
+            Category::Publications => "Publications",
+            Category::Years => "Years",
+            Category::Languages => "Languages",
+            Category::Status => "Status",
         }
-        in_kind.sort_by(|a, b| cmp_text(&a.name, &b.name));
-        groups.push(PublicationGroup { label: (kind == Kind::All).then(|| k.label().to_string()), rows: in_kind });
     }
-    if !german.is_empty() {
-        let mut rows: Vec<Publication> = german.into_iter().cloned().collect();
-        rows.sort_by(|a, b| cmp_text(&a.name, &b.name));
-        groups.push(PublicationGroup { label: Some("Deutsch".into()), rows });
+
+    pub fn noun(self) -> &'static str {
+        match self {
+            Category::Types => "Type",
+            Category::Publications => "Publication",
+            Category::Years => "Year",
+            Category::Languages => "Language",
+            Category::Status => "Status",
+        }
     }
-    groups
 }
 
-/// A publication picked under one kind or language is dropped when the
-/// chips no longer include it.
-pub fn publication_still_in_view(rows: &[Publication], id: i64, kind: Kind, language: Language) -> bool {
-    let Some(p) = rows.iter().find(|p| p.id == id) else { return true };
-    kind.id().is_none_or(|k| p.kind == k) && language.id().is_none_or(|l| p.language == l)
+/// The "Downloaded" shortcut's value.
+pub const DOWNLOADED: &str = "downloaded";
+
+/// A category's values with their issue counts: (label, value, count), in
+/// the order the values page lists them. A publication name shared by two
+/// languages names its language.
+pub fn facet_rows(issues: &[Issue], publications: &[Publication], category: Category) -> Vec<(String, String, usize)> {
+    use std::collections::HashMap;
+    match category {
+        Category::Types => Kind::ALL
+            .iter()
+            .filter_map(|k| {
+                let id = k.id()?;
+                let n = issues.iter().filter(|i| i.kind == id).count();
+                (n > 0).then(|| (k.label().to_string(), id.to_string(), n))
+            })
+            .collect(),
+        Category::Languages => Language::ALL
+            .iter()
+            .filter_map(|l| {
+                let id = l.id()?;
+                let n = issues.iter().filter(|i| i.language == id).count();
+                (n > 0).then(|| (l.label().to_string(), id.to_string(), n))
+            })
+            .collect(),
+        Category::Years => {
+            let mut counts: HashMap<i64, usize> = HashMap::new();
+            for y in issues.iter().filter_map(|i| i.year) {
+                *counts.entry(y).or_default() += 1;
+            }
+            let mut rows: Vec<(i64, usize)> = counts.into_iter().collect();
+            rows.sort_by_key(|r| std::cmp::Reverse(r.0));
+            rows.into_iter().map(|(y, n)| (y.to_string(), y.to_string(), n)).collect()
+        }
+        Category::Publications => {
+            let mut counts: HashMap<i64, usize> = HashMap::new();
+            for i in issues {
+                *counts.entry(i.publication_id).or_default() += 1;
+            }
+            let mut names: HashMap<&str, usize> = HashMap::new();
+            for p in publications {
+                *names.entry(p.name.as_str()).or_default() += 1;
+            }
+            let mut rows: Vec<(String, String, usize)> = publications
+                .iter()
+                .filter_map(|p| {
+                    let n = *counts.get(&p.id)?;
+                    let label = if names.get(p.name.as_str()).copied().unwrap_or(0) > 1 { format!("{} ({})", p.name, p.language) } else { p.name.clone() };
+                    Some((label, p.id.to_string(), n))
+                })
+                .collect();
+            rows.sort_by(|a, b| cmp_text(&a.0, &b.0));
+            rows
+        }
+        Category::Status => vec![("Downloaded".into(), DOWNLOADED.into(), 0)],
+    }
 }
 
 /// Backend failures name torrents, archive paths and byte counts. The panel
@@ -516,33 +571,39 @@ mod tests {
         book.kind = "book".into();
         book.publication_id = 2;
         let rows = vec![issue("en", "CGW", "CGW 80", Some(1991), None), de.clone(), book];
-        let f = Filter { kind: Kind::All, language: Language::De, publication_id: None, favorites: false, query: "" };
+        let none = Filter { kind: Kind::All, language: Language::All, publication_id: None, year: None, favorites: false, query: "" };
+        let f = Filter { language: Language::De, ..none };
         assert_eq!(filter_issues(&rows, &f).len(), 1);
-        let f = Filter { kind: Kind::Book, language: Language::All, publication_id: None, favorites: false, query: "doom" };
+        let f = Filter { kind: Kind::Book, query: "doom", ..none };
         assert_eq!(filter_issues(&rows, &f)[0].key, "book");
-        let f = Filter { kind: Kind::All, language: Language::All, publication_id: Some(1), favorites: false, query: "1991" };
+        let f = Filter { publication_id: Some(1), query: "1991", ..none };
         assert_eq!(filter_issues(&rows, &f)[0].key, "en");
-        let f = Filter { kind: Kind::All, language: Language::All, publication_id: None, favorites: true, query: "" };
+        let f = Filter { favorites: true, ..none };
         assert_eq!(filter_issues(&rows, &f)[0].key, "de");
+        let f = Filter { year: Some(2003), ..none };
+        assert_eq!(filter_issues(&rows, &f)[0].key, "book");
     }
 
     #[test]
-    fn publication_groups_follow_the_chips() {
-        let rows = vec![
-            publication(1, "PC Zone", "magazine", "EN"),
-            publication(2, "CGW", "magazine", "EN"),
-            publication(3, "PC Player", "magazine", "DE"),
-            publication(4, "Books", "book", "EN"),
-        ];
-        let g = publication_groups(&rows, Kind::All, Language::All);
-        assert_eq!(g.iter().map(|g| g.label.clone().unwrap()).collect::<Vec<_>>(), ["Magazines", "Books", "Deutsch"]);
-        assert_eq!(g[0].rows.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["CGW", "PC Zone"]);
-        let g = publication_groups(&rows, Kind::Magazine, Language::De);
-        assert_eq!(g.len(), 1);
-        assert!(g[0].label.is_none());
-        assert_eq!(g[0].rows[0].name, "PC Player");
-        assert!(!publication_still_in_view(&rows, 3, Kind::All, Language::En));
-        assert!(publication_still_in_view(&rows, 3, Kind::Magazine, Language::All));
+    fn sidebar_values_count_issues() {
+        let mut de = issue("de", "PC Player", "PC Player 3", Some(1994), None);
+        de.language = "DE".into();
+        de.publication_id = 3;
+        let mut book = issue("book", "Books", "Masters of Doom", Some(1994), None);
+        book.kind = "book".into();
+        book.publication_id = 4;
+        let issues = vec![issue("a", "CGW", "CGW 80", Some(1991), None), issue("b", "CGW", "CGW 81", Some(1991), None), de, book];
+        let pubs = vec![publication(1, "CGW", "magazine", "EN"), publication(3, "PC Player", "magazine", "DE"), publication(4, "Books", "book", "EN"), publication(9, "Empty", "magazine", "EN")];
+        assert_eq!(facet_rows(&issues, &pubs, Category::Types), [("Magazines".to_string(), "magazine".to_string(), 3), ("Books".into(), "book".into(), 1)]);
+        assert_eq!(facet_rows(&issues, &pubs, Category::Years), [("1994".to_string(), "1994".to_string(), 2), ("1991".into(), "1991".into(), 2)]);
+        assert_eq!(facet_rows(&issues, &pubs, Category::Languages)[1], ("Deutsch".to_string(), "DE".to_string(), 1));
+        let p = facet_rows(&issues, &pubs, Category::Publications);
+        assert_eq!(p.iter().map(|r| r.0.as_str()).collect::<Vec<_>>(), ["Books", "CGW", "PC Player"]);
+        assert_eq!(p[1], ("CGW".to_string(), "1".to_string(), 2));
+        let twins = vec![publication(1, "CGW", "magazine", "EN"), publication(2, "CGW", "magazine", "DE")];
+        assert_eq!(facet_rows(&issues, &twins, Category::Publications)[0].0, "CGW (EN)");
+        assert_eq!(Kind::from_id("book"), Kind::Book);
+        assert_eq!(Language::from_id("XX"), Language::All);
     }
 
     #[test]

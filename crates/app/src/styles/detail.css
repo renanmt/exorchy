@@ -1,0 +1,73 @@
+/* The game dossier (ui/detail.rs): header, hero row, tags, tabs, features.
+   Tokens only; the accent marks what is the game's own and what to press. */
+/* Framed like the concept (tmp/concept 01.png): a box inset from the window
+   edge, a hairline outline, a line under the header. */
+.dossier-host { background-color: var(--bg-primary); padding: 8px; }
+.dossier {
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  /* The page's own background (opaque: the dossier overlays the grid in a
+     narrow window); only the title bar is tinted. */
+  background-color: var(--bg-primary);
+}
+.dossier .detail-head {
+  border-bottom: var(--hairline) solid var(--line-frame);
+  padding: 0.6em 0.6em 0.6em 0.8em;
+  background-color: var(--bg-secondary);
+}
+.dossier .title-2 { font-size: 1.5em; }
+.dossier-heading { font-size: 0.85em; font-weight: 600; letter-spacing: 0.12em; color: var(--text-secondary); }
+button.dossier-star { color: var(--text-secondary); }
+button.dossier-star.is-favorite { color: var(--accent); }
+
+.dossier-hero { margin-top: 14px; }
+/* The hero stays above the scrolling body; a line once content passes under it. */
+.dossier-pinned { padding: 0 16px 12px 16px; border-bottom: var(--hairline) solid transparent; }
+.dossier-pinned.scrolled { border-bottom-color: var(--line-frame); }
+.dossier-hero .detail-cover { border: var(--hairline) solid var(--line-frame); border-radius: var(--radius); }
+/* Outlined secondary controls. */
+.dossier button.btn:not(.primary):not(.ghost),
+.dossier menubutton.btn > button { border: var(--hairline) solid var(--line-frame); background-color: transparent; box-shadow: none; }
+.dossier button.btn:not(.primary):not(.ghost):hover,
+.dossier menubutton.btn > button:hover { background-color: var(--fill-2); }
+.dossier-kind { color: var(--accent); font-size: 0.85em; font-weight: 700; letter-spacing: 0.08em; }
+
+/* Play with its menu: the primary button's look on both halves. */
+splitbutton.dossier-primary > button,
+splitbutton.dossier-primary > menubutton > button {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  box-shadow: none;
+  font-weight: 600;
+  padding: 8px 14px;
+}
+splitbutton.dossier-primary > menubutton > button { padding: 8px 8px; border-left: var(--border) solid color-mix(in srgb, var(--on-accent) 25%, transparent); }
+splitbutton.dossier-primary > button:hover,
+splitbutton.dossier-primary > menubutton > button:hover { background-color: var(--accent-hover); }
+splitbutton.dossier-primary:disabled > button,
+splitbutton.dossier-primary:disabled > menubutton > button { background-color: var(--accent-fill); color: var(--text-muted); }
+button.btn.dossier-primary { padding: 8px 14px; }
+
+.dossier-tag {
+  background-color: var(--fill-2);
+  border: var(--hairline) solid var(--line-frame);
+  border-radius: var(--radius);
+  padding: 2px 10px;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+}
+
+/* Tabs as an underline row rather than a pill group. */
+.dossier-tabs { margin-top: 8px; border-bottom: var(--hairline) solid var(--line-frame); }
+.dossier-tabs toggle-group { background: none; padding: 0; }
+.dossier-tabs toggle { background: none; border-radius: 0; color: var(--text-secondary); padding: 6px 12px; box-shadow: none; }
+.dossier-tabs toggle:hover { color: var(--text-primary); }
+.dossier-tabs toggle:checked { color: var(--accent); box-shadow: inset 0 -2px var(--accent); background: none; }
+
+.dossier-section { font-weight: 600; color: var(--text-strong); }
+.dossier-feature image { color: var(--accent); }
+.dossier-notes { color: var(--text-secondary); line-height: 1.45; border-top: var(--hairline) solid var(--line-frame); padding-top: 12px; }
+.dossier-doc { padding: 8px 10px; border: var(--hairline) solid var(--line-frame); border-radius: var(--radius); }
+.dossier .detail-articles button.article-row { border: var(--hairline) solid var(--line-frame); }
+.dossier-tabs separator { background: none; min-width: 0; min-height: 0; }

@@ -609,3 +609,321 @@ DOSBox-X its banner printing stops partway (the page holds the first words; the 
 the printer until closed). The user chose to keep it on DOSBox-X rather than go back to Staging,
 which cannot print at all; Game Settings can still switch it. Known issue, not investigated
 further.
+
+## 2026-10-01 - The detail panel becomes the "Game Dossier"
+
+First phase of the user's UI revamp (ROADMAP "UI revamp"). The panel keeps all of its logic
+(variants, launch notes, downloads, the Win9x network prompt) and is re-laid out after the
+mockup: header (favourite, close), a hero row with the cover beside platform, title, meta, the
+Play split button (its menu holds Game settings and the manual) and a second row (Add to
+playlist, ⋯), then tags, description and Overview / Media / Manuals / Setup tabs.
+
+- The preview video stays above the tabs, not in Media: it pauses the theme music while it
+  plays (`PauseReason::Video`), and in a hidden tab it would play unseen and hold the music.
+- The mockup's features (save states, controller support, rewind, achievements) are not true
+  for these games; the Features list shows only what eXorchy knows: the emulator (from
+  `game_engine_info`), printing, players, manual, language versions, CRT shaders.
+- Shortcuts: Enter plays the shown game, F stars it, I shows or hides the dossier, never while
+  typing or with a modifier. On the grid, activating (Enter, double-click) the card the dossier
+  already shows plays it, like double-click-to-play elsewhere; the list view keeps its
+  single-click activation for opening only, or a second click would start games.
+- Tabs are libadwaita's `InlineViewSwitcher`, restyled from a pill group to an underline row.
+
+## 2026-10-01 - UI revamp phase 2: status bar, outlined tabs, dense cards
+
+After `tmp/concept 01.png`. The status bar reuses the library's own count label (reparented) so
+"100 of 10,164 games" / "No games match …" keep one wording, and adds favourites, playlists and
+enabled collections ("collections", not the concept's "platforms": eXorchy's catalogue has five
+platforms, and what the user switches is collections). Cards follow the concept's density: the
+platform moves into the meta line, the status line ("▶ Play", "↓ 7.2 MB", "Not installed") is
+dropped except for downloads and incomplete installs, which need attention; installed games keep
+their accent outline instead. The selected card's 2 px accent ring is a border plus an outline,
+so selecting a card never shifts the grid. The star is the accent's (it was the warning yellow)
+and shows only on favourites, or on hover. Language badges stay: the concept does not show them,
+but they are real information.
+
+## 2026-10-01 - UI revamp phase 3: a browse-by sidebar and dropdown filters
+
+The sidebar browses (user's decision): a category lists its values with counts, picking one
+narrows the grid. One sidebar value at a time; Platforms, Genres, Years and Regions are also
+dropdowns in the filter bar and stay in sync with the sidebar, while Publishers, Series, Tags,
+Play Status and Favorites, which have no dropdown, show as a removable chip. The collection chips
+became the concept's "All platforms" dropdown; the sidebar is hidden below 1100 sp, where the
+dropdowns carry the same filters.
+
+"Tags" exist after all: eXo's `series` field mixes series with `Prefix: value` entries ("Theme:
+Fantasy", "Playlist: Roland MT-32", "Education: Geography"), 122 of them. `queries::is_tag`
+splits them (the prefix must start with a letter, so "1942: The Pacific Air War series" stays a
+series); filtering matches one whole `;`-separated entry, so "Theme" never matches "Theme:
+Fantasy". Play Status is a group property ("In your library" = some variant in the library, none
+installed). The new filters ride in `BrowseFilter` inside `GameFilter`; the library calls
+`get_games_browse` / `get_section_keys_browse` with one `GameQuery` instead of growing the
+positional `get_games`, which other callers keep using. Facet counts are over primary rows of the
+visible catalogue, independent of the other filters.
+
+## 2026-10-01 - UI revamp polish: the concept's controls everywhere
+
+The revamp's hairline language (`--hairline`, `--line-frame`) now lives in the shared controls,
+so every page gets it without per-module rules: `button.btn` (all buttons), `dropdown.drop`
+(outlined, transparent), `button.chip` / `button.shelf-btn` (outlined, near-square; checked =
+accent text, accent outline, `--accent-glow` tint, the active tab's look instead of a filled
+block), the filter row and jump bar rules. Settings follows the library sidebar (accent bar on
+the selected page) and draws its groups as outlined frames instead of filled panels. The older
+2 px `--border` stays for what was not redesigned.
+
+## 2026-10-01 - The interface draws at 1.4x Omarchy's base size
+
+Measured against the user's design (`tmp/concept 01.png`, 1672 px wide) and a full-screen
+screenshot on 2560 × 1440: relative to the screen, the design's text, header (7 % of the height
+vs 4 %), footer (4.3 % vs 2 %), sidebar rows, cards (6 across vs 8) and gaps are all about 1.4-1.5x
+eXorchy's, which drew everything at Omarchy's 12 px base. `theme::UI_SCALE` = 1.4 scales the
+GTK font (and `--font-size-base`); `theme::scaled()` scales every fixed pixel size of the
+revamped UI (card and cover, sidebar 294 px, dossier at ~27 % of the window, list columns) and
+the breakpoints; the concept's paddings moved to `em`. A 1024 px window is now the small layout
+(stacked toolbar, full-width dossier). A per-user "interface size" setting would need `scaled`
+to become a runtime value read at start; not done yet.
+
+## 2026-10-02 - Filters are picked in the sidebar only; interface size is a setting
+
+The user's review: no filter dropdowns between the sidebar and the grid. The sidebar is the one
+place filters are picked (Playlists joined it as a category, with "Manage playlists…"); the
+filter row shows one removable chip per active type (platform, genre, year, region, publisher,
+series, tag, play status, playlist, favorites), a second pick of the same type replaces the
+first, and sort plus grid/list sit on the right. Because the sidebar is now the only way to
+filter, it no longer disappears in a narrow window: it lives in an `adw::OverlaySplitView` that
+collapses into an overlay behind a Filters button, and it scrolls, so a large interface size
+never makes it set the window's height.
+
+`ui_scale` became a setting (Settings → Appearance → Interface size: 1.0, 1.2, 1.4 = the design,
+1.6). Fixed sizes are taken when widgets are built, so `theme::scaled` reads a value set once in
+`main.rs` before the first widget, and a change offers a restart (`relaunch_after_exit`) rather
+than half-applying live.
+
+Also found in that review: "Top rated" never had a jump bar. Its section-key query selected an
+INTEGER that the code reads as String, so every key was dropped silently; the key is now cast to
+text (test `rating_sort_has_section_keys`). And with a theme whose foreground is dim, the
+dossier frame line (20 % of the foreground) vanished against the tinted header; `--line-frame`
+is now 26 %.
+
+## 2026-10-02 - A fresh media element for every track and preview
+
+Starting a theme track aborted the app (SIGABRT) with GStreamer 1.28's
+`gstdecodebin3.c: mq_slot_handle_stream_start: assertion failed: (collection)`. The file
+itself decodes cleanly (`gst-launch-1.0 playbin3 …` exits 0). The music player kept one
+`gtk::MediaFile` for the app's lifetime and swapped its file with `set_filename`, so GTK
+re-pointed a pipeline that had already run at a new URI, and decodebin3 can then meet a
+stream-start before it has a stream collection. Both media ports (`media/audio.rs`,
+`media/preview.rs`) now build a new element for every source, after stopping and clearing the
+old one. That element was only replaced after an error before. Every reader goes through
+`store::stream()` or the port's own accessor, so nothing holds the old element. The crash was
+not reproduced here; this removes the reuse path the assertion sits on.
+
+## 2026-10-02 - Media plays through our own stream over the classic playbin
+
+The fresh-element change above did not hold: clicking through a few tiles quickly still aborted
+the app with the same decodebin3 assertion, on preview videos this time. It is an upstream
+decodebin3 bug on track changes (other players, e.g. Strawberry, hit it). GTK's built-in
+backend goes through GstPlay, which hard-codes `playbin3` and offers no switch back.
+
+So GTK no longer plays our media. `ui/media/playbin.rs` is a `gtk::MediaStream` subclass over
+GStreamer's classic `playbin`, which autoplugs with decodebin2:
+- The bus drives GTK's protocol: `async-done` → `stream_prepared`, a 100 ms ticker → `update`,
+  EOS → `stream_ended`, an error → `set_error`.
+- Frames come off a `videoconvert ! appsink` as RGBA and are painted as a `gdk::MemoryTexture`,
+  so `gtk::Picture` and the lightbox's `gtk::Video` take the stream unchanged.
+- A music stream leaves video out of the pipeline. Volume is mapped cubically, as GTK does.
+
+The ports keep their fresh-element-per-source rule, for GTK's sticky error state. New
+dependencies: `gstreamer`, `gstreamer-app` and `gstreamer-video` 0.25 (the glib 0.22 line,
+the same as gtk4 0.11). The ignored test `survives_rapid_source_changes` replays the crash
+pattern on real files (see PORTING.md). It passes 60 switches with seeks and frames painted,
+where GTK's backend aborted within a few.
+
+## 2026-10-02 - Medium is the default size; a theme plays only in its dossier
+
+Interface sizes are now Compact 1.0, Medium 1.2, Large 1.4 and Extra large 1.6, and the
+default is Medium. The design's 1.4 read too large as a default, so it is the Large choice.
+A saved `ui_scale` is kept.
+
+Theme music:
+- It no longer autoplays. The "Play theme music" switch and the `music_autoplay` key are gone.
+  Opening a dossier still fetches the theme, so its Play button is ready.
+- The button plays it in place, and a position line with seek appears under the Theme row.
+- Leaving the game (another game, or the dossier closing) stops its theme
+  (`store::leave_theme`).
+- The now-playing bar at the bottom belongs to the ♪ shuffle (and the list walk), which isn't
+  tied to a game. It never shows for a dossier theme, and the ♪ starts the shuffle while a
+  dossier theme is the loaded track. "Continue the shuffle" (`music_continuous`) stays.
+
+## 2026-10-02 - The dossier cover takes the art's own shape
+
+The dossier drew every cover inside a fixed 150 × 210 frame, scaled to fit. eXo's posters are
+two shapes:
+- box scans, portrait at about 4:5;
+- title screens, often a 320 × 200 DOS screen stored at 1.6:1, which a CRT displayed at 4:3.
+
+So box art floated in empty bands inside a too-tall frame, and title screens were small and
+squashed. `covers::Size::Boxed(base)` sizes the texture from the art itself
+(`covers::boxed_size`), and the picture shows it at that size, so the frame hugs it:
+- portrait art is `base` wide (`scaled(150)`), like a box on a shelf;
+- landscape art is 1.3 × `base` wide;
+- a 1.55–1.65 ratio is drawn at 4:3, the shape it had on screen in the 90s;
+- extreme shapes are clamped to 0.6–1.8.
+
+The library cards keep their crop to fill.
+
+## 2026-10-02 - The Reading Room works like Browse; the reader replaces its body
+
+The Reading Room had its own filters: kind and language chips, a publication menu and a
+search entry, in two rows. Now it works the way Browse does.
+
+**One sidebar for both pages.** `ui/sidebar.rs` became generic over a `Facet` category type.
+A page supplies its entries (`Nav::All`, `Favorites`, `Category`, `Shortcut`) and a `Loader`
+for a category's values. Browse keeps its entries and loads them from the database, as
+before. The Reading Room's entries are All Reading, Downloaded, Types, Publications, Years,
+Languages and Favorites; `logic::facet_rows` counts their values from the in-memory catalogue.
+- Picks keep one value per type and show one removable chip each, as in Browse.
+- Sort and grid/list sit on the right of the filter row; the header's search filters the room.
+- The room collapses its sidebar behind a Filters button at the same breakpoint as Browse.
+
+**Where "Downloaded" goes.** It is a shortcut entry right under All Reading, with its count:
+it is the reading-room counterpart of My Library, and a whole page for one value would be
+one click too many. In the game sidebar, Play Status is a category page instead.
+
+**The reader.** An opened issue is no longer a dialog. The reader replaces the room's whole
+area (sidebar included) until × or Esc.
+- `reading::open_issue` is the one way in: from the room, and from a dossier's articles. It
+  brings the Reading Room tab forward, and that tab closes any open game dossier.
+- Its full-screen button (and F11) calls `LibraryPage::set_reading_fullscreen`. The window
+  goes full screen and the banner, toolbar, now-playing bar and status bar hide. Esc leaves
+  full screen first, and leaving full screen by any other way brings the chrome back.
+- Game manuals still open as a dialog over the dossier: they belong to the game, not to the
+  room.
+
+**Fit page by default.** The PDF viewer now has a fit mode (`Fit::Page / Width / Free`) and
+starts in Page, so a document opens with a whole page in view. While in Page or Width it
+follows viewport resizes, full screen included; a manual zoom lets go of it. The refit after a
+resize is queued to idle: resizing the pages from inside GTK's allocation pass made GTK warn
+about measuring the page column.
+
+Also fixed on the way: a downloaded issue would not open while offline. The store turned away
+every request offline, though the backend answers a cached document without the network.
+
+## 2026-10-02 - Manuals read like the Reading Room; the status bar follows the page
+
+**Manuals.** Game manuals now open like Reading Room issues, not as a dialog over the dossier.
+`pdf::open_document_viewer` hands the viewer to `LibraryPage::show_document`, a "document"
+page beside the tabs:
+- the dossier steps aside while the manual is open, and returns with it on × or Esc;
+- a tab click puts the manual away, leaving the dossier shut;
+- full screen (`pdf::fullscreen_toggle`, F11) and "Fit page" are the same as in the Reading Room.
+
+The full-screen state is now `LibraryPage::set_document_fullscreen`, shared by both readers.
+
+**The status bar.** In the Reading Room it shows that room's state, not the games':
+- how many documents the view holds (the room's own count, moved down from its filter row,
+  as the games count was);
+- how many are downloaded, favourited, and the publications;
+- the reading keys: / Search, F11 Full screen, Esc Back.
+
+The room reports these from its render (`StatusBar::set_reading_counts`); the library switches
+the bar's mode with the tab.
+
+**Snapshots run unanimated.** Broadway's frame clock never finishes a `gtk::Stack`
+transition, so a shot taken after a page switch caught the old page. That was the unresolved
+Reading Room snapshot from the UI revamp. `snapshot::arm` now turns GTK animations off. New
+sequence steps: `doc:<path>` (opens a document as a manual would) and `close_doc`.
+
+## 2026-10-02 - Playlists fixed; the dossier pins its hero; art at full size
+
+**Playlists were dead.** Both playlist dialogs (`playlists::pick_for_game`, `manage`) built their
+state as an `Rc<PlaylistDialog>` and let it drop when the opener returned. Every handler held
+it weakly, so the list never rendered and neither "New playlist…" nor the rows did anything.
+The dialog now owns its state until it closes. The whole flow was verified in a test profile,
+driving the real widgets:
+- a playlist created from a dossier's "Add to playlist", holding the game;
+- another created from Manage;
+- both on the sidebar's Playlists page with their counts;
+- picking one narrows the grid and shows its chip;
+- the status bar counts them.
+
+**The preview video kept changing size.** A `ScrolledWindow`'s viewport gives a child taller
+than the view its *minimum* height by default. So under a long tab the video, a can-shrink
+`Picture`, fell to its 200 px floor, and under a short tab the spare height grew it. The
+dossier's viewport now uses `ScrollablePolicy::Natural`: everything in the body takes its
+natural height, and the video's size depends only on the panel's width.
+
+**The hero stays pinned.** The cover, title and actions sit above the scroller, so only what
+follows them scrolls. A line appears under the hero once content passes beneath it.
+
+**Art at full size.** `ui/image_viewer.rs` shows an image in a dialog centred over the window,
+at its own size, never larger than the window minus a margin, and closes on a click or Esc.
+- The cover opens it (the zoom cursor shows this). It uses the metadata pack's own
+  "Box - Front" scan when the pack is installed, else the poster, else the bundled preview.
+- Art shorter than 480 px (scaled) is enlarged to that, so a 120 px preview does not open as
+  a stamp.
+- The gallery thumbnails open the same viewer instead of an external program.
+- It decodes the file as is: the cover loader's `Fit` also scales up, which took seconds on a
+  small preview.
+
+**Snapshot tooling.** Found while proving the above:
+- `click:` searches the whole window, so dialogs can be clicked.
+- New steps: `type:<text>` (fills the focused or topmost entry and presses Enter) and `cover`.
+- A long sequence delays the shot until 1.1 s after its last step.
+- The capture waits for a fresh paint, since a dialog presented since the last frame was
+  missing from it.
+
+## 2026-10-02 - Cue sheets that name a track in another case
+
+SimCopter (eXoWin9x) asked for its CD. Its cue sheet says `FILE "OUT-SIMCOPTER.BIN"`, but the
+archive unpacks `out-simcopter.bin`. On Windows that is the same file. On Linux DOSBox-X found
+nothing and mounted an empty drive: its log says `CDROM: Image loaded No. of data tracks=0,
+audio tracks=-1`.
+
+The fix is `launchers/cue.rs::alias_cue_tracks`, which runs before every DOSBox launch (the DOS
+conf patcher and the Win9x DOSBox-X path). It reads the cue sheets the conf `IMGMOUNT`s:
+`.\`-relative ones under the eXo folder, absolute ones as written, both matched ignoring case.
+For any track file whose spelling exists on disk only in another case, it adds a symlink with
+the cue's spelling beside the real file.
+- eXo's files are not rewritten, so a verify or re-extract still matches the archive.
+- It is idempotent: once the link exists there is nothing to do.
+- It needs no per-game list: any title with the same mismatch is covered.
+
+Among the installed games only SimCopter had it. Titles not yet extracted could not be checked.
+
+## 2026-10-02 - Release polish: no bottom player, one card spacing, the motto
+
+- **The bottom player is gone.** Theme music plays only in place, in the dossier, so the
+  now-playing bar and the toolbar's ♪ (its shuffle) were removed (`media/bar.rs`, its slot,
+  the toolbar slot, and Settings' "Continue the shuffle"). What that left unused went with
+  them: the public shuffle and volume calls, and most of `PlayerView`. Not yet removed: the
+  store's internal shuffle and list-walk modes, inert now that nothing starts them.
+- **One card spacing.** Reading Room cards take the game cards' scaled margin
+  (`card::card_margin`), and their section grid takes the game grid's padding.
+- **A stronger selection.** The selected card gets a 2 px accent outline plus an accent glow
+  (still no border change, so the grid does not shift).
+- **The motto.** "RETRO GAMES. / FOREVER." sits beside the toolbar's wordmark
+  (`logo::tagline`), where the concept stacks "PLAY / PRESERVE / EXPLORE": small, spaced
+  capitals, one phrase per line.
+
+## 2026-10-02 - The splash is a floating window, built from widgets
+
+The splash used to be the key art (`assets/splash.jpg`) as an overlay inside the main window.
+It is now its own small window: floating and centred on Hyprland, it hands over to the app's
+window, which tiles.
+- **Floating without the user's config.** A runtime rule, `hyprctl eval hl.window_rule(...)`,
+  matches the splash's title, the same mechanism the DOSBox-X windows use. Other compositors
+  get an ordinary small window.
+- **Built, not a picture.** Only the computer graphic is an image
+  (`assets/splash_computer.png`, from `media/splash_t.png`). The wordmark is `logo::ascii`,
+  and the two lines are labels. Everything takes the Omarchy theme's colours. The graphic's
+  violet (hue 250°, measured) is hue-rotated to the theme by a CSS rule `theme.rs` generates:
+  halfway between the palette's blue and magenta, where the wordmark's lower rows sit.
+- **The handover.** The main window is built hidden. `Splash::release` waits out the minimum
+  (5 s), presents the main window, then fades the splash and closes it. The app never has
+  zero windows, so GTK does not quit in between.
+- **Sizing.** The graphic is scaled to its place (2× for HiDPI) before display. A picture's
+  natural size is its texture's, and the full-size art grew the window.
+
+`splash.jpg` stays in the repository for the README. The old overlay's hard-coded `#000000`
+is gone with it.

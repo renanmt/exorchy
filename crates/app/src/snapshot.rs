@@ -18,6 +18,11 @@ pub fn arm(window: &adw::ApplicationWindow) {
         _ => (spec.clone(), 3000),
     };
     let window = window.clone();
+    // Broadway's frame clock never finishes a stack's transition, so a shot
+    // after a page switch caught the old page: snapshots run unanimated.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_enable_animations(false);
+    }
     // EXORCHY_SNAPSHOT_SIZE=<w>x<h> sizes the window first (tile simulation).
     if let Some((w, h)) = std::env::var("EXORCHY_SNAPSHOT_SIZE").ok().and_then(|v| {
         let (w, h) = v.split_once('x')?;
@@ -44,17 +49,57 @@ pub fn arm(window: &adw::ApplicationWindow) {
             });
         });
     }
-    // EXORCHY_SNAPSHOT_SEQUENCE=<step,step,...> drives the open panel before the
-    // shot, one step every 400 ms: `uninstall`, `close`, `play`, `reopen`.
+    // EXORCHY_SNAPSHOT_SEQUENCE=<step,step,...> drives the app before the
+    // shot, one step every 250 ms: the open panel (`uninstall`, `close`,
+    // `run`, `exit`, `reopen`), `click:<label>` (the first button whose text
+    // is <label>) and `activate:<label>` (the first list row showing <label>).
     if let Ok(seq) = std::env::var("EXORCHY_SNAPSHOT_SEQUENCE") {
         let steps: Vec<String> = seq.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
         let base = delay_ms.saturating_sub(1500) + 400;
         for (i, step) in steps.into_iter().enumerate() {
+            let window = window.clone();
             glib::timeout_add_local_once(Duration::from_millis(base + 250 * i as u64), move || {
                 let Some(lib) = crate::ui::window::library() else { return };
                 let panel = lib.detail();
                 let game = panel.selected_game();
                 log::info!("sequence step {step}: open={} game={:?}", panel.is_open(), game.as_ref().and_then(|g| g.id));
+                if let Some(label) = step.strip_prefix("click:") {
+                    // The whole window: dialogs live beside the library page.
+                    let root: gtk::Widget = window.clone().upcast();
+                    let hit = find(&root, &|w| w.is::<gtk::Button>() && find(w, &|l| l.downcast_ref::<gtk::Label>().is_some_and(|l| l.label() == label)).is_some());
+                    match hit.and_downcast::<gtk::Button>() {
+                        Some(b) => b.emit_clicked(),
+                        None => log::warn!("snapshot: no button \"{label}\""),
+                    }
+                    return;
+                }
+                if let Some(label) = step.strip_prefix("activate:") {
+                    let root = lib.widget.clone();
+                    let mut done = false;
+                    let mut stack = vec![root];
+                    while let Some(w) = stack.pop() {
+                        if let Some(lv) = w.downcast_ref::<gtk::ListView>() {
+                            if let Some(model) = lv.model() {
+                                for i in 0..model.n_items() {
+                                    if model.item(i).and_downcast::<gtk::StringObject>().is_some_and(|o| o.string() == label) {
+                                        lv.emit_by_name::<()>("activate", &[&i]);
+                                        done = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        let mut c = w.first_child();
+                        while let Some(ch) = c {
+                            c = ch.next_sibling();
+                            stack.push(ch);
+                        }
+                    }
+                    if !done {
+                        log::warn!("snapshot: no row \"{label}\"");
+                    }
+                    return;
+                }
                 match step.as_str() {
                     "close" => panel.close(),
                     "uninstall" => {
@@ -77,26 +122,127 @@ pub fn arm(window: &adw::ApplicationWindow) {
                             panel.show(g);
                         }
                     }
+                    // The Reading Room's full screen (the reader's button / F11).
+                    "fullscreen" => {
+                        if let Some(lib) = crate::ui::window::library() {
+                            lib.set_document_fullscreen(true);
+                        }
+                    }
+                    "wait" => {}
+                    "close_doc" => lib.close_document(),
+                    "cover" => panel.view_cover(),
+                    // type:<text> fills the focused field and presses Enter.
+                    s if s.starts_with("type:") => {
+                        let focus = gtk::prelude::RootExt::focus(&window);
+                        let focused = focus.as_ref().and_then(|f| f.downcast_ref::<gtk::Entry>().cloned().or_else(|| f.parent().and_downcast::<gtk::Entry>()));
+                        // Broadway's window may hold no focus: the last mapped
+                        // entry is the topmost dialog's.
+                        let entry = focused.or_else(|| {
+                            let mut last = None;
+                            let mut stack: Vec<gtk::Widget> = vec![window.clone().upcast()];
+                            while let Some(w) = stack.pop() {
+                                if w.is::<gtk::Entry>() && w.is_visible() {
+                                    last = w.downcast_ref::<gtk::Entry>().cloned();
+                                }
+                                let mut c = w.last_child();
+                                while let Some(x) = c {
+                                    c = x.prev_sibling();
+                                    stack.push(x);
+                                }
+                            }
+                            last
+                        });
+                        match entry {
+                            Some(e) => {
+                                e.set_text(&s[5..]);
+                                e.emit_activate();
+                            }
+                            None => log::warn!("snapshot: no focused entry for {s}"),
+                        }
+                    }
+                    // doc:<path> opens a document as a dossier's manual would.
+                    s if s.starts_with("doc:") => {
+                        let path = &s[4..];
+                        let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        crate::ui::pdf::open_document_viewer(window.upcast_ref(), path, &name, None, 1);
+                    }
                     _ => log::warn!("unknown sequence step {step}"),
                 }
             });
         }
     }
-    glib::timeout_add_local_once(Duration::from_millis(delay_ms), move || {
+    // EXORCHY_SNAPSHOT_SCROLL=<css class>:<px> scrolls the first scrolled
+    // window inside the first widget with that class (Broadway's screen is
+    // 1024x768, so a tall panel is checked by scrolling, not by growing).
+    if let Some((class, px)) = std::env::var("EXORCHY_SNAPSHOT_SCROLL").ok().and_then(|v| {
+        let (c, p) = v.rsplit_once(':')?;
+        Some((c.to_string(), p.parse::<f64>().ok()?))
+    }) {
+        let w = window.clone();
+        glib::timeout_add_local_once(Duration::from_millis(delay_ms.saturating_sub(1000)), move || {
+            let target = find(w.upcast_ref(), &|x| x.has_css_class(&class)).and_then(|host| find(&host, &|x| x.is::<gtk::ScrolledWindow>()));
+            match target.and_downcast::<gtk::ScrolledWindow>() {
+                Some(sw) => sw.vadjustment().set_value(px),
+                None => log::warn!("snapshot: nothing scrollable inside .{class}"),
+            }
+        });
+    }
+    // A long sequence pushes the shot back: its last step gets the same
+    // 1.1 s to settle as a lone step has (a dialog needs about that).
+    let steps = std::env::var("EXORCHY_SNAPSHOT_SEQUENCE").map(|s| s.split(',').filter(|x| !x.trim().is_empty()).count() as u64).unwrap_or(0);
+    let shot_ms = if steps > 1 { delay_ms.max(delay_ms.saturating_sub(1100) + 250 * (steps - 1) + 1100) } else { delay_ms };
+    glib::timeout_add_local_once(Duration::from_millis(shot_ms), move || {
         if std::env::var_os("EXORCHY_DUMP_TREE").is_some() {
             dump(window.upcast_ref::<gtk::Widget>(), 0);
         }
-        match render(&window, &path) {
-            Ok(()) => log::info!("Snapshot written to {path}"),
-            Err(e) => log::error!("Snapshot failed: {e}"),
+        // The capture reuses the last painted frame: a dialog presented since
+        // is missing from it. Paint once more, then capture (or capture
+        // anyway if no frame comes).
+        let done = std::rc::Rc::new(std::cell::Cell::new(false));
+        let shoot = {
+            let (window, path, done) = (window.clone(), path.clone(), done.clone());
+            move || {
+                if done.replace(true) {
+                    return;
+                }
+                match render(window.upcast_ref(), &path) {
+                    Ok(()) => log::info!("Snapshot written to {path}"),
+                    Err(e) => log::error!("Snapshot failed: {e}"),
+                }
+                if let Some(app) = window.application() {
+                    app.quit();
+                }
+            }
+        };
+        let shoot = std::rc::Rc::new(shoot);
+        if let Some(clock) = window.frame_clock() {
+            let s = shoot.clone();
+            clock.connect_after_paint(move |_| s());
+            window.queue_draw();
+            clock.request_phase(gtk::gdk::FrameClockPhase::PAINT);
         }
-        if let Some(app) = window.application() {
-            app.quit();
-        }
+        let s = shoot.clone();
+        glib::timeout_add_local_once(Duration::from_millis(500), move || s());
     });
 }
 
-fn render(window: &adw::ApplicationWindow, path: &str) -> Result<(), String> {
+/// Depth-first search for the first descendant (or `root` itself) matching `pred`.
+fn find(root: &gtk::Widget, pred: &dyn Fn(&gtk::Widget) -> bool) -> Option<gtk::Widget> {
+    if pred(root) {
+        return Some(root.clone());
+    }
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        if let Some(hit) = find(&c, pred) {
+            return Some(hit);
+        }
+        child = c.next_sibling();
+    }
+    None
+}
+
+/// Render a window's last painted frame to a PNG (the splash uses it too).
+pub fn render(window: &gtk::Window, path: &str) -> Result<(), String> {
     let widget: gtk::Widget = window.clone().upcast();
     let (w, h) = (widget.width() as f64, widget.height() as f64);
     if w < 1.0 || h < 1.0 {

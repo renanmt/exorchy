@@ -52,3 +52,14 @@ pub fn ascii(unit: f64) -> gtk::Box {
     }
     logo
 }
+
+/// The motto beside the toolbar's wordmark, as the concept stacks its
+/// "PLAY / PRESERVE / EXPLORE": small, spaced capitals, one phrase a line.
+pub fn tagline() -> gtk::Label {
+    gtk::Label::builder()
+        .label("RETRO GAMES.\nFOREVER.")
+        .xalign(0.0)
+        .valign(gtk::Align::Center)
+        .css_classes(["brand-tagline"])
+        .build()
+}

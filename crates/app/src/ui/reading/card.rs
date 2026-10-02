@@ -12,7 +12,7 @@ use gtk::prelude::*;
 
 use super::logic::{display_title, kind_label};
 use super::store::{self, PHASE_QUEUED};
-use crate::ui::card::{ART_HEIGHT, CARD_WIDTH};
+use crate::ui::card::{art_height, card_margin, card_width};
 use crate::ui::util::format_bytes;
 use crate::ui::{bus, covers};
 
@@ -144,18 +144,18 @@ impl IssueCard {
         let widget = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .css_classes(["game-card", "issue-card"])
-            .width_request(CARD_WIDTH)
-            .margin_start(5)
-            .margin_end(5)
-            .margin_top(5)
-            .margin_bottom(5)
+            .width_request(card_width())
+            .margin_start(card_margin())
+            .margin_end(card_margin())
+            .margin_top(card_margin())
+            .margin_bottom(card_margin())
             .halign(gtk::Align::Center)
             .overflow(gtk::Overflow::Hidden)
             .build();
         let cover = gtk::Picture::builder()
             .content_fit(gtk::ContentFit::Cover)
-            .width_request(CARD_WIDTH)
-            .height_request(ART_HEIGHT)
+            .width_request(card_width())
+            .height_request(art_height())
             .can_shrink(true)
             .css_classes(["game-card-art"])
             .build();
@@ -340,7 +340,7 @@ impl IssueCard {
         self.cover_empty.set_visible(false);
         let cover = self.cover.downgrade();
         let empty = self.cover_empty.downgrade();
-        covers::request(Some(covers::MEDIA_SOURCE), key.as_deref(), covers::Size::Fill(CARD_WIDTH as u32, ART_HEIGHT as u32), move |texture| {
+        covers::request(Some(covers::MEDIA_SOURCE), key.as_deref(), covers::Size::Fill(card_width() as u32, art_height() as u32), move |texture| {
             let (Some(cover), Some(empty)) = (cover.upgrade(), empty.upgrade()) else { return };
             match texture {
                 Some(t) => cover.set_paintable(Some(&t)),

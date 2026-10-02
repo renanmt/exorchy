@@ -15,7 +15,7 @@ use exorchy_core::omarchy::{self, Theme};
 
 /// Component rules; tokens only. One sheet per feature module so they can
 /// be written independently; all are loaded at the same priority.
-const STYLES: [&str; 10] = [
+const STYLES: [&str; 15] = [
     include_str!("style.css"),
     include_str!("styles/dialogs.css"),
     include_str!("styles/settings.css"),
@@ -26,11 +26,42 @@ const STYLES: [&str; 10] = [
     include_str!("styles/backdrop.css"),
     include_str!("styles/updates.css"),
     include_str!("styles/library_location.css"),
+    include_str!("styles/detail.css"),
+    include_str!("styles/statusbar.css"),
+    include_str!("styles/sidebar.css"),
+    include_str!("styles/image_viewer.css"),
+    include_str!("styles/splash.css"),
 ];
 
 thread_local! {
     static PROVIDER: RefCell<Option<gtk::CssProvider>> = const { RefCell::new(None) };
     static CURRENT: RefCell<Option<Theme>> = const { RefCell::new(None) };
+}
+
+/// The interface sizes Settings → Appearance offers: (scale, label), as
+/// multiples of Omarchy's 12 px base. Medium is the default.
+pub const UI_SCALES: [(f64, &str); 4] = [(1.0, "Compact"), (1.2, "Medium"), (1.4, "Large"), (1.6, "Extra large")];
+pub const DEFAULT_UI_SCALE: f64 = 1.2;
+/// Config key holding the chosen scale.
+pub const UI_SCALE_KEY: &str = "ui_scale";
+
+static UI_SCALE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Set once at start, before any widget exists (fixed sizes are taken at
+/// construction, so a change applies after a restart).
+pub fn set_ui_scale(scale: f64) {
+    let _ = UI_SCALE.set(if (0.5..=3.0).contains(&scale) { scale } else { DEFAULT_UI_SCALE });
+}
+
+/// How much larger than Omarchy's base size eXorchy draws, text and the
+/// fixed sizes alike. Every fixed pixel size goes through `scaled`.
+pub fn ui_scale() -> f64 {
+    *UI_SCALE.get().unwrap_or(&DEFAULT_UI_SCALE)
+}
+
+/// A design-size length in pixels at the interface scale.
+pub fn scaled(px: i32) -> i32 {
+    (px as f64 * ui_scale() + 0.5) as i32
 }
 
 /// Install the static stylesheet, apply the current theme and follow changes.
@@ -76,7 +107,7 @@ fn apply(theme: Theme) {
 
     if let Some(settings) = gtk::Settings::default() {
         // shell.toml's base-size is in px; GTK font names take points.
-        let pt = (theme.font_base_size as f64 * 0.75).round().max(6.0) as u32;
+        let pt = (theme.font_base_size as f64 * ui_scale() * 0.75).round().max(6.0) as u32;
         let family = theme.mono_font.clone().unwrap_or_else(|| "monospace".into());
         settings.set_gtk_font_name(Some(&format!("{family} {pt}")));
     }
@@ -125,13 +156,49 @@ pub fn theme_css(theme: &Theme) -> String {
     for (k, v) in pairs {
         css.push_str(&format!("  --om-{k}: {};\n", sanitize(v)));
     }
-    css.push_str(&format!("  --font-size-base: {}px;\n", theme.font_base_size));
+    css.push_str(&format!("  --font-size-base: {}px;\n", scaled(theme.font_base_size as i32)));
     css.push_str(SEMANTIC);
     if p.mode == "light" {
         css.push_str(LIGHT_OVERRIDES);
     }
     css.push_str("}\n");
+    // The splash's computer is drawn in a violet (hue 250°); turn it to the
+    // theme's, between its blue and magenta like the wordmark's lower rows.
+    if let Some(deg) = splash_hue_shift(&p.blue, &p.magenta) {
+        css.push_str(&format!(".splash-art {{ filter: hue-rotate({deg}deg); }}\n"));
+    }
     css
+}
+
+/// The splash art's accent hue, measured from `assets/splash_computer.png`.
+const SPLASH_ART_HUE: f64 = 250.0;
+
+/// Degrees to rotate the splash art so its violet takes the hue halfway
+/// between two theme colours (`#rrggbb`); `None` for an unreadable colour.
+fn splash_hue_shift(a: &str, b: &str) -> Option<i32> {
+    let rgb = |hex: &str| -> Option<(f64, f64, f64)> {
+        let h = hex.trim().trim_start_matches('#');
+        if h.len() < 6 {
+            return None;
+        }
+        let c = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).ok().map(|v| v as f64 / 255.0);
+        Some((c(0)?, c(2)?, c(4)?))
+    };
+    let (a, b) = (rgb(a)?, rgb(b)?);
+    let (r, g, bl) = ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0, (a.2 + b.2) / 2.0);
+    let (max, min) = (r.max(g).max(bl), r.min(g).min(bl));
+    if max - min < 1e-6 {
+        return Some(0);
+    }
+    let d = max - min;
+    let hue = if max == r {
+        60.0 * (((g - bl) / d).rem_euclid(6.0))
+    } else if max == g {
+        60.0 * ((bl - r) / d + 2.0)
+    } else {
+        60.0 * ((r - g) / d + 4.0)
+    };
+    Some(((hue - SPLASH_ART_HUE).rem_euclid(360.0)).round() as i32)
 }
 
 /// A palette value is a `#rrggbb` hex; anything else falls back to a token
@@ -182,6 +249,7 @@ const SEMANTIC: &str = r#"
   --line-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --line-3: color-mix(in srgb, var(--om-foreground) 8%, transparent);
   --line-4: color-mix(in srgb, var(--om-foreground) 12%, transparent);
+  --line-frame: color-mix(in srgb, var(--om-foreground) 26%, transparent);
   --fill-1: color-mix(in srgb, var(--om-foreground) 3%, transparent);
   --fill-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --fill-3: color-mix(in srgb, var(--om-foreground) 10%, transparent);
@@ -249,6 +317,15 @@ mod tests {
     use exorchy_core::omarchy::Palette;
 
     #[test]
+    fn splash_art_follows_the_theme_hue() {
+        // A violet already at 250°: no turn. Blue and red halves: magenta-ish.
+        assert_eq!(super::splash_hue_shift("#5533ff", "#5533ff"), Some(0));
+        assert_eq!(super::splash_hue_shift("#0000ff", "#ff0000"), Some(50));
+        assert_eq!(super::splash_hue_shift("#000000", "#000000"), Some(0));
+        assert_eq!(super::splash_hue_shift("bad", "#ffffff"), None);
+    }
+
+    #[test]
     fn palette_lands_as_om_tokens_and_adwaita_variables() {
         let theme = Theme {
             name: Some("ethereal".into()),
@@ -260,7 +337,8 @@ mod tests {
         let css = theme_css(&theme);
         assert!(css.contains("--om-accent: #faa968;"));
         assert!(css.contains("--accent-bg-color: var(--om-accent);"));
-        assert!(css.contains("--font-size-base: 14px;"));
+        // Omarchy's base size, at eXorchy's interface scale.
+        assert!(css.contains(&format!("--font-size-base: {}px;", scaled(14))));
         assert!(!css.contains("--scrim: color-mix(in srgb, var(--om-darker-background) 72%"));
     }
 

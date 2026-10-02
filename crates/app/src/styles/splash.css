@@ -1,0 +1,19 @@
+/* The splash window (ui/splash.rs): the key art rebuilt in the theme's
+   colours. The computer's accent hue follows the theme (`theme.rs` adds its
+   hue-rotate); the wordmark has its own gradient (`logo.css`). */
+window.splash-window { background-color: var(--bg-primary); }
+.splash-body { padding: 1.5em 2em; }
+/* The computer stands on the wordmark, as in the key art. */
+.splash-art { margin-bottom: -0.4em; }
+label.splash-subtitle {
+  color: var(--text-strong);
+  font-size: 1.1em;
+  letter-spacing: 0.12em;
+  margin-top: 1.1em;
+}
+label.splash-slogan {
+  color: var(--text-strong);
+  font-size: 1.3em;
+  font-weight: 700;
+  margin-top: 1.5em;
+}

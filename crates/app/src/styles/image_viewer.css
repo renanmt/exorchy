@@ -1,0 +1,4 @@
+/* The full-resolution image dialog (ui/image_viewer.rs). */
+dialog.image-viewer .image-viewer-picture {
+  background-color: var(--bg-primary);
+}

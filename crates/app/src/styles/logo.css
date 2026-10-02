@@ -16,3 +16,13 @@
 
 .about-logo { padding: 12px 0 4px 0; }
 .about-logo .tagline { color: var(--text-secondary); letter-spacing: 0.2em; }
+
+/* The toolbar's motto beside the wordmark (logo::tagline). */
+label.brand-tagline {
+  color: var(--text-muted);
+  font-size: 0.62em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1.35;
+  margin: 0 6px 0 2px;
+}

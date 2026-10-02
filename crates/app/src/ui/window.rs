@@ -1,5 +1,5 @@
-//! The application window: a stack of setup ↔ library under a splash
-//! overlay, wrapped in a toast overlay. No header bar: Hyprland draws no
+//! The application window: a stack of setup ↔ library, wrapped in a toast
+//! overlay, presented by the splash (`ui/splash.rs`) once it knows what to show. No header bar: Hyprland draws no
 //! decorations and tiles the window; the pages carry their own toolbars.
 
 use gtk::glib;
@@ -32,7 +32,8 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
         .build();
 
     let stack = gtk::Stack::builder().transition_type(gtk::StackTransitionType::Crossfade).build();
-    let splash = Rc::new(Splash::new());
+    // The splash is its own floating window; this one appears when it goes.
+    let splash = Splash::new(application);
     // Layers: the user's background image (if any), the pages, the splash.
     // The overlay measures the pages, not the picture, so an image never
     // sets the window's size.
@@ -40,7 +41,6 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
     overlay.set_child(Some(&crate::ui::backdrop::install(&window)));
     overlay.add_overlay(&stack);
     overlay.set_measure_overlay(&stack, true);
-    overlay.add_overlay(&splash.widget);
     let toasts = adw::ToastOverlay::new();
     toasts.set_child(Some(&overlay));
     bus::set_toast_overlay(&toasts);
@@ -50,7 +50,7 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
     if let Some(msg) = startup_error {
         let win = window.clone();
         dialogs::error(&win, "eXorchy failed to start", &format!("{msg}\n\nSee the log folder for details."));
-        splash.release();
+        splash.release(&window);
         return window;
     }
 
@@ -72,7 +72,7 @@ pub fn build(application: &adw::Application, startup_error: Option<String>) -> a
             } else {
                 show_setup(&win, &stack, &toasts);
             }
-            splash.release();
+            splash.release(&win);
         }),
     );
 
@@ -109,7 +109,7 @@ fn show_library(window: &adw::ApplicationWindow, stack: &gtk::Stack, _toasts: &a
     let w = window.clone();
     page.activity_button.connect_clicked(move |_| crate::ui::transfers::open(&w));
     page.set_reading_widget(&crate::ui::reading::build(window.upcast_ref()));
-    crate::ui::media::install(window.upcast_ref(), &page, &page.bar_slot);
+    crate::ui::media::install(window.upcast_ref(), &page);
     crate::ui::updates::install(window.upcast_ref(), &page.banner_slot);
 
     downloads::init_dependency_downloads();
