@@ -98,6 +98,7 @@ and pops Omarchy's crash notice on their desktop (2026-09-30, once per run).
 More switches: `EXORCHY_SNAPSHOT_SEQUENCE=click:<button text>,activate:<list row text>,wait,…` (one step per 250 ms; e.g. `click:Tags,wait,activate:Theme: Fantasy`; `fullscreen` puts the open document in full-screen reading mode, `doc:<path>` opens a document as a dossier's manual would, `close_doc` closes it, `type:<text>` fills the focused (or topmost) entry and presses Enter, `cover` opens the dossier's cover at full size; `click:` finds buttons in dialogs too; a long sequence delays the shot to 1.1 s after its last step, and the capture waits for a fresh paint; snapshots run with GTK animations off, since Broadway never finishes a stack transition), `EXORCHY_SNAPSHOT_SCROLL=<css class>:<px>` (scrolls inside e.g. `detail-panel`; Broadway is capped at 1024x768), `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
 `EXORCHY_SNAPSHOT_READING=1` (+ `_VIEW=list`, `EXORCHY_SNAPSHOT_ISSUE=<key>`, `EXORCHY_SNAPSHOT_DOC=<file>`).
 `EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
+`EXORCHY_SNAPSHOT_SPLASH=<png>` (with `EXORCHY_SNAPSHOT` set) captures the splash window instead of the app.
 Media: `EXORCHY_MEDIA_FAKE_SINKS=1` sends all sound to a fakesink (silent test runs);
 `EXORCHY_MEDIA_TEST_FILES=a.mp4:b.mp3 cargo test -p exorchy playbin -- --ignored` (under a
 Broadway display, with the fake sinks) switches 60 times between real cached files, the

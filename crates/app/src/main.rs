@@ -42,9 +42,9 @@ fn main() -> glib::ExitCode {
             win.present();
             return;
         }
+        // The splash presents the window once the app knows what to show.
         let window = ui::window::build(application, startup_error.clone());
         snapshot::arm(&window);
-        window.present();
     });
     let core = boot.app.clone();
     application.connect_shutdown(move |_| {

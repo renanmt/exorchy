@@ -205,7 +205,7 @@ pub fn arm(window: &adw::ApplicationWindow) {
                 if done.replace(true) {
                     return;
                 }
-                match render(&window, &path) {
+                match render(window.upcast_ref(), &path) {
                     Ok(()) => log::info!("Snapshot written to {path}"),
                     Err(e) => log::error!("Snapshot failed: {e}"),
                 }
@@ -241,7 +241,8 @@ fn find(root: &gtk::Widget, pred: &dyn Fn(&gtk::Widget) -> bool) -> Option<gtk::
     None
 }
 
-fn render(window: &adw::ApplicationWindow, path: &str) -> Result<(), String> {
+/// Render a window's last painted frame to a PNG (the splash uses it too).
+pub fn render(window: &gtk::Window, path: &str) -> Result<(), String> {
     let widget: gtk::Widget = window.clone().upcast();
     let (w, h) = (widget.width() as f64, widget.height() as f64);
     if w < 1.0 || h < 1.0 {

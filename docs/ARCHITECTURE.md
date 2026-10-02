@@ -54,7 +54,7 @@ exorchy/
 │   ├── src/ui/               window, splash, setup, library, card, detail, model, covers, downloads,
 │   │                         actions, bus, dialogs, util + the feature modules (settings, reading,
 │   │                         media, playlists, game_settings, onboarding)
-│   └── assets/               splash.jpg, exorchy.png (icon), logo.txt (ASCII wordmark), collections/<col>.jpg
+│   └── assets/               splash_computer.png (splash graphic), splash.jpg (README key art), exorchy.png (icon), logo.txt (ASCII wordmark), collections/<col>.jpg
 ├── metadata/                 bundled XML (gz), configs zips, variant indexes, media index, exorchy.db.gz
 ├── torrents/                 every eXo .torrent (DOS packs, Win3x, Win9x, ScummVM, Media Pack)
 ├── manifest.json             content packs + emulator packs per collection
@@ -271,9 +271,16 @@ seeding consent, packs, transfer polling, `ensure_dosbox_staging`,
 returns the live page. Single instance comes from GApplication: a second
 `exorchy` activates the running one, which presents its window.
 
-The splash (`ui/splash.rs`) shows `assets/splash.jpg` on its own dark
-backdrop for at least 1.6 s and until the app knows what to render, then
-fades; it is an overlay inside the window, never a second toplevel.
+The splash (`ui/splash.rs`) is its own small window (3:2, `scaled(600)` wide),
+floated and centred on Hyprland by a runtime rule (`hyprctl eval`, matched on
+its title "eXorchy splash"; the user's config is untouched). It is built from
+widgets in the theme's colours: `assets/splash_computer.png` (its violet
+hue-rotated to the theme by a rule `theme.rs` generates), the pixel wordmark
+(`logo::ascii`), "THE EXODOS LAUNCHER FOR OMARCHY" and the slogan
+(`styles/splash.css`). The main window is built hidden; after at least 1.6 s,
+once the app knows what to render, `Splash::release` presents it (Hyprland
+tiles it) and the splash fades and closes. Snapshot runs skip the splash;
+`EXORCHY_SNAPSHOT_SPLASH=<png>` captures it.
 
 The wordmark (`ui/logo.rs`) is `assets/logo.txt`, half-block ASCII art, drawn
 as pixel art: one `DrawingArea` per text row, each character two square

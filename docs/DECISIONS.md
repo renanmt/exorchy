@@ -905,3 +905,25 @@ Among the installed games only SimCopter had it. Titles not yet extracted could 
 - **The motto.** "RETRO GAMES. / FOREVER." sits beside the toolbar's wordmark
   (`logo::tagline`), where the concept stacks "PLAY / PRESERVE / EXPLORE": small, spaced
   capitals, one phrase per line.
+
+## 2026-10-02 - The splash is a floating window, built from widgets
+
+The splash used to be the key art (`assets/splash.jpg`) as an overlay inside the main window.
+It is now its own small window: floating and centred on Hyprland, it hands over to the app's
+window, which tiles.
+- **Floating without the user's config.** A runtime rule, `hyprctl eval hl.window_rule(...)`,
+  matches the splash's title, the same mechanism the DOSBox-X windows use. Other compositors
+  get an ordinary small window.
+- **Built, not a picture.** Only the computer graphic is an image
+  (`assets/splash_computer.png`, from `media/splash_t.png`). The wordmark is `logo::ascii`,
+  and the two lines are labels. Everything takes the Omarchy theme's colours. The graphic's
+  violet (hue 250°, measured) is hue-rotated to the theme by a CSS rule `theme.rs` generates:
+  halfway between the palette's blue and magenta, where the wordmark's lower rows sit.
+- **The handover.** The main window is built hidden. `Splash::release` waits out the 1.6 s
+  minimum, presents the main window, then fades the splash and closes it. The app never has
+  zero windows, so GTK does not quit in between.
+- **Sizing.** The graphic is scaled to its place (2× for HiDPI) before display. A picture's
+  natural size is its texture's, and the full-size art grew the window.
+
+`splash.jpg` stays in the repository for the README. The old overlay's hard-coded `#000000`
+is gone with it.
