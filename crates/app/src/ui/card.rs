@@ -25,8 +25,10 @@ pub fn set_selected_id(id: Option<i64>) {
     SELECTED.with(|s| s.set(id));
 }
 
-pub const CARD_WIDTH: i32 = 172;
-pub const ART_HEIGHT: i32 = 226;
+pub const CARD_WIDTH: i32 = crate::theme::scaled(172);
+pub const ART_HEIGHT: i32 = crate::theme::scaled(226);
+/// Half the gap between cards.
+const CARD_MARGIN: i32 = crate::theme::scaled(5);
 
 pub struct Card {
     pub widget: gtk::Box,
@@ -55,10 +57,10 @@ impl Card {
             .orientation(gtk::Orientation::Vertical)
             .css_classes(["game-card"])
             .width_request(CARD_WIDTH)
-            .margin_start(5)
-            .margin_end(5)
-            .margin_top(5)
-            .margin_bottom(5)
+            .margin_start(CARD_MARGIN)
+            .margin_end(CARD_MARGIN)
+            .margin_top(CARD_MARGIN)
+            .margin_bottom(CARD_MARGIN)
             .overflow(gtk::Overflow::Hidden)
             .build();
 

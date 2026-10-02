@@ -384,7 +384,11 @@ with `color-mix()`, and sets libadwaita's own variables (`--accent-bg-color`,
 `--window-bg-color`, ...) so stock widgets follow too. The provider is
 swapped live on every `theme-changed`; `adw::StyleManager` is forced to
 dark or light from the palette's mode; the font comes from `shell.toml`'s
-base size (px → pt) and the monospace family through `gtk-font-name`.
+base size (px → pt) times `theme::UI_SCALE` (1.4, the proportions of the user's
+design, `tmp/concept 01.png`) and the monospace family through `gtk-font-name`.
+Every fixed pixel size in the revamped UI (cards, covers, sidebar, dossier,
+list columns, breakpoints) goes through `theme::scaled`, and the concept's
+paddings are in `em`, so the whole interface scales together.
 `style.css` carries Tokyo Night fallbacks for the `--om-*` keys so the app
 renders before the first theme lands. No rule outside `theme.rs` names a
 colour; each feature module keeps its rules in `styles/<module>.css`.

@@ -36,6 +36,17 @@ thread_local! {
     static CURRENT: RefCell<Option<Theme>> = const { RefCell::new(None) };
 }
 
+/// How much larger than Omarchy's base size eXorchy draws, text and the
+/// fixed sizes alike: the proportions of the user's design (tmp/concept
+/// 01.png), whose interface is about 1.4x the 12 px base relative to the
+/// screen. Every fixed pixel size goes through `scaled`.
+pub const UI_SCALE: f64 = 1.4;
+
+/// A design-size length in pixels at `UI_SCALE`.
+pub const fn scaled(px: i32) -> i32 {
+    (px as f64 * UI_SCALE + 0.5) as i32
+}
+
 /// Install the static stylesheet, apply the current theme and follow changes.
 pub fn init() {
     let display = gtk::gdk::Display::default().expect("a display");
@@ -79,7 +90,7 @@ fn apply(theme: Theme) {
 
     if let Some(settings) = gtk::Settings::default() {
         // shell.toml's base-size is in px; GTK font names take points.
-        let pt = (theme.font_base_size as f64 * 0.75).round().max(6.0) as u32;
+        let pt = (theme.font_base_size as f64 * UI_SCALE * 0.75).round().max(6.0) as u32;
         let family = theme.mono_font.clone().unwrap_or_else(|| "monospace".into());
         settings.set_gtk_font_name(Some(&format!("{family} {pt}")));
     }
@@ -128,7 +139,7 @@ pub fn theme_css(theme: &Theme) -> String {
     for (k, v) in pairs {
         css.push_str(&format!("  --om-{k}: {};\n", sanitize(v)));
     }
-    css.push_str(&format!("  --font-size-base: {}px;\n", theme.font_base_size));
+    css.push_str(&format!("  --font-size-base: {}px;\n", scaled(theme.font_base_size as i32)));
     css.push_str(SEMANTIC);
     if p.mode == "light" {
         css.push_str(LIGHT_OVERRIDES);
@@ -264,7 +275,8 @@ mod tests {
         let css = theme_css(&theme);
         assert!(css.contains("--om-accent: #faa968;"));
         assert!(css.contains("--accent-bg-color: var(--om-accent);"));
-        assert!(css.contains("--font-size-base: 14px;"));
+        // Omarchy's base size, at eXorchy's interface scale.
+        assert!(css.contains(&format!("--font-size-base: {}px;", scaled(14))));
         assert!(!css.contains("--scrim: color-mix(in srgb, var(--om-darker-background) 72%"));
     }
 

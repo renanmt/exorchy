@@ -2,7 +2,7 @@
 .statusbar {
   background-color: var(--bg-primary);
   border-top: var(--hairline) solid var(--line-frame);
-  padding: 6px 14px;
+  padding: 0.85em 1.2em;
   font-size: 0.9em;
   color: var(--text-secondary);
 }

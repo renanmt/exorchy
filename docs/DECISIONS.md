@@ -670,3 +670,15 @@ accent text, accent outline, `--accent-glow` tint, the active tab's look instead
 block), the filter row and jump bar rules. Settings follows the library sidebar (accent bar on
 the selected page) and draws its groups as outlined frames instead of filled panels. The older
 2 px `--border` stays for what was not redesigned.
+
+## 2026-10-01 - The interface draws at 1.4x Omarchy's base size
+
+Measured against the user's design (`tmp/concept 01.png`, 1672 px wide) and a full-screen
+screenshot on 2560 × 1440: relative to the screen, the design's text, header (7 % of the height
+vs 4 %), footer (4.3 % vs 2 %), sidebar rows, cards (6 across vs 8) and gaps are all about 1.4-1.5x
+eXorchy's, which drew everything at Omarchy's 12 px base. `theme::UI_SCALE` = 1.4 scales the
+GTK font (and `--font-size-base`); `theme::scaled()` scales every fixed pixel size of the
+revamped UI (card and cover, sidebar 294 px, dossier at ~27 % of the window, list columns) and
+the breakpoints; the concept's paddings moved to `em`. A 1024 px window is now the small layout
+(stacked toolbar, full-width dossier). A per-user "interface size" setting would need `scaled`
+to become a runtime value read at start; not done yet.

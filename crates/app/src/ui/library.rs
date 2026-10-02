@@ -135,7 +135,7 @@ impl LibraryPage {
         // logo stays and the tools keep together on their own line.
         let toolbar = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["toolbar"]).build();
         let head = adw::WrapBox::builder().child_spacing(12).line_spacing(6).align(0.5).build();
-        let brand = crate::ui::logo::ascii(1.5);
+        let brand = crate::ui::logo::ascii(1.5 * crate::theme::UI_SCALE);
         brand.add_css_class("brand");
         head.append(&brand);
         let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).css_classes(["tabs"]).build();
@@ -291,9 +291,10 @@ impl LibraryPage {
             .sidebar(&detail.widget)
             .sidebar_position(gtk::PackType::End)
             .show_sidebar(false)
-            .min_sidebar_width(300.0)
-            .max_sidebar_width(600.0)
-            .sidebar_width_fraction(0.42)
+            // The concept's dossier: about a quarter of the window.
+            .min_sidebar_width(crate::theme::scaled(300) as f64)
+            .max_sidebar_width(crate::theme::scaled(480) as f64)
+            .sidebar_width_fraction(0.27)
             .enable_hide_gesture(true)
             .vexpand(true)
             .build();
@@ -328,16 +329,16 @@ impl LibraryPage {
         let widget = adw::BreakpointBin::builder().width_request(360).height_request(300).child(&column).build();
         // Medium: everything side by side, but the status bar's key hints
         // only fit from 1300 sp. Added first: the last matching breakpoint wins.
-        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1300.0, adw::LengthUnit::Sp));
+        let medium = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, crate::theme::scaled(1300) as f64, adw::LengthUnit::Sp));
         medium.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
         widget.add_breakpoint(medium);
-        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 1100.0, adw::LengthUnit::Sp));
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, crate::theme::scaled(1100) as f64, adw::LengthUnit::Sp));
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
         narrow.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
         // The dropdowns carry the filters when the sidebar does not fit.
         narrow.add_setter(&sidebar.nav, "visible", Some(&false.to_value()));
         widget.add_breakpoint(narrow);
-        let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, 760.0, adw::LengthUnit::Sp));
+        let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, crate::theme::scaled(760) as f64, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
         // A small tile: the dossier takes the whole area rather than a strip.
         tiny.add_setter(&split, "sidebar-width-fraction", Some(&1.0f64.to_value()));
@@ -1442,14 +1443,14 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>, recent: bool) 
 /// width, right-aligned number). Header and rows use the same cells, so they
 /// line up; a cell's text never sizes it (see `cell`).
 const COLS: [(&str, i32, bool, bool); 8] = [
-    ("Title", 180, true, false),
-    ("Year", 44, false, true),
-    ("Genre", 110, true, false),
-    ("Developer", 100, true, false),
-    ("Publisher", 100, true, false),
-    ("Rating", 50, false, true),
-    ("Size", 70, false, true),
-    ("Status", 80, false, false),
+    ("Title", crate::theme::scaled(180), true, false),
+    ("Year", crate::theme::scaled(44), false, true),
+    ("Genre", crate::theme::scaled(110), true, false),
+    ("Developer", crate::theme::scaled(100), true, false),
+    ("Publisher", crate::theme::scaled(100), true, false),
+    ("Rating", crate::theme::scaled(50), false, true),
+    ("Size", crate::theme::scaled(70), false, true),
+    ("Status", crate::theme::scaled(80), false, false),
 ];
 // Base widths plus spacing and padding stay under ~790 px, so the table
 // fits beside the 280 px sidebar from the 1100 sp breakpoint up.

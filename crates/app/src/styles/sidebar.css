@@ -5,7 +5,7 @@
   /* The dossier title bar's tint (styles/detail.css), as in the concept. */
   background-color: var(--bg-secondary);
   border-right: var(--hairline) solid var(--line-frame);
-  padding: 10px 8px;
+  padding: 0.8em 0.6em;
 }
 button.sidebar-item {
   background: none;
@@ -13,7 +13,7 @@ button.sidebar-item {
   border-left: 2px solid transparent;
   border-radius: 0 var(--radius) var(--radius) 0;
   box-shadow: none;
-  padding: 7px 10px;
+  padding: 0.85em 1em;
   color: var(--text-secondary);
 }
 button.sidebar-item:hover { background-color: var(--fill-2); color: var(--text-primary); }
@@ -30,7 +30,7 @@ button.sidebar-item.active {
   border-radius: var(--radius);
   padding: 0 6px;
 }
-.sidebar-values { padding: 12px 14px; }
+.sidebar-values { padding: 0.9em 1.2em; }
 .sidebar-values-title { font-weight: 600; color: var(--text-strong); }
 listview.sidebar-value-list { background: none; }
 listview.sidebar-value-list > row {

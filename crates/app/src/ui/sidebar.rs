@@ -17,7 +17,7 @@ use crate::ui::statusbar::grouped;
 
 /// The width of the app's left columns: this sidebar and Settings'
 /// navigation are the same bar, so they share it.
-pub const SIDEBAR_WIDTH: i32 = 280;
+pub const SIDEBAR_WIDTH: i32 = crate::theme::scaled(210);
 
 /// A category the sidebar browses by.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

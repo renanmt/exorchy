@@ -18,7 +18,7 @@ use crate::app;
 use crate::ui::util::{esc, format_bytes, platform_tag};
 use crate::ui::{actions, bus, covers, downloads, launch_notes};
 
-pub const PANEL_WIDTH: i32 = 560;
+pub const PANEL_WIDTH: i32 = crate::theme::scaled(560);
 
 pub struct DetailPanel {
     /// The panel itself; the library hosts it in its split view.
@@ -78,7 +78,7 @@ impl DetailPanel {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
         // The split view's sidebar pane has libadwaita's own background; the
         // host paints the page background around the framed dossier.
-        let host = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(300).hexpand(true).css_classes(["dossier-host"]).build();
+        let host = gtk::Box::builder().orientation(gtk::Orientation::Vertical).width_request(crate::theme::scaled(300)).hexpand(true).css_classes(["dossier-host"]).build();
         let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).vexpand(true).css_classes(["detail-panel", "dossier"]).build();
         host.append(&root);
 
@@ -95,7 +95,7 @@ impl DetailPanel {
 
         // Hero: the cover beside who and what the game is, and what to do.
         let hero = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["dossier-hero"]).build();
-        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).width_request(150).height_request(210).can_shrink(true).valign(gtk::Align::Start).css_classes(["detail-cover"]).build();
+        let cover = gtk::Picture::builder().content_fit(gtk::ContentFit::Contain).width_request(crate::theme::scaled(150)).height_request(crate::theme::scaled(210)).can_shrink(true).valign(gtk::Align::Start).css_classes(["detail-cover"]).build();
         hero.append(&cover);
         let side = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).hexpand(true).build();
         let kind = gtk::Label::builder().xalign(0.0).css_classes(["dossier-kind"]).build();
@@ -472,7 +472,7 @@ impl DetailPanel {
                 panel.manual_path.replace(meta.manual_path.clone());
                 panel.gallery.remove_all();
                 for (thumb, full) in meta.thumbnails.iter().zip(meta.images.iter()) {
-                    let pic = gtk::Picture::builder().content_fit(gtk::ContentFit::Cover).height_request(96).css_classes(["gallery-thumb"]).build();
+                    let pic = gtk::Picture::builder().content_fit(gtk::ContentFit::Cover).height_request(crate::theme::scaled(96)).css_classes(["gallery-thumb"]).build();
                     let path = std::path::PathBuf::from(thumb);
                     let p2 = pic.clone();
                     let handle = exorchy_core::host::async_runtime::spawn_blocking(move || gtk::gdk::Texture::from_filename(&path).ok());
