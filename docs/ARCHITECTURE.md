@@ -277,7 +277,7 @@ its title "eXorchy splash"; the user's config is untouched). It is built from
 widgets in the theme's colours: `assets/splash_computer.png` (its violet
 hue-rotated to the theme by a rule `theme.rs` generates), the pixel wordmark
 (`logo::ascii`), "THE EXODOS LAUNCHER FOR OMARCHY" and the slogan
-(`styles/splash.css`). The main window is built hidden; after at least 1.6 s,
+(`styles/splash.css`). The main window is built hidden; after at least 5 s,
 once the app knows what to render, `Splash::release` presents it (Hyprland
 tiles it) and the splash fades and closes. Snapshot runs skip the splash;
 `EXORCHY_SNAPSHOT_SPLASH=<png>` captures it.

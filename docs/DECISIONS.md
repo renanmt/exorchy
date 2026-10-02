@@ -919,8 +919,8 @@ window, which tiles.
   and the two lines are labels. Everything takes the Omarchy theme's colours. The graphic's
   violet (hue 250°, measured) is hue-rotated to the theme by a CSS rule `theme.rs` generates:
   halfway between the palette's blue and magenta, where the wordmark's lower rows sit.
-- **The handover.** The main window is built hidden. `Splash::release` waits out the 1.6 s
-  minimum, presents the main window, then fades the splash and closes it. The app never has
+- **The handover.** The main window is built hidden. `Splash::release` waits out the minimum
+  (5 s), presents the main window, then fades the splash and closes it. The app never has
   zero windows, so GTK does not quit in between.
 - **Sizing.** The graphic is scaled to its place (2× for HiDPI) before display. A picture's
   natural size is its texture's, and the full-size art grew the window.

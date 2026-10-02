@@ -19,7 +19,7 @@ use gtk::prelude::*;
 
 const COMPUTER: &[u8] = include_bytes!("../../assets/splash_computer.png");
 /// The splash stays at least this long, so it reads as a splash, not a flicker.
-const MIN_MS: u64 = 1600;
+const MIN_MS: u64 = 5000;
 /// The fade before the splash window closes.
 const FADE_MS: u32 = 350;
 /// The title the Hyprland rule matches.
