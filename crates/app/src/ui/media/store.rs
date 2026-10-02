@@ -24,6 +24,7 @@ use crate::app;
 use crate::ui::bus;
 
 use super::audio::AudioPort;
+use super::playbin::PlaybinStream;
 
 /// Frontend-only phase: waiting for a fetch slot.
 pub const PHASE_QUEUED: &str = "queued";
@@ -1613,7 +1614,7 @@ pub fn set_preview_muted(v: bool) {
 }
 
 /// The audio element, for the seek bar.
-pub fn stream() -> Option<gtk::MediaFile> {
+pub fn stream() -> Option<PlaybinStream> {
     PORT.with(|p| p.borrow().as_ref().map(|p| p.stream()))
 }
 

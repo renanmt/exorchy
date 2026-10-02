@@ -19,6 +19,7 @@ use crate::app;
 use crate::ui::detail::panel_width;
 
 use super::store::{self, Change, PauseReason, Track, PHASE_PROBING, PHASE_QUEUED};
+use super::playbin::PlaybinStream;
 
 /// The panel settles on a game before any torrent read starts: clicking
 /// through the grid would otherwise queue a read per card.
@@ -58,7 +59,7 @@ pub struct Preview {
     theme_name: gtk::Label,
     theme_retry: gtk::Button,
     // Hero controller.
-    stream: RefCell<gtk::MediaFile>,
+    stream: RefCell<PlaybinStream>,
     game_id: Cell<Option<i64>>,
     phase: Cell<Phase>,
     error: RefCell<Option<String>>,
@@ -91,7 +92,7 @@ impl Preview {
     pub fn new(window: &gtk::Window) -> Rc<Self> {
         let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).visible(false).css_classes(["media-slot"]).build();
 
-        let stream = gtk::MediaFile::new();
+        let stream = PlaybinStream::new_video();
         let picture = gtk::Picture::builder().paintable(&stream).content_fit(gtk::ContentFit::Contain).height_request(200).can_shrink(true).css_classes(["media-picture"]).build();
         let frame = gtk::Overlay::builder().child(&picture).visible(false).css_classes(["media-frame"]).build();
         let controls = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).halign(gtk::Align::End).valign(gtk::Align::End).margin_end(8).margin_bottom(8).css_classes(["media-controls"]).build();
@@ -224,7 +225,7 @@ impl Preview {
         self.owner.borrow().as_ref().and_then(|g| g.id)
     }
 
-    fn stream(&self) -> gtk::MediaFile {
+    fn stream(&self) -> PlaybinStream {
         self.stream.borrow().clone()
     }
 
@@ -372,7 +373,7 @@ impl Preview {
 
     // ── Hero controller (heroVideo.ts) ───────────────────────────────────
 
-    fn wire_stream(self: &Rc<Self>, stream: &gtk::MediaFile) {
+    fn wire_stream(self: &Rc<Self>, stream: &PlaybinStream) {
         let weak = Rc::downgrade(self);
         stream.connect_playing_notify(move |s| {
             let Some(p) = weak.upgrade() else { return };
@@ -399,16 +400,15 @@ impl Preview {
     }
 
     /// Every source gets a fresh element, and the picture follows: GTK keeps
-    /// a failed stream in its error state, and reusing a pipeline that has
-    /// run trips GStreamer's decodebin3 (see `audio::AudioPort::fresh_stream`).
-    fn fresh_stream(self: &Rc<Self>) -> gtk::MediaFile {
+    /// a failed stream in its error state for good.
+    fn fresh_stream(self: &Rc<Self>) -> PlaybinStream {
         let current = self.stream();
         if current.file().is_none() && current.error().is_none() {
             return current;
         }
         current.pause();
         current.clear();
-        let next = gtk::MediaFile::new();
+        let next = PlaybinStream::new_video();
         self.wire_stream(&next);
         self.picture.set_paintable(Some(&next));
         *self.stream.borrow_mut() = next.clone();

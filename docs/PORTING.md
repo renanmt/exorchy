@@ -98,6 +98,10 @@ and pops Omarchy's crash notice on their desktop (2026-09-30, once per run).
 More switches: `EXORCHY_SNAPSHOT_SEQUENCE=click:<button text>,activate:<list row text>,wait,…` (one step per 250 ms; e.g. `click:Tags,wait,activate:Theme: Fantasy`), `EXORCHY_SNAPSHOT_SCROLL=<css class>:<px>` (scrolls inside e.g. `detail-panel`; Broadway is capped at 1024x768), `EXORCHY_SNAPSHOT_TAB=library|reading`, `EXORCHY_SNAPSHOT_SETTINGS=<section>`,
 `EXORCHY_SNAPSHOT_READING=1` (+ `_VIEW=list`, `EXORCHY_SNAPSHOT_ISSUE=<key>`, `EXORCHY_SNAPSHOT_DOC=<file>`).
 `EXORCHY_DUMP_TREE=1` prints the widget tree next to the snapshot.
+Media: `EXORCHY_MEDIA_FAKE_SINKS=1` sends all sound to a fakesink (silent test runs);
+`EXORCHY_MEDIA_TEST_FILES=a.mp4:b.mp3 cargo test -p exorchy playbin -- --ignored` (under a
+Broadway display, with the fake sinks) switches 60 times between real cached files, the
+pattern that aborted GTK's playbin3 backend.
 
 ## Rules
 

@@ -4,11 +4,13 @@
 //!
 //! - `store`: fetch jobs + scheduler + the player state machine (`videos.ts`,
 //!   `mediaQueue.ts`, `music.ts`)
-//! - `audio`: the one `gtk::MediaFile` the player drives, with fades
+//! - `audio`: the music player's media element, with fades
+//! - `playbin`: the media element itself, a `gtk::MediaStream` over GStreamer's
+//!   classic `playbin` (GTK's built-in backend is playbin3, which aborts)
 //! - `preview`: the hero controller (`heroVideo.ts`), the panel slot, the lightbox
 //! - `bar`: the now-playing bar and the toolbar button
 //!
-//! Playback is GTK's GStreamer backend, so the cached files play by path -
+//! Playback is GStreamer (`playbin`), so the cached files play by path -
 //! the web UI's localhost media server is not used. Where GStreamer cannot
 //! decode (no audio sink, no H.264 or MP3 decoder) the backend's probes
 //! stand the feature down and the panel note says why; an element error on
@@ -19,6 +21,7 @@
 
 mod audio;
 mod bar;
+mod playbin;
 mod preview;
 mod store;
 

@@ -21,7 +21,7 @@ Exodium's SolidJS web UI in a Tauri webview and is being rebuilt natively
 | Database | SQLite via `rusqlite` (WAL), pre-built catalogue shipped gzipped | ~6 MB catalogue instead of eXo's 5 GB metadata zip |
 | Torrent | `librqbit` 9.0.0-rc.0 (fork pin, see DECISIONS) with selective file downloads | stream one game at a time |
 | Emulators | DOSBox Staging 0.83.0 fetched as an emulator pack (or the system binary); DOSBox-X / 86Box / ScummVM packs for the other collections | AUR-only on Arch |
-| Media | GStreamer (previews, music), poppler-glib (manuals, magazines), `image` (covers) | native players instead of the webview's |
+| Media | GStreamer `playbin` through our own `gtk::MediaStream` (`ui/media/playbin.rs`; GTK's built-in backend is playbin3, which aborts), poppler-glib (manuals, magazines), `image` (covers) | native players instead of the webview's |
 | Theme | Omarchy `colors.toml` + `shell.toml`, watched with inotify, applied as GTK CSS custom properties | live theme switching |
 
 ## Repository layout

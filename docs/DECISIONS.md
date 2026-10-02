@@ -717,3 +717,24 @@ stream-start before it has a stream collection. Both media ports (`media/audio.r
 old one. That element was only replaced after an error before. Every reader goes through
 `store::stream()` or the port's own accessor, so nothing holds the old element. The crash was
 not reproduced here; this removes the reuse path the assertion sits on.
+
+## 2026-10-02 - Media plays through our own stream over the classic playbin
+
+The fresh-element change above did not hold: clicking through a few tiles quickly still aborted
+the app with the same decodebin3 assertion, on preview videos this time. It is an upstream
+decodebin3 bug on track changes (other players, e.g. Strawberry, hit it). GTK's built-in
+backend goes through GstPlay, which hard-codes `playbin3` and offers no switch back.
+
+So GTK no longer plays our media. `ui/media/playbin.rs` is a `gtk::MediaStream` subclass over
+GStreamer's classic `playbin`, which autoplugs with decodebin2:
+- The bus drives GTK's protocol: `async-done` → `stream_prepared`, a 100 ms ticker → `update`,
+  EOS → `stream_ended`, an error → `set_error`.
+- Frames come off a `videoconvert ! appsink` as RGBA and are painted as a `gdk::MemoryTexture`,
+  so `gtk::Picture` and the lightbox's `gtk::Video` take the stream unchanged.
+- A music stream leaves video out of the pipeline. Volume is mapped cubically, as GTK does.
+
+The ports keep their fresh-element-per-source rule, for GTK's sticky error state. New
+dependencies: `gstreamer`, `gstreamer-app` and `gstreamer-video` 0.25 (the glib 0.22 line,
+the same as gtk4 0.11). The ignored test `survives_rapid_source_changes` replays the crash
+pattern on real files (see PORTING.md). It passes 60 switches with seeks and frames painted,
+where GTK's backend aborted within a few.
