@@ -15,7 +15,7 @@ crates/app/src/
   style.css      base rules + styles/<module>.css (one sheet per feature module)
   snapshot.rs    EXORCHY_SNAPSHOT=<png>[:<ms>] renders the window to a PNG and quits
   ui/window.rs   the window: splash, setup ↔ library, toasts, startup order, restart_to_setup(), reinit_library(), show_page()/close_page()
-  ui/library.rs  Browse / My Library / Reading tabs, grid, filters, detail panel host; slots: toolbar_slot, bar_slot, set_reading_widget()
+  ui/library.rs  Browse / My Library / Reading tabs, grid, filters, detail panel host; slots: banner_slot, set_reading_widget(), the document page (show_document)
   ui/detail.rs   the detail panel; hooks: media_slot, on_shown(cb), current()
   ui/card.rs     a game card; ui/model.rs GameObject; ui/covers.rs cover loading
   ui/downloads.rs the download trackers (1 Hz poll); ui/actions.rs shared game actions
