@@ -377,8 +377,11 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       sidebar picks (Playlists joined it), one removable chip per filter
       type, sort and grid/list on the right; the sidebar collapses into an
       overlay behind a Filters button in narrow windows. Interface size is a
-      setting (Compact 1.0, Comfortable 1.2, Large 1.4 = the design, Extra
-      large 1.6; restart to apply). Fixed: "Top rated" had no jump bar
+      setting (Compact 1.0, Medium 1.2 = the default, Large 1.4, Extra
+      large 1.6; restart to apply). Theme music never autoplays: Play in
+      the dossier plays it in place with its own position line, and it
+      stops when the dossier leaves the game; the bottom bar is the ♪
+      shuffle's only. Fixed: "Top rated" had no jump bar
       (its section keys were integers read as text); frame lines stronger
       (`--line-frame` 26 %), so the dossier frame shows beside the tinted
       header.

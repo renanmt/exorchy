@@ -119,7 +119,6 @@ pub struct PlayerView {
     pub wanted_auto: bool,
     pub mode: Mode,
     pub playing: bool,
-    pub user_paused: bool,
     pub reasons: Vec<PauseReason>,
     pub play_error: Option<String>,
     pub bar_hidden: bool,
@@ -1041,17 +1040,11 @@ impl Media {
         self.want(track, auto);
     }
 
-    /// The panel that auto-requested this theme closed before the bytes
-    /// arrived: stand the wait down. The fetch keeps running - the bytes land
-    /// in the cache. A click's wait is never withdrawn.
-    fn withdraw_auto_theme(&mut self, id: i64) {
-        if self.deferred_theme.as_ref().map(|t| t.game_id) == Some(id) {
-            self.deferred_theme = None;
-        }
-        if self.wanted_auto && self.wanted_id() == Some(id) {
-            self.clear_skip_timer();
-            self.wanted = None;
-            self.changed(Change::Player);
+    /// The dossier moved off a game: its theme stops with it. The shuffle
+    /// and the list walk are not tied to a game and keep playing.
+    fn leave_theme(&mut self, id: i64) {
+        if self.mode == Mode::Theme && (self.current_id() == Some(id) || self.wanted_id() == Some(id)) {
+            self.stop();
         }
     }
 
@@ -1359,7 +1352,6 @@ impl Media {
             wanted_auto: self.wanted_auto,
             mode: self.mode,
             playing: self.playing,
-            user_paused: self.user_paused,
             reasons: self.reasons.iter().copied().collect(),
             play_error: self.play_error.clone(),
             bar_hidden: self.bar_hidden,
@@ -1515,8 +1507,8 @@ pub fn play_theme(track: Track, auto: bool) {
     with(|m| m.play_theme(track, auto));
 }
 
-pub fn withdraw_auto_theme(id: i64) {
-    with(|m| m.withdraw_auto_theme(id));
+pub fn leave_theme(id: i64) {
+    with(|m| m.leave_theme(id));
 }
 
 #[allow(dead_code)]

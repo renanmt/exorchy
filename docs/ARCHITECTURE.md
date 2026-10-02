@@ -386,7 +386,7 @@ swapped live on every `theme-changed`; `adw::StyleManager` is forced to
 dark or light from the palette's mode; the font comes from `shell.toml`'s
 base size (px → pt) times `theme::ui_scale()` (Settings → Appearance →
 Interface size, config `ui_scale`, read in `main.rs` before any widget exists;
-default 1.4, the proportions of the user's design, `tmp/concept 01.png`) and the monospace family through `gtk-font-name`.
+default 1.2 "Medium"; 1.4 "Large" is the proportions of the user's design, `tmp/concept 01.png`) and the monospace family through `gtk-font-name`.
 Every fixed pixel size in the revamped UI (cards, covers, sidebar, dossier,
 list columns, breakpoints) goes through `theme::scaled`, and the concept's
 paddings are in `em`, so the whole interface scales together.

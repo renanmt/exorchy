@@ -1,7 +1,7 @@
 //! The now-playing bar under the library (cover, title, transport, seek,
-//! volume, hide) and the toolbar's music button. The bar shows once a track
-//! is loaded, or while a track the listener asked for is still fetching; a
-//! panel's autoplay probe is not such an ask.
+//! volume, hide) and the toolbar's music button. The bar belongs to the ♪
+//! shuffle (and the list walk): it shows once such a track is loaded or
+//! still fetching. A dossier's theme plays in place in the dossier instead.
 
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
@@ -169,7 +169,8 @@ impl Bar {
     fn render(self: &Rc<Self>) {
         let view = store::view();
         let track = bar_track(&view);
-        let visible = !view.bar_hidden && track.is_some();
+        // A dossier's theme plays in the dossier: the bar is the shuffle's.
+        let visible = !view.bar_hidden && view.mode != Mode::Theme && track.is_some();
         self.root.set_visible(visible);
         let Some(track) = track.filter(|_| visible) else {
             self.stop_tick();
@@ -287,7 +288,7 @@ pub fn toolbar_button() -> gtk::Button {
     let btn = gtk::Button::builder().label("♪").css_classes(["btn", "icon", "ghost", "music-toolbar-btn"]).build();
     btn.connect_clicked(|_| {
         let view = store::view();
-        if view.current.is_none() && view.wanted.is_none() {
+        if view.mode == Mode::Theme || (view.current.is_none() && view.wanted.is_none()) {
             store::start_shuffle();
         } else if view.bar_hidden {
             store::show_player();
@@ -320,7 +321,7 @@ fn bar_track(view: &PlayerView) -> Option<Track> {
 }
 
 fn toolbar_label(view: &PlayerView) -> &'static str {
-    if view.current.is_none() && view.wanted.is_none() {
+    if view.mode == Mode::Theme || (view.current.is_none() && view.wanted.is_none()) {
         "Play music (shuffle)"
     } else if view.bar_hidden {
         "Show player"
@@ -364,7 +365,7 @@ fn paused_note(view: &PlayerView) -> Option<&'static str> {
 }
 
 /// `m:ss`, or `--:--` while the element has no duration to report.
-fn format_time(micros: Option<i64>) -> String {
+pub(super) fn format_time(micros: Option<i64>) -> String {
     match micros {
         Some(us) if us >= 0 => {
             let whole = us / 1_000_000;
@@ -385,7 +386,6 @@ mod tests {
             wanted_auto: false,
             mode: Mode::Theme,
             playing: false,
-            user_paused: false,
             reasons: vec![],
             play_error: None,
             bar_hidden: false,
@@ -425,6 +425,9 @@ mod tests {
         let mut v = view();
         assert_eq!(toolbar_label(&v), "Play music (shuffle)");
         v.current = Some(track(1));
+        // A dossier's theme has no bar: the ♪ starts the shuffle.
+        assert_eq!(toolbar_label(&v), "Play music (shuffle)");
+        v.mode = Mode::Shuffle;
         assert_eq!(toolbar_label(&v), "Hide player");
         v.bar_hidden = true;
         assert_eq!(toolbar_label(&v), "Show player");

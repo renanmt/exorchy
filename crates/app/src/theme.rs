@@ -36,11 +36,10 @@ thread_local! {
     static CURRENT: RefCell<Option<Theme>> = const { RefCell::new(None) };
 }
 
-/// The interface sizes Settings → Appearance offers: (scale, label). 1.4 is
-/// the proportions of the user's design (tmp/concept 01.png), about 1.4x
-/// Omarchy's 12 px base relative to the screen.
-pub const UI_SCALES: [(f64, &str); 4] = [(1.0, "Compact"), (1.2, "Comfortable"), (1.4, "Large (the design)"), (1.6, "Extra large")];
-pub const DEFAULT_UI_SCALE: f64 = 1.4;
+/// The interface sizes Settings → Appearance offers: (scale, label), as
+/// multiples of Omarchy's 12 px base. Medium is the default.
+pub const UI_SCALES: [(f64, &str); 4] = [(1.0, "Compact"), (1.2, "Medium"), (1.4, "Large"), (1.6, "Extra large")];
+pub const DEFAULT_UI_SCALE: f64 = 1.2;
 /// Config key holding the chosen scale.
 pub const UI_SCALE_KEY: &str = "ui_scale";
 

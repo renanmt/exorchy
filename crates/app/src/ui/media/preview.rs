@@ -18,12 +18,15 @@ use adw::prelude::*;
 use crate::app;
 use crate::ui::detail::panel_width;
 
+use super::bar::format_time;
 use super::store::{self, Change, PauseReason, Track, PHASE_PROBING, PHASE_QUEUED};
 use super::playbin::PlaybinStream;
 
 /// The panel settles on a game before any torrent read starts: clicking
 /// through the grid would otherwise queue a read per card.
 const SETTLE_MS: u64 = 400;
+/// How often the theme row's position line updates.
+const THEME_TICK_MS: u64 = 250;
 /// How long the cover keeps the panel to itself before the preview starts.
 const VIDEO_START_DELAY_MS: u64 = 2000;
 const FADE_MS: u64 = 600;
@@ -80,7 +83,11 @@ pub struct Preview {
     /// restart nor re-request them.
     owner: RefCell<Option<Game>>,
     settle_timer: Cell<Option<glib::SourceId>>,
-    auto_theme_for: Cell<Option<i64>>,
+    theme_progress: gtk::Box,
+    theme_pos: gtk::Label,
+    theme_seek: gtk::Scale,
+    theme_dur: gtk::Label,
+    theme_tick: RefCell<Option<glib::SourceId>>,
     /// A fetch phase was observed for this game: the user spent the wait
     /// looking at the cover, and the ready video starts at once.
     video_just_fetched: Cell<bool>,
@@ -129,6 +136,18 @@ impl Preview {
         theme_row.append(&theme_name);
         theme_row.append(&theme_retry);
         root.append(&theme_row);
+        // The playing theme's position, in place under its row.
+        let theme_progress = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).visible(false).css_classes(["theme-progress", "player-seek"]).build();
+        let theme_pos = gtk::Label::builder().label("--:--").css_classes(["player-time"]).build();
+        let theme_seek = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.1);
+        theme_seek.set_hexpand(true);
+        theme_seek.set_draw_value(false);
+        theme_seek.set_sensitive(false);
+        let theme_dur = gtk::Label::builder().label("--:--").css_classes(["player-time"]).build();
+        theme_progress.append(&theme_pos);
+        theme_progress.append(&theme_seek);
+        theme_progress.append(&theme_dur);
+        root.append(&theme_progress);
 
         let p = Rc::new(Preview {
             window: window.clone(),
@@ -164,7 +183,11 @@ impl Preview {
             shown: RefCell::new(None),
             owner: RefCell::new(None),
             settle_timer: Cell::new(None),
-            auto_theme_for: Cell::new(None),
+            theme_progress,
+            theme_pos,
+            theme_seek,
+            theme_dur,
+            theme_tick: RefCell::new(None),
             video_just_fetched: Cell::new(false),
             video_phase_game: Cell::new(None),
             lightbox: RefCell::new(None),
@@ -197,6 +220,14 @@ impl Preview {
                 store::request_theme(id);
             }
         }));
+        p.theme_seek.connect_change_value(|_, _, v| {
+            if let Some(s) = store::stream() {
+                if s.is_seekable() {
+                    s.seek((v * 1_000_000.0) as i64);
+                }
+            }
+            glib::Propagation::Proceed
+        });
         p.theme_btn.connect_clicked(glib::clone!(#[weak] p, move |_| {
             let Some(owner) = p.owner.borrow().clone() else { return };
             let Some(track) = Track::of_game(&owner) else { return };
@@ -284,7 +315,7 @@ impl Preview {
         if let Some(id) = self.owner_id() {
             store::release_video(id);
         }
-        self.drop_auto_theme();
+        self.drop_theme();
         if let Some(d) = self.lightbox.borrow_mut().take() {
             d.force_close();
         }
@@ -292,9 +323,10 @@ impl Preview {
         self.video_just_fetched.set(false);
     }
 
-    fn drop_auto_theme(&self) {
-        if let Some(id) = self.auto_theme_for.take() {
-            store::withdraw_auto_theme(id);
+    /// The game's theme stops with its dossier.
+    fn drop_theme(&self) {
+        if let Some(id) = self.owner_id() {
+            store::leave_theme(id);
         }
     }
 
@@ -313,34 +345,12 @@ impl Preview {
             if store::video_state(id).is_some_and(|v| v.phase == "ready") {
                 p.sync_video();
             }
-            // Autoplay on: it becomes the wanted track; off: fetched so the
-            // row can offer it. The key is re-read: the settings page writes
-            // it and there is no change event.
+            // The theme is fetched so the row can offer it; it plays only
+            // when the Play button is pressed.
             store::refresh_prefs();
-            let core = app::core();
-            app::spawn(
-                async move { games::get_config(core.state(), "music_autoplay".into()).await },
-                glib::clone!(#[weak] p, move |res| {
-                    if p.owner_id() != Some(id) || store::music_unsupported() {
-                        return;
-                    }
-                    let autoplay = res.ok().flatten().map(|v| v == "1").unwrap_or(true);
-                    let view = store::view();
-                    // Already the active track: leave the player alone.
-                    if view.current.as_ref().map(|t| t.game_id) == Some(id) || view.wanted.as_ref().map(|t| t.game_id) == Some(id) {
-                        return;
-                    }
-                    // Autoplay never overrules the listener's × or pause.
-                    let dismissed = view.user_paused || view.bar_hidden;
-                    let Some(track) = p.owner.borrow().as_ref().and_then(Track::of_game) else { return };
-                    if autoplay && !dismissed {
-                        store::play_theme(track, true);
-                        p.auto_theme_for.set(Some(id));
-                    } else {
-                        store::request_theme(id);
-                    }
-                }),
-            );
+            if !store::music_unsupported() {
+                store::request_theme(id);
+            }
         }))));
     }
 
@@ -364,6 +374,31 @@ impl Preview {
             None => self.clear_preview(),
         }
         self.render();
+    }
+
+    /// This game's theme is the loaded track (playing or paused).
+    fn holds_this_theme(&self) -> bool {
+        let view = store::view();
+        self.owner_id().is_some() && view.mode == store::Mode::Theme && view.current.as_ref().map(|t| t.game_id) == self.owner_id()
+    }
+
+    fn render_theme_progress(&self, ready: bool) {
+        let show = ready && self.holds_this_theme();
+        self.theme_progress.set_visible(show);
+        if !show {
+            if let Some(t) = self.theme_tick.take() {
+                t.remove();
+            }
+            return;
+        }
+        let (pos, seek, dur) = (self.theme_pos.clone(), self.theme_seek.clone(), self.theme_dur.clone());
+        tick_theme(&pos, &seek, &dur);
+        if self.theme_tick.borrow().is_none() {
+            self.theme_tick.replace(Some(glib::timeout_add_local(Duration::from_millis(THEME_TICK_MS), move || {
+                tick_theme(&pos, &seek, &dur);
+                glib::ControlFlow::Continue
+            })));
+        }
     }
 
     fn is_playing_this_theme(&self) -> bool {
@@ -799,8 +834,24 @@ impl Preview {
             self.theme_name.set_label("");
         }
 
+        self.render_theme_progress(mready);
+
         let anything = frames || pill.is_some() || failed || hero_error.is_some() || self.play_ready.is_visible() || self.theme_row.is_visible();
         self.root.set_visible(anything);
+    }
+}
+
+/// The theme row's position line follows the music element.
+fn tick_theme(pos: &gtk::Label, seek: &gtk::Scale, dur: &gtk::Label) {
+    let Some(stream) = store::stream() else { return };
+    let (position, duration) = (stream.timestamp(), stream.duration());
+    let known = duration > 0;
+    pos.set_label(&format_time(if known || position > 0 { Some(position) } else { None }));
+    dur.set_label(&format_time(known.then_some(duration)));
+    seek.set_sensitive(known && stream.is_seekable());
+    if known {
+        seek.set_range(0.0, duration as f64 / 1_000_000.0);
+        seek.set_value(position as f64 / 1_000_000.0);
     }
 }
 

@@ -56,10 +56,12 @@ fn interface_size_row(ctx: &Ctx) -> Row {
     let drop = gtk::DropDown::from_strings(&labels);
     drop.add_css_class("drop");
     let current = crate::theme::ui_scale();
-    let idx = crate::theme::UI_SCALES.iter().position(|(v, _)| (v - current).abs() < 0.01).unwrap_or(2);
+    let idx = crate::theme::UI_SCALES.iter().position(|(v, _)| (v - current).abs() < 0.01)
+        .or_else(|| crate::theme::UI_SCALES.iter().position(|(v, _)| *v == crate::theme::DEFAULT_UI_SCALE))
+        .unwrap_or(0);
     drop.set_selected(idx as u32);
     let row = Row::new("Interface size")
-        .hint("Text and layout together. Large matches eXorchy's design; pick a smaller size on a small screen. eXorchy restarts to apply it.")
+        .hint("Text and layout together. Medium suits most screens; pick a smaller size on a small screen, a larger one far from it. eXorchy restarts to apply it.")
         .action(&drop);
     let window = ctx.window.clone();
     drop.connect_selected_notify(move |d| {

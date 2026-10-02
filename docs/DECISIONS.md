@@ -738,3 +738,19 @@ dependencies: `gstreamer`, `gstreamer-app` and `gstreamer-video` 0.25 (the glib 
 the same as gtk4 0.11). The ignored test `survives_rapid_source_changes` replays the crash
 pattern on real files (see PORTING.md). It passes 60 switches with seeks and frames painted,
 where GTK's backend aborted within a few.
+
+## 2026-10-02 - Medium is the default size; a theme plays only in its dossier
+
+Interface sizes are now Compact 1.0, Medium 1.2, Large 1.4 and Extra large 1.6, and the
+default is Medium. The design's 1.4 read too large as a default, so it is the Large choice.
+A saved `ui_scale` is kept.
+
+Theme music:
+- It no longer autoplays. The "Play theme music" switch and the `music_autoplay` key are gone.
+  Opening a dossier still fetches the theme, so its Play button is ready.
+- The button plays it in place, and a position line with seek appears under the Theme row.
+- Leaving the game (another game, or the dossier closing) stops its theme
+  (`store::leave_theme`).
+- The now-playing bar at the bottom belongs to the ♪ shuffle (and the list walk), which isn't
+  tied to a game. It never shows for a dossier theme, and the ♪ starts the shuffle while a
+  dossier theme is the loaded track. "Continue the shuffle" (`music_continuous`) stays.
