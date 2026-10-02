@@ -393,14 +393,16 @@ impl Preview {
         });
     }
 
-    /// GTK keeps a stream in its error state for good: a new source after an
-    /// error gets a fresh element, and the picture follows.
+    /// Every source gets a fresh element, and the picture follows: GTK keeps
+    /// a failed stream in its error state, and reusing a pipeline that has
+    /// run trips GStreamer's decodebin3 (see `audio::AudioPort::fresh_stream`).
     fn fresh_stream(self: &Rc<Self>) -> gtk::MediaFile {
         let current = self.stream();
-        if current.error().is_none() {
+        if current.file().is_none() && current.error().is_none() {
             return current;
         }
         current.pause();
+        current.clear();
         let next = gtk::MediaFile::new();
         self.wire_stream(&next);
         self.picture.set_paintable(Some(&next));

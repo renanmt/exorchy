@@ -37,7 +37,7 @@ checkbutton.welcome-option:disabled { color: var(--text-muted); }
   margin-bottom: 4px;
   color: var(--text-secondary);
 }
-.launch-note .note-text { line-height: 1.45; }
+.launch-note .note-text { font-size: 0.86em; line-height: 1.35; }
 .launch-note .note-mark {
   min-width: 16px;
   min-height: 16px;

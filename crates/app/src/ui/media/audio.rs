@@ -1,9 +1,7 @@
-//! The music player's audio element: one `gtk::MediaFile` (GStreamer) that
-//! lives for the app's lifetime, driven by the store's `PortOp`s. Fades: a
-//! start ramps up from silence, a pause ramps down and only then pauses the
-//! element - a track cut off at full volume is a pop, not a pause. A stream
-//! that reported an error is replaced on the next source: GTK keeps a media
-//! stream in its error state for good.
+//! The music player's audio element: a `gtk::MediaFile` (GStreamer), driven
+//! by the store's `PortOp`s. Fades: a start ramps up from silence, a pause ramps down and only then pauses the
+//! element - a track cut off at full volume is a pop, not a pause. Each new
+//! source gets a fresh element (see `fresh_stream`).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -85,14 +83,18 @@ impl AudioPort {
         });
     }
 
-    /// The element failed on its last source: GTK keeps it in the error
-    /// state, so the next source gets a fresh one.
+    /// Every source gets a fresh element. GTK keeps a stream that failed in
+    /// its error state for good, and swapping the file of a pipeline that has
+    /// already run trips GStreamer 1.28's decodebin3 (`mq_slot_handle_stream_start:
+    /// assertion failed: (collection)`), which aborts the whole app. The old
+    /// element is stopped and dropped.
     fn fresh_stream(self: &Rc<Self>) -> gtk::MediaFile {
         let current = self.stream.borrow().clone();
-        if current.error().is_none() {
+        if current.file().is_none() && current.error().is_none() {
             return current;
         }
         current.pause();
+        current.clear();
         let next = gtk::MediaFile::new();
         self.wire(&next);
         *self.stream.borrow_mut() = next.clone();

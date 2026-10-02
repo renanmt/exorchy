@@ -704,3 +704,16 @@ INTEGER that the code reads as String, so every key was dropped silently; the ke
 text (test `rating_sort_has_section_keys`). And with a theme whose foreground is dim, the
 dossier frame line (20 % of the foreground) vanished against the tinted header; `--line-frame`
 is now 26 %.
+
+## 2026-10-02 - A fresh media element for every track and preview
+
+Starting a theme track aborted the app (SIGABRT) with GStreamer 1.28's
+`gstdecodebin3.c: mq_slot_handle_stream_start: assertion failed: (collection)`. The file
+itself decodes cleanly (`gst-launch-1.0 playbin3 …` exits 0). The music player kept one
+`gtk::MediaFile` for the app's lifetime and swapped its file with `set_filename`, so GTK
+re-pointed a pipeline that had already run at a new URI, and decodebin3 can then meet a
+stream-start before it has a stream collection. Both media ports (`media/audio.rs`,
+`media/preview.rs`) now build a new element for every source, after stopping and clearing the
+old one. That element was only replaced after an error before. Every reader goes through
+`store::stream()` or the port's own accessor, so nothing holds the old element. The crash was
+not reproduced here; this removes the reuse path the assertion sits on.
