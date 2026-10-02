@@ -1438,20 +1438,53 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>, recent: bool) 
 
 // ── list view rows ──
 
-const COLS: [(&str, i32); 8] = [("Title", 320), ("Year", 60), ("Genre", 180), ("Developer", 160), ("Publisher", 160), ("Rating", 70), ("Size", 80), ("Status", 120)];
+/// The list's columns: (header, base width px, takes a share of the spare
+/// width, right-aligned number). Header and rows use the same cells, so they
+/// line up; a cell's text never sizes it (see `cell`).
+const COLS: [(&str, i32, bool, bool); 8] = [
+    ("Title", 180, true, false),
+    ("Year", 44, false, true),
+    ("Genre", 110, true, false),
+    ("Developer", 100, true, false),
+    ("Publisher", 100, true, false),
+    ("Rating", 50, false, true),
+    ("Size", 70, false, true),
+    ("Status", 80, false, false),
+];
+/// Base widths plus spacing and padding stay under ~790 px, so the table
+/// fits beside the 280 px sidebar from the 1100 sp breakpoint up.
+
+/// One table cell. `max_width_chars(1)` takes the text out of the label's
+/// natural width, so every row asks for exactly the base widths and the
+/// flexible columns split what is left evenly: the columns line up in every
+/// row whatever the text, and long text ends in "…".
+fn cell(text: &str, width: i32, flexible: bool, numeric: bool) -> gtk::Label {
+    gtk::Label::builder()
+        .label(text)
+        .xalign(if numeric { 1.0 } else { 0.0 })
+        .width_request(width)
+        .hexpand(flexible)
+        .width_chars(1)
+        .max_width_chars(1)
+        .single_line_mode(true)
+        .ellipsize(gtk::pango::EllipsizeMode::End)
+        .build()
+}
 
 fn list_header() -> gtk::Box {
-    let header = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["list-header"]).build();
-    for (label, w) in COLS {
-        header.append(&gtk::Label::builder().label(label).xalign(0.0).width_request(w).css_classes(["list-col"]).build());
+    let header = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["list-header"]).build();
+    for (label, w, flexible, numeric) in COLS {
+        let c = cell(label, w, flexible, numeric);
+        c.add_css_class("list-col");
+        header.append(&c);
     }
     header
 }
 
 fn row_widget() -> gtk::Widget {
-    let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["game-row"]).build();
-    for (_, w) in COLS {
-        row.append(&gtk::Label::builder().xalign(0.0).width_request(w).ellipsize(gtk::pango::EllipsizeMode::End).build());
+    let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["game-row"]).build();
+    for (_, w, flexible, numeric) in COLS {
+        row.append(&cell("", w, flexible, numeric));
     }
     row.upcast()
 }
@@ -1485,11 +1518,20 @@ fn bind_row(row: &gtk::Widget, g: &Game, _on_detail: Rc<dyn Fn(Game)>) {
         g.download_size.filter(|s| *s > 0).map(|s| format_bytes(s as u64)).unwrap_or_default(),
         status.to_string(),
     ];
-    for (l, v) in labels.iter().zip(values.iter()) {
+    for ((l, v), (_, _, flexible, _)) in labels.iter().zip(values.iter()).zip(COLS) {
         l.set_label(v);
+        // The full text of a cell that may be cut short.
+        l.set_tooltip_text(if flexible && !v.is_empty() { Some(v) } else { None });
     }
     if let Some(first) = labels.first() {
         first.set_markup(&format!("<b>{}</b>", esc(&g.title)));
+    }
+    if let Some(status) = labels.last() {
+        if g.installed {
+            status.add_css_class("row-installed");
+        } else {
+            status.remove_css_class("row-installed");
+        }
     }
 }
 
