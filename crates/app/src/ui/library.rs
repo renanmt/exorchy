@@ -1451,8 +1451,8 @@ const COLS: [(&str, i32, bool, bool); 8] = [
     ("Size", 70, false, true),
     ("Status", 80, false, false),
 ];
-/// Base widths plus spacing and padding stay under ~790 px, so the table
-/// fits beside the 280 px sidebar from the 1100 sp breakpoint up.
+// Base widths plus spacing and padding stay under ~790 px, so the table
+// fits beside the 280 px sidebar from the 1100 sp breakpoint up.
 
 /// One table cell. `max_width_chars(1)` takes the text out of the label's
 /// natural width, so every row asks for exactly the base widths and the
