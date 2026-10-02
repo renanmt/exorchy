@@ -18,7 +18,6 @@ use adw::prelude::*;
 use crate::app;
 use crate::ui::detail::panel_width;
 
-use super::bar::format_time;
 use super::store::{self, Change, PauseReason, Track, PHASE_PROBING, PHASE_QUEUED};
 use super::playbin::PlaybinStream;
 
@@ -838,6 +837,17 @@ impl Preview {
 
         let anything = frames || pill.is_some() || failed || hero_error.is_some() || self.play_ready.is_visible() || self.theme_row.is_visible();
         self.root.set_visible(anything);
+    }
+}
+
+/// `m:ss`, or `--:--` while the element has no duration to report.
+fn format_time(micros: Option<i64>) -> String {
+    match micros {
+        Some(us) if us >= 0 => {
+            let whole = us / 1_000_000;
+            format!("{}:{:02}", whole / 60, whole % 60)
+        }
+        _ => "--:--".into(),
     }
 }
 

@@ -46,7 +46,6 @@ const AUTO_SKIP_MAX: u32 = 5;
 pub const MAX_CONCURRENT: usize = 3;
 /// The fade-out the audio port runs before a pause; a source swap waits it out.
 const SWAP_AFTER_FADE_MS: u64 = 280;
-const VOLUME_SAVE_DEBOUNCE_MS: u64 = 400;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -111,20 +110,12 @@ impl Track {
     }
 }
 
-/// The player as the bar and the panel see it.
+/// The player as the dossier's Theme row sees it.
 #[derive(Clone, Debug)]
 pub struct PlayerView {
     pub current: Option<Track>,
-    pub wanted: Option<Track>,
-    pub wanted_auto: bool,
     pub mode: Mode,
     pub playing: bool,
-    pub reasons: Vec<PauseReason>,
-    pub play_error: Option<String>,
-    pub bar_hidden: bool,
-    pub unsupported: bool,
-    pub continuous: bool,
-    pub volume: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,7 +193,6 @@ struct Media {
     continuous: bool,
     volume: f64,
     preview_muted: bool,
-    volume_save: Option<glib::SourceId>,
     // Effects, drained by `flush`.
     ops: Vec<PortOp>,
     pending: Vec<Change>,
@@ -336,7 +326,6 @@ impl Media {
             continuous: true,
             volume: 0.8,
             preview_muted: true,
-            volume_save: None,
             ops: Vec::new(),
             pending: Vec::new(),
             listeners: Vec::new(),
@@ -1234,19 +1223,6 @@ impl Media {
         self.advance(true);
     }
 
-    fn prev(&mut self) {
-        let Some(previous) = self.history.pop() else { return };
-        // The current track goes in front of the queue rather than back into
-        // history, so "prev" then "next" returns to it.
-        if self.mode == Mode::Shuffle {
-            if let Some(cur) = self.current.clone() {
-                self.up_next = Some(cur);
-            }
-        }
-        self.stepping_back_to = Some(previous.game_id);
-        self.want(previous, false);
-    }
-
     /// A click on a play control is the listener's word: it overrides the
     /// pause of their own and whatever else claimed the speakers.
     fn listener_wants_sound(&mut self) {
@@ -1268,19 +1244,6 @@ impl Media {
         if self.current.is_some() {
             self.play();
         }
-    }
-
-    /// Put the bar away without giving up the track. A gesture, so it counts
-    /// as a pause of the listener's own - nothing resumes behind a hidden bar.
-    fn hide_player(&mut self) {
-        self.bar_hidden = true;
-        self.user_paused = true;
-        self.pause();
-    }
-
-    fn show_player(&mut self) {
-        self.bar_hidden = false;
-        self.changed(Change::Player);
     }
 
     fn stop(&mut self) {
@@ -1346,19 +1309,7 @@ impl Media {
     }
 
     fn view(&self) -> PlayerView {
-        PlayerView {
-            current: self.current.clone(),
-            wanted: self.wanted.clone(),
-            wanted_auto: self.wanted_auto,
-            mode: self.mode,
-            playing: self.playing,
-            reasons: self.reasons.iter().copied().collect(),
-            play_error: self.play_error.clone(),
-            bar_hidden: self.bar_hidden,
-            unsupported: self.music_unsupported(),
-            continuous: self.continuous,
-            volume: self.volume,
-        }
+        PlayerView { current: self.current.clone(), mode: self.mode, playing: self.playing }
     }
 }
 
@@ -1527,28 +1478,8 @@ pub fn playable_hint(game: &Game) -> bool {
     read(|m| m.playable_hint(game))
 }
 
-pub fn start_shuffle() {
-    with(|m| m.start_shuffle());
-}
-
-pub fn next() {
-    with(|m| m.next());
-}
-
-pub fn prev() {
-    with(|m| m.prev());
-}
-
 pub fn toggle_play() {
     with(|m| m.toggle_play());
-}
-
-pub fn hide_player() {
-    with(|m| m.hide_player());
-}
-
-pub fn show_player() {
-    with(|m| m.show_player());
 }
 
 #[allow(dead_code)]
@@ -1570,30 +1501,6 @@ pub fn sync_running(now: &HashSet<i64>) {
 
 pub fn view() -> PlayerView {
     read(|m| m.view())
-}
-
-pub fn set_continuous(v: bool) {
-    with(|m| {
-        m.continuous = v;
-        m.changed(Change::Player);
-    });
-    persist("music_continuous", if v { "1" } else { "0" }.into());
-}
-
-pub fn set_volume(v: f64) {
-    let v = v.clamp(0.0, 1.0);
-    with(|m| {
-        m.volume = v;
-        m.ops.push(PortOp::SetVolume(v));
-        m.changed(Change::Player);
-        if let Some(src) = m.volume_save.take() {
-            src.remove();
-        }
-        m.volume_save = Some(once(VOLUME_SAVE_DEBOUNCE_MS, move || {
-            with(|m| m.volume_save = None);
-            persist("music_volume", format!("{v:.2}"));
-        }));
-    });
 }
 
 pub fn preview_muted() -> bool {

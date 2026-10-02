@@ -397,6 +397,10 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       dialogs dropped their own state); the dossier's hero stays pinned
       while the body scrolls; the preview video keeps one size across tabs;
       the cover (and gallery) open at full size in a centred dialog.
+- [x] **Release polish 2026-10-02:** the bottom player and the toolbar's ♪
+      are gone (themes play in the dossier); Reading Room cards share the
+      games' spacing; a stronger selected-card frame; the "RETRO GAMES. /
+      FOREVER." motto beside the wordmark.
 
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,

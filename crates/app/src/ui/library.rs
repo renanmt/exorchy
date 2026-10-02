@@ -113,12 +113,10 @@ pub struct LibraryPage {
     pub activity: gtk::Label,
     pub activity_button: gtk::Button,
     pub settings_button: gtk::Button,
-    pub bar_slot: gtk::Box,
     /// Full-width notices above the toolbar (the update banner).
     pub banner_slot: gtk::Box,
-    pub toolbar_slot: gtk::Box,
     /// What steps aside while the Reading Room reads full screen: the
-    /// banner, the toolbar, the now-playing bar, the status bar.
+    /// banner, the toolbar, the status bar.
     chrome: Vec<gtk::Widget>,
     document_fullscreen: Cell<bool>,
     /// A game's manual, open in place of the tabs' content.
@@ -150,6 +148,7 @@ impl LibraryPage {
         let brand = crate::ui::logo::ascii(1.5 * crate::theme::ui_scale());
         brand.add_css_class("brand");
         head.append(&brand);
+        head.append(&crate::ui::logo::tagline());
         let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).css_classes(["tabs"]).build();
         let mut tab_buttons = Vec::new();
         for (id, label) in [("browse", "Browse"), ("library", "My Library"), ("reading", "Reading Room")] {
@@ -171,8 +170,6 @@ impl LibraryPage {
         let activity_button = gtk::Button::builder().child(&activity_inner).css_classes(["btn", "ghost", "activity-btn"]).tooltip_text("Transfers").build();
         tools.append(&activity_button);
         // Feature modules (music button, ...) mount their toolbar controls here.
-        let toolbar_slot = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
-        tools.append(&toolbar_slot);
         let settings_button = gtk::Button::builder().icon_name("emblem-system-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Settings (Ctrl+,)").build();
         tools.append(&settings_button);
         toolbar.append(&tools);
@@ -331,18 +328,15 @@ impl LibraryPage {
             glib::idle_add_local_once(move || s.set_show_sidebar(detail.is_open()));
         }));
 
-        // The now-playing bar (ui::media) mounts under the content.
-        let bar_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         let banner_slot = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
         column.append(&banner_slot);
         column.append(&toolbar);
         column.append(&split);
-        column.append(&bar_slot);
         let status_bar = crate::ui::statusbar::build(&status);
         column.append(&status_bar.widget);
-        let (chrome_banner, chrome_toolbar, chrome_bar, chrome_status) =
-            (banner_slot.clone().upcast::<gtk::Widget>(), toolbar.clone().upcast::<gtk::Widget>(), bar_slot.clone().upcast::<gtk::Widget>(), status_bar.widget.clone().upcast::<gtk::Widget>());
+        let (chrome_banner, chrome_toolbar, chrome_status) =
+            (banner_slot.clone().upcast::<gtk::Widget>(), toolbar.clone().upcast::<gtk::Widget>(), status_bar.widget.clone().upcast::<gtk::Widget>());
 
         // Breakpoints: a narrow tile collapses the panel into an overlay and
         // stacks the toolbar; the layout never demands more than 360×300.
@@ -399,10 +393,8 @@ impl LibraryPage {
             activity,
             activity_button,
             settings_button,
-            bar_slot,
             banner_slot,
-            toolbar_slot,
-            chrome: vec![chrome_banner, chrome_toolbar, chrome_bar, chrome_status],
+            chrome: vec![chrome_banner, chrome_toolbar, chrome_status],
             document_fullscreen: Cell::new(false),
             doc_slot,
             document: RefCell::new(None),

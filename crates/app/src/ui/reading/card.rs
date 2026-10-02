@@ -12,7 +12,7 @@ use gtk::prelude::*;
 
 use super::logic::{display_title, kind_label};
 use super::store::{self, PHASE_QUEUED};
-use crate::ui::card::{art_height, card_width};
+use crate::ui::card::{art_height, card_margin, card_width};
 use crate::ui::util::format_bytes;
 use crate::ui::{bus, covers};
 
@@ -145,10 +145,10 @@ impl IssueCard {
             .orientation(gtk::Orientation::Vertical)
             .css_classes(["game-card", "issue-card"])
             .width_request(card_width())
-            .margin_start(5)
-            .margin_end(5)
-            .margin_top(5)
-            .margin_bottom(5)
+            .margin_start(card_margin())
+            .margin_end(card_margin())
+            .margin_top(card_margin())
+            .margin_bottom(card_margin())
             .halign(gtk::Align::Center)
             .overflow(gtk::Overflow::Hidden)
             .build();

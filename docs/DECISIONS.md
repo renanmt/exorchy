@@ -890,3 +890,18 @@ the cue's spelling beside the real file.
 - It needs no per-game list: any title with the same mismatch is covered.
 
 Among the installed games only SimCopter had it. Titles not yet extracted could not be checked.
+
+## 2026-10-02 - Release polish: no bottom player, one card spacing, the motto
+
+- **The bottom player is gone.** Theme music plays only in place, in the dossier, so the
+  now-playing bar and the toolbar's ♪ (its shuffle) were removed (`media/bar.rs`, its slot,
+  the toolbar slot, and Settings' "Continue the shuffle"). What that left unused went with
+  them: the public shuffle and volume calls, and most of `PlayerView`. Not yet removed: the
+  store's internal shuffle and list-walk modes, inert now that nothing starts them.
+- **One card spacing.** Reading Room cards take the game cards' scaled margin
+  (`card::card_margin`), and their section grid takes the game grid's padding.
+- **A stronger selection.** The selected card gets a 2 px accent outline plus an accent glow
+  (still no border change, so the grid does not shift).
+- **The motto.** "RETRO GAMES. / FOREVER." sits beside the toolbar's wordmark
+  (`logo::tagline`), where the concept stacks "PLAY / PRESERVE / EXPLORE": small, spaced
+  capitals, one phrase per line.

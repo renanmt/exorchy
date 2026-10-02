@@ -1,5 +1,5 @@
 //! General: the game folder, the installed-games rescan, game defaults
-//! (CRT shader, fullscreen) and the music preferences.
+//! (CRT shader, fullscreen).
 
 use adw::prelude::*;
 use exorchy_core::commands::{games, library, library_location, setup};
@@ -42,11 +42,6 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     defaults.add(&fs_row.widget);
     page.add(&defaults);
 
-    // ── Music ──
-    let music = widgets::group("Music", None);
-    let (ct_row, continuous) = widgets::switch_row("Continue the shuffle", "In the ♪ shuffle, when a theme ends the next one plays.", true);
-    music.add(&ct_row.widget);
-    page.add(&music);
 
     // Game defaults mirror launch_game's own defaults until the load lands.
     let core = app::core();
@@ -58,27 +53,25 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
                 async move { games::get_config(c.state(), k).await.ok().flatten() }
             };
             (
-                (get("data_dir").await, get("global_glshader").await, get("default_fullscreen").await, get("music_continuous").await),
+                (get("data_dir").await, get("global_glshader").await, get("default_fullscreen").await),
                 (get("start_tab").await, get("update_check").await),
             )
         },
         {
-            let (folder, crt, fullscreen, continuous, start_library, check_updates) =
-                (folder.clone(), crt.clone(), fullscreen.clone(), continuous.clone(), start_library.clone(), check_updates.clone());
-            move |((dir, shader, fs, ct), (start, upd))| {
+            let (folder, crt, fullscreen, start_library, check_updates) =
+                (folder.clone(), crt.clone(), fullscreen.clone(), start_library.clone(), check_updates.clone());
+            move |((dir, shader, fs), (start, upd))| {
                 start_library.set_quiet(start.as_deref() == Some("library"));
                 check_updates.set_quiet(upd.as_deref() != Some("0"));
                 folder.set_value(dir.as_deref().filter(|d| !d.is_empty()).unwrap_or("Not set"));
                 crt.set_quiet(shader.is_none() || shader.as_deref() == Some("crt-auto"));
                 fullscreen.set_quiet(fs.as_deref() == Some("fullscreen"));
-                continuous.set_quiet(ct.is_none() || ct.as_deref() == Some("1"));
             }
         },
     );
 
     bind_toggle(&crt, "global_glshader", "crt-auto", "default");
     bind_toggle(&fullscreen, "default_fullscreen", "fullscreen", "window");
-    bind_toggle(&continuous, "music_continuous", "1", "0");
     bind_toggle(&start_library, "start_tab", "library", "browse");
     bind_toggle(&check_updates, "update_check", "1", "0");
 

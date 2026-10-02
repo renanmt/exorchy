@@ -32,8 +32,8 @@ pub fn card_width() -> i32 {
 pub fn art_height() -> i32 {
     crate::theme::scaled(226)
 }
-/// Half the gap between cards.
-fn card_margin() -> i32 {
+/// Half the gap between cards (game and Reading Room alike).
+pub fn card_margin() -> i32 {
     crate::theme::scaled(5)
 }
 
