@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use exorchy_core::commands::{games, setup};
+use exorchy_core::commands::{games, playlists, setup};
 use gtk::glib;
 
 use crate::app;
@@ -17,7 +17,9 @@ use crate::ui::statusbar::grouped;
 
 /// The width of the app's left columns: this sidebar and Settings'
 /// navigation are the same bar, so they share it.
-pub const SIDEBAR_WIDTH: i32 = crate::theme::scaled(210);
+pub fn sidebar_width() -> i32 {
+    crate::theme::scaled(210)
+}
 
 /// A category the sidebar browses by.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -30,6 +32,7 @@ pub enum Category {
     Regions,
     Tags,
     Status,
+    Playlists,
 }
 
 impl Category {
@@ -42,7 +45,7 @@ impl Category {
             Category::Years => "year",
             Category::Regions => "region",
             Category::Tags => "tag",
-            Category::Status => return None,
+            Category::Status | Category::Playlists => return None,
         })
     }
 
@@ -56,6 +59,7 @@ impl Category {
             Category::Regions => "Regions",
             Category::Tags => "Tags",
             Category::Status => "Play Status",
+            Category::Playlists => "Playlists",
         }
     }
 
@@ -70,6 +74,7 @@ impl Category {
             Category::Regions => "Region",
             Category::Tags => "Tag",
             Category::Status => "Status",
+            Category::Playlists => "Playlist",
         }
     }
 }
@@ -96,6 +101,8 @@ pub struct Sidebar {
     title: gtk::Label,
     list: gtk::StringList,
     filter_entry: gtk::SearchEntry,
+    /// "Manage playlists…", on the Playlists page only.
+    manage: gtk::Button,
     /// Shown label -> (value, count) for the category on the values page.
     entries: RefCell<HashMap<String, (String, usize)>>,
     showing: Cell<Option<Category>>,
@@ -109,7 +116,7 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     // expand inside it, and without an explicit
     // `hexpand(false)` that would spread to the sidebar and split a wide
     // window's spare room with the grid.
-    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(SIDEBAR_WIDTH).hexpand(false).css_classes(["sidebar"]).build();
+    let nav = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).width_request(sidebar_width()).hexpand(false).css_classes(["sidebar"]).build();
 
     // Values page: a heading, a filter field, the virtualised list.
     let values = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).css_classes(["sidebar-values"]).build();
@@ -117,6 +124,9 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     let title = gtk::Label::builder().xalign(0.0).hexpand(true).css_classes(["sidebar-values-title"]).build();
     let filter_entry = gtk::SearchEntry::builder().placeholder_text("Filter…").css_classes(["search"]).width_chars(22).build();
     head.append(&title);
+    let manage = gtk::Button::builder().label("Manage playlists…").css_classes(["btn"]).visible(false).build();
+    manage.connect_clicked(crate::ui::playlists::manage);
+    head.append(&manage);
     head.append(&filter_entry);
     values.append(&head);
     let list = gtk::StringList::new(&[]);
@@ -138,6 +148,7 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
         title,
         list,
         filter_entry,
+        manage,
         entries: RefCell::new(HashMap::new()),
         showing: Cell::new(None),
         generation: Cell::new(0),
@@ -175,7 +186,7 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
     });
 
     // Navigation.
-    let entries: [(Option<Category>, bool, &str, &str); 10] = [
+    let entries: [(Option<Category>, bool, &str, &str); 11] = [
         (None, false, "view-grid-symbolic", "All Games"),
         (Some(Category::Platforms), false, "computer-symbolic", "Platforms"),
         (Some(Category::Genres), false, "folder-symbolic", "Genres"),
@@ -185,6 +196,7 @@ pub fn build(on_pick: impl Fn(Pick) + 'static, on_values: impl Fn() + 'static) -
         (Some(Category::Regions), false, "mark-location-symbolic", "Regions"),
         (Some(Category::Tags), false, "bookmark-new-symbolic", "Tags"),
         (Some(Category::Status), false, "object-select-symbolic", "Play Status"),
+        (Some(Category::Playlists), false, "view-list-bullet-symbolic", "Playlists"),
         (None, true, "starred-symbolic", "Favorites"),
     ];
     for (category, favorites, icon, label) in entries {
@@ -243,6 +255,20 @@ impl Sidebar {
         (self.on_values)();
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
+        self.manage.set_visible(category == Category::Playlists);
+        if category == Category::Playlists {
+            let core = app::core();
+            let weak = Rc::downgrade(self);
+            app::spawn(async move { playlists::get_playlists(core.state()).await }, move |r| {
+                let Some(s) = weak.upgrade() else { return };
+                if s.generation.get() != generation {
+                    return;
+                }
+                let rows = r.unwrap_or_default().into_iter().map(|p| (p.name, p.id.to_string(), p.game_count as usize)).collect();
+                s.fill(rows);
+            });
+            return;
+        }
         if category == Category::Status {
             let rows: Vec<(String, String, usize)> = STATUS.iter().map(|(v, l)| (l.to_string(), v.to_string(), 0)).collect();
             self.fill(rows);

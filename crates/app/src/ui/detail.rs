@@ -18,7 +18,9 @@ use crate::app;
 use crate::ui::util::{esc, format_bytes, platform_tag};
 use crate::ui::{actions, bus, covers, downloads, launch_notes};
 
-pub const PANEL_WIDTH: i32 = crate::theme::scaled(560);
+pub fn panel_width() -> i32 {
+    crate::theme::scaled(560)
+}
 
 pub struct DetailPanel {
     /// The panel itself; the library hosts it in its split view.
@@ -416,7 +418,7 @@ impl DetailPanel {
         self.generation.set(generation);
         self.cover.set_paintable(gtk::gdk::Paintable::NONE);
         let panel = Rc::downgrade(self);
-        covers::request(game.torrent_source.as_deref(), game.thumbnail_key.as_deref(), covers::Size::Fit(PANEL_WIDTH as u32 - 32, 320), move |t| {
+        covers::request(game.torrent_source.as_deref(), game.thumbnail_key.as_deref(), covers::Size::Fit(panel_width() as u32 - 32, 320), move |t| {
             let Some(panel) = panel.upgrade() else { return };
             if panel.generation.get() != generation {
                 return;

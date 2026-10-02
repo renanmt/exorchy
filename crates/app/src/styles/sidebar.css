@@ -1,10 +1,11 @@
 /* The library's sidebar and values page (ui/sidebar.rs), after
    tmp/concept 01.png: a rule on the right, plain items, the active one with
    an accent bar and tint; counts muted on the right. */
+/* The scroller keeps the tint to the bottom of the window. */
+scrolledwindow.sidebar-scroller { background-color: var(--bg-secondary); border-right: var(--hairline) solid var(--line-frame); }
 .sidebar {
   /* The dossier title bar's tint (styles/detail.css), as in the concept. */
   background-color: var(--bg-secondary);
-  border-right: var(--hairline) solid var(--line-frame);
   padding: 0.8em 0.6em;
 }
 button.sidebar-item {

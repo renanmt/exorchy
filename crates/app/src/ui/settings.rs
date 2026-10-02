@@ -149,8 +149,8 @@ fn build(window: &gtk::Window, section: &str, on_close: Rc<dyn Fn()>) -> gtk::Wi
         .sidebar(&sidebar)
         .content(&content)
         // The library sidebar's width, at every window size.
-        .min_sidebar_width(crate::ui::sidebar::SIDEBAR_WIDTH as f64)
-        .max_sidebar_width(crate::ui::sidebar::SIDEBAR_WIDTH as f64)
+        .min_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
+        .max_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
         .show_content(true)
         .build();
     let view = adw::BreakpointBin::builder()

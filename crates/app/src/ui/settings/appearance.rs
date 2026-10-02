@@ -42,10 +42,56 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
     type_group.add(&Row::new("Monospace font").value(&mono).hint("Omarchy's terminal font, used for paths and codes.").widget);
     let size = theme.as_ref().map(|t| format!("{}px", t.font_base_size)).unwrap_or_else(|| "—".into());
     type_group.add(&Row::new("Base size").value(&size).hint("Follows Omarchy's font size setting.").widget);
+    type_group.add(&interface_size_row(ctx).widget);
     page.add(&type_group);
 
     page.add(&background_group(ctx));
     page.upcast()
+}
+
+/// How large eXorchy draws, text and layout together (`theme::ui_scale`).
+/// Sizes are taken when widgets are built, so a change restarts eXorchy.
+fn interface_size_row(ctx: &Ctx) -> Row {
+    let labels: Vec<&str> = crate::theme::UI_SCALES.iter().map(|(_, l)| *l).collect();
+    let drop = gtk::DropDown::from_strings(&labels);
+    drop.add_css_class("drop");
+    let current = crate::theme::ui_scale();
+    let idx = crate::theme::UI_SCALES.iter().position(|(v, _)| (v - current).abs() < 0.01).unwrap_or(2);
+    drop.set_selected(idx as u32);
+    let row = Row::new("Interface size")
+        .hint("Text and layout together. Large matches eXorchy's design; pick a smaller size on a small screen. eXorchy restarts to apply it.")
+        .action(&drop);
+    let window = ctx.window.clone();
+    drop.connect_selected_notify(move |d| {
+        let Some((scale, _)) = crate::theme::UI_SCALES.get(d.selected() as usize).copied() else { return };
+        if (scale - crate::theme::ui_scale()).abs() < 0.01 {
+            return;
+        }
+        let core = crate::app::core();
+        let window = window.clone();
+        crate::app::spawn(
+            async move {
+                exorchy_core::commands::games::set_config(core.clone(), core.state(), crate::theme::UI_SCALE_KEY.into(), scale.to_string()).await
+            },
+            move |r| match r {
+                Ok(()) => {
+                    let w = window.clone();
+                    dialogs::confirm(&window, "Restart eXorchy?", "The new interface size applies after a restart.", "Restart now", false, move || {
+                        crate::app::spawn(async { exorchy_core::commands::library_location::relaunch_after_exit().await }, move |r| match r {
+                            Ok(()) => {
+                                if let Some(app) = w.application() {
+                                    app.quit();
+                                }
+                            }
+                            Err(e) => crate::ui::bus::toast_with("Could not restart eXorchy", Some(&e), None),
+                        });
+                    });
+                }
+                Err(e) => crate::ui::bus::toast_with("Could not save the interface size", Some(&e), None),
+            },
+        );
+    });
+    row
 }
 
 /// Background image: choose / remove, and how strongly it shows.

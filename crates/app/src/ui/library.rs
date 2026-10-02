@@ -16,7 +16,7 @@ use gtk::glib;
 use adw::prelude::*;
 
 use crate::app;
-use crate::ui::card::{Card, CARD_WIDTH};
+use crate::ui::card::{card_width, Card};
 use crate::ui::detail::DetailPanel;
 use crate::ui::model::GameObject;
 use crate::ui::util::{esc, format_bytes};
@@ -37,6 +37,9 @@ pub const SORT_OPTIONS: [(&str, &str); 6] = [
     ("rating", "Top rated"),
     ("genre", "Genre A–Z"),
 ];
+
+/// What a filter chip's ✕ does to the filters.
+type ClearFilter = Rc<dyn Fn(&mut Filters)>;
 
 #[derive(Default, Clone)]
 struct Filters {
@@ -84,20 +87,16 @@ pub struct LibraryPage {
     tab_stack: gtk::Stack,
     tab_buttons: RefCell<Vec<(String, gtk::Button)>>,
     search: gtk::SearchEntry,
-    genre_drop: gtk::DropDown,
-    genre_values: RefCell<Vec<String>>,
     sort_drop: gtk::DropDown,
-    /// Collections ("All platforms" first), years and regions: the filter
-    /// bar's dropdowns and the values behind their entries.
-    platform_drop: gtk::DropDown,
-    platform_values: RefCell<Vec<String>>,
-    year_drop: gtk::DropDown,
-    year_values: RefCell<Vec<Option<i64>>>,
-    region_drop: gtk::DropDown,
-    region_values: RefCell<Vec<String>>,
-    /// The sidebar's pick that no dropdown shows ("Publisher: Sierra ✕").
-    browse_chip: gtk::Box,
-    browse_chip_label: gtk::Label,
+    /// One removable chip per active filter type (tmp/concept 01.png has
+    /// no dropdowns: the sidebar picks, the chips show and clear).
+    chips: adw::WrapBox,
+    /// Names for the chips: collection ids and playlist ids.
+    collection_names: RefCell<HashMap<String, String>>,
+    playlist_names: RefCell<HashMap<i64, String>>,
+    /// The sidebar beside Browse; an overlay behind `filters_button` in a
+    /// window too narrow for both.
+    sidebar_split: adw::OverlaySplitView,
     sidebar: Rc<crate::ui::sidebar::Sidebar>,
     /// The list view is chosen (else the grid).
     list_mode: Cell<bool>,
@@ -118,7 +117,6 @@ pub struct LibraryPage {
     /// Full-width notices above the toolbar (the update banner).
     pub banner_slot: gtk::Box,
     pub toolbar_slot: gtk::Box,
-    playlist_menu: gtk::Box,
     window: gtk::Window,
 }
 
@@ -135,7 +133,7 @@ impl LibraryPage {
         // logo stays and the tools keep together on their own line.
         let toolbar = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(16).css_classes(["toolbar"]).build();
         let head = adw::WrapBox::builder().child_spacing(12).line_spacing(6).align(0.5).build();
-        let brand = crate::ui::logo::ascii(1.5 * crate::theme::UI_SCALE);
+        let brand = crate::ui::logo::ascii(1.5 * crate::theme::ui_scale());
         brand.add_css_class("brand");
         head.append(&brand);
         let tabs = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(2).css_classes(["tabs"]).build();
@@ -166,36 +164,20 @@ impl LibraryPage {
         toolbar.append(&tools);
 
         // ── filter row: wraps onto more lines in a narrow tile ──
-        let filter_row = adw::WrapBox::builder().child_spacing(8).line_spacing(6).css_classes(["filter-row"]).build();
-        // The sidebar's pick, removable (only for what no dropdown shows).
-        let browse_chip = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).css_classes(["browse-chip"]).visible(false).build();
-        let browse_chip_label = gtk::Label::new(None);
-        let browse_chip_clear = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Clear").build();
-        browse_chip.append(&browse_chip_label);
-        browse_chip.append(&browse_chip_clear);
-        filter_row.append(&browse_chip);
-        let drop_of = |first: &str| {
-            let d = gtk::DropDown::from_strings(&[first]);
-            d.add_css_class("drop");
-            d
-        };
-        let platform_drop = drop_of("All platforms");
-        filter_row.append(&platform_drop);
-        let genre_drop = drop_of("All genres");
-        filter_row.append(&genre_drop);
-        let year_drop = drop_of("All years");
-        filter_row.append(&year_drop);
-        let region_drop = drop_of("All regions");
-        filter_row.append(&region_drop);
-        let playlist_menu = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        filter_row.append(&playlist_menu);
+        // Chips for the active filters on the left; order and view on the right.
+        let filter_row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["filter-row"]).build();
+        let filters_button = gtk::ToggleButton::builder().icon_name("sidebar-show-symbolic").css_classes(["btn", "icon"]).tooltip_text("Filters").visible(false).valign(gtk::Align::Center).build();
+        filter_row.append(&filters_button);
+        let chips = adw::WrapBox::builder().child_spacing(6).line_spacing(6).hexpand(true).valign(gtk::Align::Center).build();
+        filter_row.append(&chips);
         let sort_labels: Vec<&str> = SORT_OPTIONS.iter().map(|(_, l)| *l).collect();
         let sort_drop = gtk::DropDown::from_strings(&sort_labels);
         sort_drop.add_css_class("drop");
+        sort_drop.set_valign(gtk::Align::Center);
         filter_row.append(&sort_drop);
         let view_grid = gtk::ToggleButton::builder().icon_name("view-grid-symbolic").active(true).css_classes(["btn", "icon"]).tooltip_text("Grid").build();
         let view_list = gtk::ToggleButton::builder().icon_name("view-list-symbolic").group(&view_grid).css_classes(["btn", "icon"]).tooltip_text("List").build();
-        let view_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        let view_box = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).valign(gtk::Align::Center).build();
         view_box.add_css_class("linked");
         view_box.append(&view_grid);
         view_box.append(&view_list);
@@ -267,10 +249,30 @@ impl LibraryPage {
             )
         };
         view_stack.add_named(&sidebar.values, Some("values"));
+        let browse_main = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        browse_main.append(&browse);
+        browse_main.append(&jump_scroller);
+        // Scrollable: at a large interface size the entries can be taller
+        // than the window, and the sidebar must never set its height.
+        let sidebar_scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).child(&sidebar.nav).css_classes(["sidebar-scroller"]).build();
+        let sidebar_split = adw::OverlaySplitView::builder()
+            .sidebar(&sidebar_scroller)
+            .content(&browse_main)
+            .sidebar_position(gtk::PackType::Start)
+            .min_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
+            .max_sidebar_width(crate::ui::sidebar::sidebar_width() as f64)
+            .show_sidebar(true)
+            .build();
+        // Collapsed (a narrow window): the sidebar slides in over the grid
+        // from the Filters button and starts hidden; wide again, it is back.
+        sidebar_split.bind_property("collapsed", &filters_button, "visible").sync_create().build();
+        sidebar_split.bind_property("show-sidebar", &filters_button, "active").sync_create().bidirectional().build();
+        sidebar_split.connect_collapsed_notify(|s| {
+            let s = s.clone();
+            glib::idle_add_local_once(move || s.set_show_sidebar(!s.is_collapsed()));
+        });
         let browse_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        browse_row.append(&sidebar.nav);
-        browse_row.append(&browse);
-        browse_row.append(&jump_scroller);
+        browse_row.append(&sidebar_split);
 
         // My Library shelves.
         let shelves = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(18).margin_top(12).margin_bottom(24).margin_start(14).margin_end(14).build();
@@ -335,8 +337,7 @@ impl LibraryPage {
         let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, crate::theme::scaled(1100) as f64, adw::LengthUnit::Sp));
         narrow.add_setter(&split, "collapsed", Some(&true.to_value()));
         narrow.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
-        // The dropdowns carry the filters when the sidebar does not fit.
-        narrow.add_setter(&sidebar.nav, "visible", Some(&false.to_value()));
+        narrow.add_setter(&sidebar_split, "collapsed", Some(&true.to_value()));
         widget.add_breakpoint(narrow);
         let tiny = adw::Breakpoint::new(adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, crate::theme::scaled(760) as f64, adw::LengthUnit::Sp));
         tiny.add_setter(&split, "collapsed", Some(&true.to_value()));
@@ -347,7 +348,7 @@ impl LibraryPage {
         tiny.add_setter(&toolbar, "spacing", Some(&8i32.to_value()));
         tiny.add_setter(&status_bar.details, "visible", Some(&false.to_value()));
         tiny.add_setter(&status_bar.hints, "visible", Some(&false.to_value()));
-        tiny.add_setter(&sidebar.nav, "visible", Some(&false.to_value()));
+        tiny.add_setter(&sidebar_split, "collapsed", Some(&true.to_value()));
         widget.add_breakpoint(tiny);
 
         let page = Rc::new(LibraryPage {
@@ -363,17 +364,11 @@ impl LibraryPage {
             tab_stack,
             tab_buttons: RefCell::new(tab_buttons),
             search,
-            genre_drop,
-            genre_values: RefCell::new(vec![String::new()]),
             sort_drop,
-            platform_drop,
-            platform_values: RefCell::new(vec![String::new()]),
-            year_drop,
-            year_values: RefCell::new(vec![None]),
-            region_drop,
-            region_values: RefCell::new(vec![String::new()]),
-            browse_chip,
-            browse_chip_label,
+            chips,
+            collection_names: RefCell::new(HashMap::new()),
+            playlist_names: RefCell::new(HashMap::new()),
+            sidebar_split,
             sidebar,
             list_mode: Cell::new(false),
             jump_bar,
@@ -389,12 +384,10 @@ impl LibraryPage {
             bar_slot,
             banner_slot,
             toolbar_slot,
-            playlist_menu,
             window: window.clone(),
         });
 
         *page_ref.borrow_mut() = Rc::downgrade(&page);
-        browse_chip_clear.connect_clicked(glib::clone!(#[weak] page, move |_| page.clear_browse_pick()));
         page.setup_factories();
         page.wire(view_grid, view_list);
         page.set_tab("browse");
@@ -502,39 +495,6 @@ impl LibraryPage {
             page.grid.grab_focus();
         }));
         // Genre / sort
-        self.genre_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
-            let v = page.genre_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
-            if page.filters.borrow().genre != v {
-                page.filters.borrow_mut().genre = v;
-                page.show_games();
-                page.fetch();
-            }
-        }));
-        self.platform_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
-            let v = page.platform_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
-            if page.filters.borrow().collection != v {
-                page.filters.borrow_mut().collection = v;
-                page.load_genres();
-                page.show_games();
-                page.fetch();
-            }
-        }));
-        self.year_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
-            let v = page.year_values.borrow().get(d.selected() as usize).cloned().flatten();
-            if page.filters.borrow().browse.year != v {
-                page.filters.borrow_mut().browse.year = v;
-                page.show_games();
-                page.fetch();
-            }
-        }));
-        self.region_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
-            let v = page.region_values.borrow().get(d.selected() as usize).cloned().unwrap_or_default();
-            if page.filters.borrow().browse.region != v {
-                page.filters.borrow_mut().browse.region = v;
-                page.show_games();
-                page.fetch();
-            }
-        }));
         self.sort_drop.connect_selected_notify(glib::clone!(#[weak(rename_to = page)] self, move |d| {
             let v = SORT_OPTIONS.get(d.selected() as usize).map(|(k, _)| k.to_string()).unwrap_or_default();
             if page.filters.borrow().sort_by != v {
@@ -614,7 +574,6 @@ impl LibraryPage {
         // trimmed: every list re-reads, the genre list too (Adult comes and goes).
         bus::on_visibility_changed(glib::clone!(#[weak(rename_to = page)] self, move |_| {
             page.fetch();
-            page.load_genres();
             page.refresh_shelves();
             page.detail.refresh_actions();
         }));
@@ -715,63 +674,136 @@ impl LibraryPage {
                 let enabled = games::get_config(core.state(), "collections".into()).await.ok().flatten().unwrap_or_else(|| "eXoDOS".into());
                 let all = setup::get_available_collections(core.state()).await.unwrap_or_default();
                 let total = games::get_games_browse(core.state(), 1, 1, games::GameQuery::default()).await.map(|l| l.total).unwrap_or(0);
-                let years = games::get_facet_values(core.state(), "year".into()).await.unwrap_or_default();
-                let regions = games::get_facet_values(core.state(), "region".into()).await.unwrap_or_default();
-                (enabled, all, total, years, regions)
+                (enabled, all, total)
             },
-            glib::clone!(#[weak(rename_to = page)] self, move |(enabled, all, total, years, regions)| {
+            glib::clone!(#[weak(rename_to = page)] self, move |(enabled, all, total)| {
                 let enabled: Vec<&str> = enabled.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
-                let cols: Vec<(String, String, i64)> = all
-                    .iter()
-                    .filter(|c| enabled.contains(&c.id.as_str()))
-                    .map(|c| (c.id.clone(), c.display_name.clone(), c.game_count))
-                    .collect();
                 page.sidebar.set_total(total);
-
+                page.collection_names.replace(all.iter().map(|c| (c.id.clone(), c.display_name.clone())).collect());
                 // A filter on a collection that was just disabled would show nothing.
                 let current = page.filters.borrow().collection.clone();
-                if !current.is_empty() && !cols.iter().any(|c| c.0 == current) {
-                    page.filters.borrow_mut().collection = String::new();
+                if !current.is_empty() && !enabled.contains(&current.as_str()) {
+                    page.filters.borrow_mut().collection.clear();
                 }
-                let mut values = vec![String::new()];
-                let mut labels = vec!["All platforms".to_string()];
-                for (id, name, count) in &cols {
-                    values.push(id.clone());
-                    labels.push(if *count > 0 { format!("{name}  ({})", short_count(*count)) } else { name.clone() });
-                }
-                set_drop(&page.platform_drop, &labels);
-                page.platform_drop.set_visible(cols.len() > 1);
-                let target = page.filters.borrow().collection.clone();
-                page.platform_values.replace(values.clone());
-                page.platform_drop.set_selected(values.iter().position(|v| *v == target).unwrap_or(0) as u32);
-
-                let mut yv = vec![None];
-                let mut yl = vec!["All years".to_string()];
-                for y in years {
-                    yl.push(y.value.clone());
-                    yv.push(y.value.parse().ok());
-                }
-                set_drop(&page.year_drop, &yl);
-                let cy = page.filters.borrow().browse.year;
-                page.year_values.replace(yv.clone());
-                page.year_drop.set_selected(yv.iter().position(|v| *v == cy).unwrap_or(0) as u32);
-
-                let mut rv = vec![String::new()];
-                let mut rl = vec!["All regions".to_string()];
-                for r in regions {
-                    rl.push(r.value.clone());
-                    rv.push(r.value);
-                }
-                set_drop(&page.region_drop, &rl);
-                let cr = page.filters.borrow().browse.region.clone();
-                page.region_values.replace(rv.clone());
-                page.region_drop.set_selected(rv.iter().position(|v| *v == cr).unwrap_or(0) as u32);
-
-                page.load_genres();
                 page.load_playlists();
+                page.rebuild_chips();
                 page.fetch();
             }),
         );
+    }
+
+    /// Playlist names for the chip; a filtered playlist that was deleted
+    /// drops back to the whole catalogue.
+    pub fn load_playlists(self: &Rc<Self>) {
+        let core = app::core();
+        app::spawn(async move { playlists::get_playlists(core.state()).await }, glib::clone!(#[weak(rename_to = page)] self, move |r| {
+            let lists = r.unwrap_or_default();
+            page.playlist_names.replace(lists.iter().map(|p| (p.id, p.name.clone())).collect());
+            let current = page.filters.borrow().playlist;
+            if current.is_some() && !lists.iter().any(|p| Some(p.id) == current) {
+                page.filters.borrow_mut().playlist = None;
+                page.fetch();
+            }
+            page.rebuild_chips();
+        }));
+    }
+
+    /// A sidebar pick: one value per type, replacing that type's value;
+    /// All Games clears every filter.
+    fn apply_pick(self: &Rc<Self>, pick: crate::ui::sidebar::Pick) {
+        use crate::ui::sidebar::{Category, Pick};
+        {
+            let mut f = self.filters.borrow_mut();
+            match &pick {
+                Pick::All => {
+                    f.collection.clear();
+                    f.genre.clear();
+                    f.playlist = None;
+                    f.favorites = false;
+                    f.browse = Default::default();
+                }
+                Pick::Favorites => f.favorites = true,
+                Pick::Value { category, value, .. } => match category {
+                    Category::Platforms => f.collection = value.clone(),
+                    Category::Genres => f.genre = value.clone(),
+                    Category::Years => f.browse.year = value.parse().ok(),
+                    Category::Regions => f.browse.region = value.clone(),
+                    Category::Publishers => f.browse.publisher = value.clone(),
+                    Category::Series => f.browse.series = value.clone(),
+                    Category::Tags => f.browse.tag = value.clone(),
+                    Category::Status => f.browse.status = value.clone(),
+                    Category::Playlists => f.playlist = value.parse().ok(),
+                },
+            }
+        }
+        // As an overlay (narrow window) the sidebar steps aside for the grid.
+        if self.sidebar_split.is_collapsed() {
+            self.sidebar_split.set_show_sidebar(false);
+        }
+        self.rebuild_chips();
+        self.show_games();
+        self.fetch();
+    }
+
+    /// One chip per active filter type, each clearing its own type.
+    fn rebuild_chips(self: &Rc<Self>) {
+        use crate::ui::sidebar::{Category, STATUS};
+        while let Some(c) = self.chips.first_child() {
+            self.chips.remove(&c);
+        }
+        let f = self.filters.borrow().clone();
+        let mut active: Vec<(String, ClearFilter)> = Vec::new();
+        let label = |c: Category, v: &str| format!("{}: {v}", c.noun());
+        if !f.collection.is_empty() {
+            let name = self.collection_names.borrow().get(&f.collection).cloned().unwrap_or_else(|| f.collection.clone());
+            active.push((label(Category::Platforms, &name), Rc::new(|f: &mut Filters| f.collection.clear())));
+        }
+        if !f.genre.is_empty() {
+            active.push((label(Category::Genres, &f.genre), Rc::new(|f: &mut Filters| f.genre.clear())));
+        }
+        if let Some(y) = f.browse.year {
+            active.push((label(Category::Years, &y.to_string()), Rc::new(|f: &mut Filters| f.browse.year = None)));
+        }
+        if !f.browse.region.is_empty() {
+            active.push((label(Category::Regions, &f.browse.region), Rc::new(|f: &mut Filters| f.browse.region.clear())));
+        }
+        if !f.browse.publisher.is_empty() {
+            active.push((label(Category::Publishers, &f.browse.publisher), Rc::new(|f: &mut Filters| f.browse.publisher.clear())));
+        }
+        if !f.browse.series.is_empty() {
+            active.push((label(Category::Series, &f.browse.series), Rc::new(|f: &mut Filters| f.browse.series.clear())));
+        }
+        if !f.browse.tag.is_empty() {
+            active.push((f.browse.tag.clone(), Rc::new(|f: &mut Filters| f.browse.tag.clear())));
+        }
+        if !f.browse.status.is_empty() {
+            let name = STATUS.iter().find(|(v, _)| *v == f.browse.status).map(|(_, l)| l.to_string()).unwrap_or_else(|| f.browse.status.clone());
+            active.push((name, Rc::new(|f: &mut Filters| f.browse.status.clear())));
+        }
+        if let Some(id) = f.playlist {
+            let name = self.playlist_names.borrow().get(&id).cloned().unwrap_or_else(|| "Playlist".into());
+            active.push((label(Category::Playlists, &name), Rc::new(|f: &mut Filters| f.playlist = None)));
+        }
+        if f.favorites {
+            active.push(("Favorites".into(), Rc::new(|f: &mut Filters| f.favorites = false)));
+        }
+        for (text, clear) in active {
+            let chip = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).css_classes(["browse-chip"]).build();
+            chip.append(&gtk::Label::builder().label(&text).ellipsize(gtk::pango::EllipsizeMode::End).max_width_chars(36).build());
+            let x = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Clear").build();
+            x.connect_clicked(glib::clone!(#[weak(rename_to = page)] self, move |_| {
+                clear(&mut page.filters.borrow_mut());
+                page.rebuild_chips();
+                page.show_games();
+                page.fetch();
+            }));
+            chip.append(&x);
+            self.chips.append(&chip);
+        }
+        let none = self.chips.first_child().is_none();
+        if none {
+            self.sidebar.set_active(None, false);
+        }
     }
 
     /// The grid or the list, whichever the user chose (leaving the values page).
@@ -783,190 +815,6 @@ impl LibraryPage {
     fn show_values(&self) {
         self.view_stack.set_visible_child_name("values");
         self.jump_bar.set_visible(false);
-    }
-
-    /// A sidebar pick: one browse-by value at a time; the dropdowns follow
-    /// for what they can show, the chip says the rest.
-    fn apply_pick(self: &Rc<Self>, pick: crate::ui::sidebar::Pick) {
-        use crate::ui::sidebar::{Category, Pick};
-        let chip: Option<String>;
-        {
-            let mut f = self.filters.borrow_mut();
-            // Clear the sidebar-only dimensions; dropdown ones stay.
-            f.favorites = false;
-            f.browse.publisher.clear();
-            f.browse.developer.clear();
-            f.browse.series.clear();
-            f.browse.tag.clear();
-            f.browse.status.clear();
-            match &pick {
-                Pick::All => {
-                    f.collection.clear();
-                    f.genre.clear();
-                    f.browse = Default::default();
-                    chip = None;
-                }
-                Pick::Favorites => {
-                    f.favorites = true;
-                    chip = Some("Favorites".into());
-                }
-                Pick::Value { category, value, label } => {
-                    chip = match category {
-                        Category::Platforms => {
-                            f.collection = value.clone();
-                            None
-                        }
-                        Category::Genres => {
-                            f.genre = value.clone();
-                            None
-                        }
-                        Category::Years => {
-                            f.browse.year = value.parse().ok();
-                            None
-                        }
-                        Category::Regions => {
-                            f.browse.region = value.clone();
-                            None
-                        }
-                        Category::Publishers => {
-                            f.browse.publisher = value.clone();
-                            Some(format!("{}: {label}", category.noun()))
-                        }
-                        Category::Series => {
-                            f.browse.series = value.clone();
-                            Some(format!("{}: {label}", category.noun()))
-                        }
-                        Category::Tags => {
-                            f.browse.tag = value.clone();
-                            Some(label.clone())
-                        }
-                        Category::Status => {
-                            f.browse.status = value.clone();
-                            Some(label.clone())
-                        }
-                    };
-                }
-            }
-        }
-        self.sync_drops();
-        self.browse_chip_label.set_label(chip.as_deref().unwrap_or(""));
-        self.browse_chip.set_visible(chip.is_some());
-        if matches!(pick, Pick::Value { category: Category::Platforms, .. } | Pick::All) {
-            self.load_genres();
-        }
-        self.show_games();
-        self.fetch();
-    }
-
-    /// The chip's ✕: back to the games without the sidebar's pick.
-    fn clear_browse_pick(self: &Rc<Self>) {
-        {
-            let mut f = self.filters.borrow_mut();
-            f.favorites = false;
-            f.browse.publisher.clear();
-            f.browse.developer.clear();
-            f.browse.series.clear();
-            f.browse.tag.clear();
-            f.browse.status.clear();
-        }
-        self.browse_chip.set_visible(false);
-        self.sidebar.set_active(None, false);
-        self.show_games();
-        self.fetch();
-    }
-
-    /// Dropdowns to the filters (their handlers see no change, so no fetch).
-    fn sync_drops(&self) {
-        let f = self.filters.borrow().clone();
-        let pos = |values: &[String], v: &str| values.iter().position(|x| x == v).unwrap_or(0) as u32;
-        self.platform_drop.set_selected(pos(&self.platform_values.borrow(), &f.collection));
-        self.genre_drop.set_selected(pos(&self.genre_values.borrow(), &f.genre));
-        self.region_drop.set_selected(pos(&self.region_values.borrow(), &f.browse.region));
-        let y = self.year_values.borrow().iter().position(|v| *v == f.browse.year).unwrap_or(0) as u32;
-        self.year_drop.set_selected(y);
-    }
-
-    fn load_genres(self: &Rc<Self>) {
-        let core = app::core();
-        let col = self.filters.borrow().collection.clone();
-        app::spawn(async move { games::get_genres(core.state(), Some(col)).await }, glib::clone!(#[weak(rename_to = page)] self, move |r| {
-            let flat = r.unwrap_or_default();
-            // Parent/child tree from " / " entries; a parent filters by prefix.
-            let mut groups: Vec<(String, Vec<String>)> = Vec::new();
-            for g in &flat {
-                match g.split_once(" / ") {
-                    Some((p, c)) => match groups.iter_mut().find(|(k, _)| k == p) {
-                        Some((_, kids)) => kids.push(c.to_string()),
-                        None => groups.push((p.to_string(), vec![c.to_string()])),
-                    },
-                    None => {
-                        if !groups.iter().any(|(k, _)| k == g) {
-                            groups.push((g.clone(), vec![]));
-                        }
-                    }
-                }
-            }
-            groups.sort_by(|a, b| a.0.cmp(&b.0));
-            let mut values = vec![String::new()];
-            let mut labels = vec!["All genres".to_string()];
-            for (p, kids) in groups {
-                values.push(p.clone());
-                labels.push(p.clone());
-                let mut kids = kids;
-                kids.sort();
-                for k in kids {
-                    values.push(format!("{p} / {k}"));
-                    labels.push(format!("   {k}"));
-                }
-            }
-            let current = page.filters.borrow().genre.clone();
-            let idx = values.iter().position(|v| *v == current).unwrap_or(0);
-            let strs: Vec<&str> = labels.iter().map(String::as_str).collect();
-            page.genre_drop.set_model(Some(&gtk::StringList::new(&strs)));
-            page.genre_values.replace(values);
-            page.genre_drop.set_selected(idx as u32);
-        }));
-    }
-
-    pub fn load_playlists(self: &Rc<Self>) {
-        let core = app::core();
-        app::spawn(async move { playlists::get_playlists(core.state()).await }, glib::clone!(#[weak(rename_to = page)] self, move |r| {
-            let lists = r.unwrap_or_default();
-            while let Some(c) = page.playlist_menu.first_child() {
-                page.playlist_menu.remove(&c);
-            }
-            // The filtered playlist was deleted: back to the whole catalogue.
-            let current = page.filters.borrow().playlist;
-            if current.is_some() && !lists.iter().any(|p| Some(p.id) == current) {
-                page.filters.borrow_mut().playlist = None;
-                page.fetch();
-            }
-            if lists.is_empty() {
-                let new_btn = gtk::Button::builder().label("New playlist…").css_classes(["btn", "ghost"]).build();
-                new_btn.connect_clicked(crate::ui::playlists::manage);
-                page.playlist_menu.append(&new_btn);
-                return;
-            }
-            let mut labels = vec!["All playlists".to_string()];
-            labels.extend(lists.iter().map(|p| format!("{} ({})", p.name, p.game_count)));
-            let strs: Vec<&str> = labels.iter().map(String::as_str).collect();
-            let drop = gtk::DropDown::from_strings(&strs);
-            drop.add_css_class("drop");
-            let ids: Vec<Option<i64>> = std::iter::once(None).chain(lists.iter().map(|p| Some(p.id))).collect();
-            let current = page.filters.borrow().playlist;
-            drop.set_selected(ids.iter().position(|i| *i == current).unwrap_or(0) as u32);
-            drop.connect_selected_notify(glib::clone!(#[weak] page, move |d| {
-                let v = ids.get(d.selected() as usize).copied().flatten();
-                if page.filters.borrow().playlist != v {
-                    page.filters.borrow_mut().playlist = v;
-                    page.fetch();
-                }
-            }));
-            page.playlist_menu.append(&drop);
-            let manage = gtk::Button::builder().icon_name("document-edit-symbolic").css_classes(["btn", "icon", "ghost"]).tooltip_text("Manage playlists").build();
-            manage.connect_clicked(crate::ui::playlists::manage);
-            page.playlist_menu.append(&manage);
-        }));
     }
 
     // ── fetching ──
@@ -1427,7 +1275,7 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>, recent: bool) 
         let card = Card::new(on_detail.clone());
         card.set_in_recent(recent);
         card.bind(g);
-        card.widget.set_size_request(CARD_WIDTH, -1);
+        card.widget.set_size_request(card_width(), -1);
         card.widget.set_halign(gtk::Align::Start);
         // Shelf cards are not recycled; keep them findable for refreshes.
         CARDS.with(|c| c.borrow_mut().insert(card.widget.clone().upcast(), card.clone()));
@@ -1442,7 +1290,8 @@ fn shelf(title: &str, list: &[Game], on_detail: Rc<dyn Fn(Game)>, recent: bool) 
 /// The list's columns: (header, base width px, takes a share of the spare
 /// width, right-aligned number). Header and rows use the same cells, so they
 /// line up; a cell's text never sizes it (see `cell`).
-const COLS: [(&str, i32, bool, bool); 8] = [
+fn cols() -> [(&'static str, i32, bool, bool); 8] {
+    [
     ("Title", crate::theme::scaled(180), true, false),
     ("Year", crate::theme::scaled(44), false, true),
     ("Genre", crate::theme::scaled(110), true, false),
@@ -1451,7 +1300,8 @@ const COLS: [(&str, i32, bool, bool); 8] = [
     ("Rating", crate::theme::scaled(50), false, true),
     ("Size", crate::theme::scaled(70), false, true),
     ("Status", crate::theme::scaled(80), false, false),
-];
+]
+}
 // Base widths plus spacing and padding stay under ~790 px, so the table
 // fits beside the 280 px sidebar from the 1100 sp breakpoint up.
 
@@ -1474,7 +1324,7 @@ fn cell(text: &str, width: i32, flexible: bool, numeric: bool) -> gtk::Label {
 
 fn list_header() -> gtk::Box {
     let header = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["list-header"]).build();
-    for (label, w, flexible, numeric) in COLS {
+    for (label, w, flexible, numeric) in cols() {
         let c = cell(label, w, flexible, numeric);
         c.add_css_class("list-col");
         header.append(&c);
@@ -1484,7 +1334,7 @@ fn list_header() -> gtk::Box {
 
 fn row_widget() -> gtk::Widget {
     let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(10).css_classes(["game-row"]).build();
-    for (_, w, flexible, numeric) in COLS {
+    for (_, w, flexible, numeric) in cols() {
         row.append(&cell("", w, flexible, numeric));
     }
     row.upcast()
@@ -1519,7 +1369,7 @@ fn bind_row(row: &gtk::Widget, g: &Game, _on_detail: Rc<dyn Fn(Game)>) {
         g.download_size.filter(|s| *s > 0).map(|s| format_bytes(s as u64)).unwrap_or_default(),
         status.to_string(),
     ];
-    for ((l, v), (_, _, flexible, _)) in labels.iter().zip(values.iter()).zip(COLS) {
+    for ((l, v), (_, _, flexible, _)) in labels.iter().zip(values.iter()).zip(cols()) {
         l.set_label(v);
         // The full text of a cell that may be cut short.
         l.set_tooltip_text(if flexible && !v.is_empty() { Some(v) } else { None });
@@ -1533,21 +1383,6 @@ fn bind_row(row: &gtk::Widget, g: &Game, _on_detail: Rc<dyn Fn(Game)>) {
         } else {
             status.remove_css_class("row-installed");
         }
-    }
-}
-
-/// Replace a dropdown's entries.
-fn set_drop(d: &gtk::DropDown, labels: &[String]) {
-    let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
-    d.set_model(Some(&gtk::StringList::new(&refs)));
-}
-
-/// 7666 -> "7.7k", for the platform dropdown.
-fn short_count(n: i64) -> String {
-    if n >= 1000 {
-        format!("{:.1}k", n as f64 / 1000.0)
-    } else {
-        n.to_string()
     }
 }
 

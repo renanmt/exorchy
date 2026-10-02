@@ -781,7 +781,9 @@ pub fn get_section_keys(conn: &Connection, f: &GameFilter) -> DbResult<Vec<Strin
         "year_asc"  => ("COALESCE(CAST(year AS TEXT),'Unknown')", "key ASC"),
         "year_desc" => ("COALESCE(CAST(year AS TEXT),'Unknown')", "key DESC"),
         "genre"     => ("COALESCE(genre,'Unknown')",               "key ASC"),
-        "rating"    => ("CAST(ROUND(COALESCE(rating,-1)) AS INTEGER)", "key DESC"),
+        // Text, like every other key: read as String below, an INTEGER
+        // column failed the read and the jump bar came back empty.
+        "rating"    => ("CAST(CAST(ROUND(COALESCE(rating,-1)) AS INTEGER) AS TEXT)", "CAST(key AS INTEGER) DESC"),
         _           => return Ok(vec![]),
     };
 
@@ -1228,6 +1230,19 @@ mod tests {
         assert_eq!(titles(BrowseFilter { status: "available".into(), ..b() }), ["Warcraft II"]);
         assert!(is_tag("Theme: Sci-Fi") && !is_tag("Warcraft universe") && !is_tag("Board / Party Game translations"));
         assert!(!is_tag("1942: The Pacific Air War series"));
+    }
+
+    /// "Top rated" has jump-bar sections (star buckets, unrated last).
+    #[test]
+    fn rating_sort_has_section_keys() {
+        let conn = open_test_db();
+        let mut a = make_game("A");
+        a.rating = Some(4.4);
+        let mut b = make_game("B");
+        b.rating = Some(2.6);
+        insert_games(&conn, &[a, b, make_game("C")]).unwrap();
+        let f = GameFilter { query: "", genre: "", sort_by: "rating", collection: "", favorites_only: false, playlist_id: None, with_music: false, browse: Default::default() };
+        assert_eq!(get_section_keys(&conn, &f).unwrap(), ["★★★★☆", "★★★☆☆", "Unrated"]);
     }
 
     /// A single row fetched by id carries the group's language map once the

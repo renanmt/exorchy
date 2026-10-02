@@ -373,6 +373,16 @@ Phases, each its own PR checked with snapshots at wide and narrow widths
       `get_games_browse` / `get_section_keys_browse` / `get_facet_values`.
       Awaiting the user's review.
 
+- [x] **Review round 2026-10-02:** the filter dropdowns are gone; the
+      sidebar picks (Playlists joined it), one removable chip per filter
+      type, sort and grid/list on the right; the sidebar collapses into an
+      overlay behind a Filters button in narrow windows. Interface size is a
+      setting (Compact 1.0, Comfortable 1.2, Large 1.4 = the design, Extra
+      large 1.6; restart to apply). Fixed: "Top rated" had no jump bar
+      (its section keys were integers read as text); frame lines stronger
+      (`--line-frame` 26 %), so the dossier frame shows beside the tinted
+      header.
+
 Reference for every phase: `tmp/concept 01.png` (the user's mockup, local and
 gitignored). Borders as drawn there: framed panels inset from the window edge,
 `--hairline` (1 px) outlines in `--line-frame`, outlined controls and tags, a

@@ -682,3 +682,25 @@ revamped UI (card and cover, sidebar 294 px, dossier at ~27 % of the window, lis
 the breakpoints; the concept's paddings moved to `em`. A 1024 px window is now the small layout
 (stacked toolbar, full-width dossier). A per-user "interface size" setting would need `scaled`
 to become a runtime value read at start; not done yet.
+
+## 2026-10-02 - Filters are picked in the sidebar only; interface size is a setting
+
+The user's review: no filter dropdowns between the sidebar and the grid. The sidebar is the one
+place filters are picked (Playlists joined it as a category, with "Manage playlists…"); the
+filter row shows one removable chip per active type (platform, genre, year, region, publisher,
+series, tag, play status, playlist, favorites), a second pick of the same type replaces the
+first, and sort plus grid/list sit on the right. Because the sidebar is now the only way to
+filter, it no longer disappears in a narrow window: it lives in an `adw::OverlaySplitView` that
+collapses into an overlay behind a Filters button, and it scrolls, so a large interface size
+never makes it set the window's height.
+
+`ui_scale` became a setting (Settings → Appearance → Interface size: 1.0, 1.2, 1.4 = the design,
+1.6). Fixed sizes are taken when widgets are built, so `theme::scaled` reads a value set once in
+`main.rs` before the first widget, and a change offers a restart (`relaunch_after_exit`) rather
+than half-applying live.
+
+Also found in that review: "Top rated" never had a jump bar. Its section-key query selected an
+INTEGER that the code reads as String, so every key was dropped silently; the key is now cast to
+text (test `rating_sort_has_section_keys`). And with a theme whose foreground is dim, the
+dossier frame line (20 % of the foreground) vanished against the tinted header; `--line-frame`
+is now 26 %.

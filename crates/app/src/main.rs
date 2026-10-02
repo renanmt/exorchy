@@ -22,6 +22,13 @@ fn main() -> glib::ExitCode {
     // The backend first: logger, database, managed state, theme watcher.
     let boot = exorchy_core::bootstrap();
     app::install(boot.app.clone());
+    // The interface size (Settings → Appearance), before any widget exists.
+    let scale = boot
+        .app
+        .try_state::<exorchy_core::commands::DbState>()
+        .and_then(|db| db.lock().ok().and_then(|c| exorchy_core::db::queries::get_config(&c, theme::UI_SCALE_KEY).ok().flatten()))
+        .and_then(|v| v.parse::<f64>().ok());
+    theme::set_ui_scale(scale.unwrap_or(theme::DEFAULT_UI_SCALE));
 
     // GApplication is single-instance by itself: a second `exorchy` activates
     // the running one, which presents its window.

@@ -16,7 +16,7 @@ use gtk::prelude::*;
 use adw::prelude::*;
 
 use crate::app;
-use crate::ui::detail::PANEL_WIDTH;
+use crate::ui::detail::panel_width;
 
 use super::store::{self, Change, PauseReason, Track, PHASE_PROBING, PHASE_QUEUED};
 
@@ -674,7 +674,7 @@ impl Preview {
         let title = self.owner.borrow().as_ref().map(|g| g.title.clone()).unwrap_or_default();
         let stream = self.stream();
         let video = gtk::Video::builder().media_stream(&stream).autoplay(false).hexpand(true).vexpand(true).css_classes(["media-lightbox-video"]).build();
-        let dialog = adw::Dialog::builder().title(&title).content_width((PANEL_WIDTH * 2).max(960)).content_height(640).child(&video).css_classes(["media-lightbox"]).build();
+        let dialog = adw::Dialog::builder().title(&title).content_width((panel_width() * 2).max(960)).content_height(640).child(&video).css_classes(["media-lightbox"]).build();
         dialog.connect_closed(glib::clone!(#[weak(rename_to = p)] self, move |_| {
             p.lightbox.replace(None);
             p.set_lightbox(false, false);

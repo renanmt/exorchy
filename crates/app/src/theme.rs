@@ -36,15 +36,31 @@ thread_local! {
     static CURRENT: RefCell<Option<Theme>> = const { RefCell::new(None) };
 }
 
-/// How much larger than Omarchy's base size eXorchy draws, text and the
-/// fixed sizes alike: the proportions of the user's design (tmp/concept
-/// 01.png), whose interface is about 1.4x the 12 px base relative to the
-/// screen. Every fixed pixel size goes through `scaled`.
-pub const UI_SCALE: f64 = 1.4;
+/// The interface sizes Settings → Appearance offers: (scale, label). 1.4 is
+/// the proportions of the user's design (tmp/concept 01.png), about 1.4x
+/// Omarchy's 12 px base relative to the screen.
+pub const UI_SCALES: [(f64, &str); 4] = [(1.0, "Compact"), (1.2, "Comfortable"), (1.4, "Large (the design)"), (1.6, "Extra large")];
+pub const DEFAULT_UI_SCALE: f64 = 1.4;
+/// Config key holding the chosen scale.
+pub const UI_SCALE_KEY: &str = "ui_scale";
 
-/// A design-size length in pixels at `UI_SCALE`.
-pub const fn scaled(px: i32) -> i32 {
-    (px as f64 * UI_SCALE + 0.5) as i32
+static UI_SCALE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Set once at start, before any widget exists (fixed sizes are taken at
+/// construction, so a change applies after a restart).
+pub fn set_ui_scale(scale: f64) {
+    let _ = UI_SCALE.set(if (0.5..=3.0).contains(&scale) { scale } else { DEFAULT_UI_SCALE });
+}
+
+/// How much larger than Omarchy's base size eXorchy draws, text and the
+/// fixed sizes alike. Every fixed pixel size goes through `scaled`.
+pub fn ui_scale() -> f64 {
+    *UI_SCALE.get().unwrap_or(&DEFAULT_UI_SCALE)
+}
+
+/// A design-size length in pixels at the interface scale.
+pub fn scaled(px: i32) -> i32 {
+    (px as f64 * ui_scale() + 0.5) as i32
 }
 
 /// Install the static stylesheet, apply the current theme and follow changes.
@@ -90,7 +106,7 @@ fn apply(theme: Theme) {
 
     if let Some(settings) = gtk::Settings::default() {
         // shell.toml's base-size is in px; GTK font names take points.
-        let pt = (theme.font_base_size as f64 * UI_SCALE * 0.75).round().max(6.0) as u32;
+        let pt = (theme.font_base_size as f64 * ui_scale() * 0.75).round().max(6.0) as u32;
         let family = theme.mono_font.clone().unwrap_or_else(|| "monospace".into());
         settings.set_gtk_font_name(Some(&format!("{family} {pt}")));
     }
@@ -196,7 +212,7 @@ const SEMANTIC: &str = r#"
   --line-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --line-3: color-mix(in srgb, var(--om-foreground) 8%, transparent);
   --line-4: color-mix(in srgb, var(--om-foreground) 12%, transparent);
-  --line-frame: color-mix(in srgb, var(--om-foreground) 20%, transparent);
+  --line-frame: color-mix(in srgb, var(--om-foreground) 26%, transparent);
   --fill-1: color-mix(in srgb, var(--om-foreground) 3%, transparent);
   --fill-2: color-mix(in srgb, var(--om-foreground) 6%, transparent);
   --fill-3: color-mix(in srgb, var(--om-foreground) 10%, transparent);

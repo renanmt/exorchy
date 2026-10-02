@@ -25,10 +25,17 @@ pub fn set_selected_id(id: Option<i64>) {
     SELECTED.with(|s| s.set(id));
 }
 
-pub const CARD_WIDTH: i32 = crate::theme::scaled(172);
-pub const ART_HEIGHT: i32 = crate::theme::scaled(226);
+/// The card's width and cover height at the interface scale.
+pub fn card_width() -> i32 {
+    crate::theme::scaled(172)
+}
+pub fn art_height() -> i32 {
+    crate::theme::scaled(226)
+}
 /// Half the gap between cards.
-const CARD_MARGIN: i32 = crate::theme::scaled(5);
+fn card_margin() -> i32 {
+    crate::theme::scaled(5)
+}
 
 pub struct Card {
     pub widget: gtk::Box,
@@ -56,18 +63,18 @@ impl Card {
         let widget = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .css_classes(["game-card"])
-            .width_request(CARD_WIDTH)
-            .margin_start(CARD_MARGIN)
-            .margin_end(CARD_MARGIN)
-            .margin_top(CARD_MARGIN)
-            .margin_bottom(CARD_MARGIN)
+            .width_request(card_width())
+            .margin_start(card_margin())
+            .margin_end(card_margin())
+            .margin_top(card_margin())
+            .margin_bottom(card_margin())
             .overflow(gtk::Overflow::Hidden)
             .build();
 
         let cover = gtk::Picture::builder()
             .content_fit(gtk::ContentFit::Cover)
-            .width_request(CARD_WIDTH)
-            .height_request(ART_HEIGHT)
+            .width_request(card_width())
+            .height_request(art_height())
             .can_shrink(true)
             .css_classes(["game-card-art"])
             .build();
@@ -263,7 +270,7 @@ impl Card {
         let card = Rc::downgrade(self);
         // Exactly the card's size: a GtkPicture's natural size is its
         // texture's pixel size, and the grid sizes its cells by it.
-        covers::request(source.as_deref(), key.as_deref(), covers::Size::Fill(CARD_WIDTH as u32, ART_HEIGHT as u32), move |texture| {
+        covers::request(source.as_deref(), key.as_deref(), covers::Size::Fill(card_width() as u32, art_height() as u32), move |texture| {
             let Some(card) = card.upgrade() else { return };
             if card.generation.get() != generation {
                 return;
