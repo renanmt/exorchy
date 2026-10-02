@@ -307,6 +307,11 @@ impl Preview {
                 return;
             }
             store::request_video(id);
+            // A video fetched on an earlier visit raises no change event:
+            // load it here, as a fresh fetch would.
+            if store::video_state(id).is_some_and(|v| v.phase == "ready") {
+                p.sync_video();
+            }
             // Autoplay on: it becomes the wanted track; off: fetched so the
             // row can offer it. The key is re-read: the settings page writes
             // it and there is no change event.
@@ -558,7 +563,12 @@ impl Preview {
 
     /// The replay button: a gesture, so it starts with the real preference.
     fn replay(self: &Rc<Self>, muted: bool) {
-        if self.game_id.get().is_none() {
+        // Offered but never loaded into the hero: load it and start now.
+        if self.game_id.get().is_none() || self.game_id.get() != self.owner_id() {
+            let Some(id) = self.owner_id() else { return };
+            let Some(path) = store::video_state(id).filter(|v| v.phase == "ready").and_then(|v| v.path) else { return };
+            self.show_preview(id, path, muted, 0);
+            self.render();
             return;
         }
         self.clear_timer();
