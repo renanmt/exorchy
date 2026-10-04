@@ -1,8 +1,9 @@
 //! General: the game folder, the installed-games rescan, game defaults
-//! (CRT shader, fullscreen).
+//! (fullscreen) and each emulator's graphics filter.
 
 use adw::prelude::*;
-use exorchy_core::commands::{games, library, library_location, setup};
+use exorchy_core::commands::{games, library, library_location, scummvm, setup};
+use exorchy_core::launchers::dosbox;
 
 use super::widgets::{self, Ctx, Row};
 use super::{plural, storage};
@@ -36,11 +37,20 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
 
     // ── Game defaults ──
     let defaults = widgets::group("Game defaults", Some("Applied on every launch, on top of eXoDOS's own configs."));
-    let (crt_row, crt) = widgets::switch_row("Auto CRT shaders", "A CRT shader matched to the game's video mode. DOSBox ECE (Windows) has none.", true);
     let (fs_row, fullscreen) = widgets::switch_row("Launch in fullscreen", "Alt+Enter still toggles at runtime.", false);
-    defaults.add(&crt_row.widget);
     defaults.add(&fs_row.widget);
     page.add(&defaults);
+
+    // ── Graphics filters ── one per emulator; a game's settings override it.
+    let looks = widgets::group("Graphics filters", Some("How every game looks, per emulator: a CRT monitor of the time, or smoothed pixel art. A game's own settings can override it."));
+    filter_row(&looks, "DOSBox Staging", "Most DOS and Windows 3.x games. Automatic CRT follows the game's video mode.", "global_glshader", dosbox::STAGING_SHADERS.to_vec(), |v| Some(dosbox::staging_shader(v)));
+    let mut dosx = vec![("", "Off (eXo's own)")];
+    dosx.extend_from_slice(dosbox::DOSBOX_X_FILTERS);
+    filter_row(&looks, "DOSBox-X", "DOS games under DOSBox-X. Windows 9x games set theirs per game.", "dosx_filter", dosx, |v| v.map(str::to_string));
+    let mut svm = vec![("", "Off (sharp pixels)")];
+    svm.extend(scummvm::FILTERS.iter().map(|f| (f.0, f.1)));
+    filter_row(&looks, "ScummVM", "Smooths the pixel art of ScummVM games, HQ2x for example.", "svm_filter", svm, |v| v.map(str::to_string));
+    page.add(&looks);
 
 
     // Game defaults mirror launch_game's own defaults until the load lands.
@@ -53,24 +63,22 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
                 async move { games::get_config(c.state(), k).await.ok().flatten() }
             };
             (
-                (get("data_dir").await, get("global_glshader").await, get("default_fullscreen").await),
+                (get("data_dir").await, get("default_fullscreen").await),
                 (get("start_tab").await, get("update_check").await),
             )
         },
         {
-            let (folder, crt, fullscreen, start_library, check_updates) =
-                (folder.clone(), crt.clone(), fullscreen.clone(), start_library.clone(), check_updates.clone());
-            move |((dir, shader, fs), (start, upd))| {
+            let (folder, fullscreen, start_library, check_updates) =
+                (folder.clone(), fullscreen.clone(), start_library.clone(), check_updates.clone());
+            move |((dir, fs), (start, upd))| {
                 start_library.set_quiet(start.as_deref() == Some("library"));
                 check_updates.set_quiet(upd.as_deref() != Some("0"));
                 folder.set_value(dir.as_deref().filter(|d| !d.is_empty()).unwrap_or("Not set"));
-                crt.set_quiet(shader.is_none() || shader.as_deref() == Some("crt-auto"));
                 fullscreen.set_quiet(fs.as_deref() == Some("fullscreen"));
             }
         },
     );
 
-    bind_toggle(&crt, "global_glshader", "crt-auto", "default");
     bind_toggle(&fullscreen, "default_fullscreen", "fullscreen", "window");
     bind_toggle(&start_library, "start_tab", "library", "browse");
     bind_toggle(&check_updates, "update_check", "1", "0");
@@ -129,6 +137,38 @@ pub fn build(ctx: &Ctx) -> gtk::Widget {
 }
 
 /// Save a switch as `on`/`off`; a refused write puts the switch back.
+/// A dropdown of one emulator's filters, stored under `key` in the global
+/// config. `current` turns the stored value into an option's id (Staging's
+/// unset key means its default shader, for one). Saving starts once the
+/// stored value is shown, so loading never writes it back.
+fn filter_row(
+    group: &adw::PreferencesGroup,
+    label: &str,
+    hint: &str,
+    key: &'static str,
+    options: Vec<(&'static str, &'static str)>,
+    current: fn(Option<&str>) -> Option<String>,
+) {
+    let drop = gtk::DropDown::from_strings(&options.iter().map(|(_, l)| *l).collect::<Vec<_>>());
+    drop.add_css_class("drop");
+    group.add(&Row::new(label).hint(hint).action(&drop).widget);
+    let core = app::core();
+    app::spawn(async move { games::get_config(core.state(), key.into()).await.ok().flatten() }, move |stored| {
+        let id = current(stored.as_deref());
+        let idx = options.iter().position(|(v, _)| Some(*v) == id.as_deref()).unwrap_or(0);
+        drop.set_selected(idx as u32);
+        drop.connect_selected_notify(move |d| {
+            let Some((value, _)) = options.get(d.selected() as usize).copied() else { return };
+            let core = app::core();
+            app::spawn(async move { games::set_config(core.clone(), core.state(), key.into(), value.into()).await }, move |res| {
+                if let Err(e) = res {
+                    log::error!("settings: failed to save {key}: {e}");
+                }
+            });
+        });
+    });
+}
+
 fn bind_toggle(sw: &widgets::Switch, key: &'static str, on: &'static str, off: &'static str) {
     let s = sw.clone();
     sw.on_change(move |next| {

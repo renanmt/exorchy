@@ -75,9 +75,9 @@ full list of credits.
   Settings → Hidden titles.
 - Your own background image behind the library, with an opacity slider, and
   an option to open straight into My Library.
-- Tells you when a new release is out and updates itself: one click opens a
-  terminal that installs it (pacman asks for your password) and eXorchy
-  starts again.
+- Tells you when a new release is out. Nothing installs on its own: if you
+  choose Update, a terminal installs it (pacman asks for your password) and
+  eXorchy starts again.
 - A native GTK4 / libadwaita window: no web view, no title bar (Hyprland
   draws the borders and tiles it), a virtualised grid that stays smooth on
   11,000 games, keyboard-first navigation.
@@ -135,7 +135,7 @@ From a checkout instead: `cd packaging && makepkg -si` (system-wide) or
 
 ## Update
 
-**From eXorchy 0.4.0 on, the app updates itself.** A few seconds after it
+**From eXorchy 0.4.0 on, the app notifies you about updates.** A few seconds after it
 starts (and every few hours) it checks for a new release; when one is out, a
 banner at the top of the library offers:
 
@@ -148,7 +148,7 @@ banner at the top of the library offers:
 You can also check by hand in Settings → About → **Check now**, and turn the
 automatic check off in Settings → General → **Check for updates**.
 
-**By hand, or from eXorchy 0.3.0 and older** (which cannot update itself yet):
+**By hand, or from eXorchy 0.3.0 and older** (which do not notify you):
 run the install line again. It installs the latest release over the one you
 have and keeps your settings, library and games:
 
@@ -159,7 +159,7 @@ curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.s
 To install a particular version instead:
 
 ```bash
-curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --version v0.5.0
+curl -fsSL https://github.com/renanmt/exorchy/releases/latest/download/install.sh | bash -s -- --version v0.6.0
 ```
 
 Everything that changed is in [CHANGELOG.md](CHANGELOG.md).

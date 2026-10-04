@@ -1,14 +1,18 @@
 //! Per-game emulator settings (the web UI's `GameSettingsDialog`): each key
-//! overrides the global one (engine, CRT shader, fullscreen, CPU cycles,
-//! custom DOSBox config). An installed eXoScummVM game gets the variant
-//! tree's menus (edition, sound, subtitles, aspect) instead of the DOSBox
-//! controls; Win9x rows get the same form as DOS rows, as on the web.
+//! overrides the global one (engine, graphics filter, fullscreen, CPU
+//! cycles, custom DOSBox config). The filter list is the emulator's: DOSBox
+//! Staging's shaders, DOSBox-X's shaders and scalers (Win9x games under
+//! DOSBox-X too), none for 86Box. An installed eXoScummVM game gets the variant
+//! tree's menus (edition, sound, subtitles, aspect), a graphics filter and
+//! extra ScummVM options instead of the DOSBox controls; Win9x rows get the
+//! same form as DOS rows, as on the web.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use exorchy_core::commands::scummvm::{ScummVmVariants, SvmOptions, SvmVariant};
 use exorchy_core::commands::{games, scummvm};
+use exorchy_core::launchers::dosbox;
 use exorchy_core::models::Game;
 use gtk::glib;
 use adw::prelude::*;
@@ -18,11 +22,31 @@ use crate::app;
 // "eXo's choice" names what it resolves to for this game.
 const ENGINE_EXO_STAGING: [(&str, &str); 3] = [("", "eXo's choice (DOSBox Staging)"), ("staging", "DOSBox Staging"), ("dosbox-x", "DOSBox-X")];
 const ENGINE_EXO_X: [(&str, &str); 3] = [("", "eXo's choice (DOSBox-X)"), ("staging", "DOSBox Staging"), ("dosbox-x", "DOSBox-X")];
-const SHADER: [(&str, &str); 3] = [("", "Default (global)"), ("crt-auto", "On"), ("sharp", "Off")];
 const FULLSCREEN: [(&str, &str); 3] = [("", "Default (global)"), ("true", "On"), ("false", "Off")];
 const CYCLES: [(&str, &str); 4] = [("", "Default (game's own)"), ("auto", "Auto"), ("max", "Max"), ("fixed", "Fixed")];
 const ON_OFF: [(&str, &str); 2] = [("false", "Off"), ("true", "On")];
 const ASPECT: [(&str, &str); 2] = [("true", "Corrected (4:3)"), ("false", "Pixel-exact")];
+
+/// "Default (global)", then DOSBox Staging's shaders.
+fn staging_options() -> Vec<(&'static str, &'static str)> {
+    let mut v = vec![("", "Default (global)")];
+    v.extend_from_slice(dosbox::STAGING_SHADERS);
+    v
+}
+
+/// DOSBox-X's filters. A Win9x game has no global one to fall back to.
+fn dosx_options(win9x: bool) -> Vec<(&'static str, &'static str)> {
+    let mut v = if win9x { vec![("", "Off (eXo's own)")] } else { vec![("", "Default (global)"), (dosbox::FILTER_NONE, "Off (eXo's own)")] };
+    v.extend_from_slice(dosbox::DOSBOX_X_FILTERS);
+    v
+}
+
+/// "Default (global)", "Off", then ScummVM's filters.
+fn filter_options() -> Vec<(&'static str, &'static str)> {
+    let mut v = vec![("", "Default (global)"), (scummvm::FILTER_NONE, "Off (sharp pixels)")];
+    v.extend(scummvm::FILTERS.iter().map(|f| (f.0, f.1)));
+    v
+}
 
 pub fn open(parent: &impl IsA<gtk::Widget>, game: &Game) {
     let Some(id) = game.id else { return };
@@ -106,6 +130,8 @@ struct SvmForm {
     subtitles: gtk::DropDown,
     subtitles_row: gtk::Box,
     aspect: gtk::DropDown,
+    filter: gtk::DropDown,
+    args: gtk::Entry,
 }
 
 impl SvmForm {
@@ -154,8 +180,14 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
         let aspect = drop(&ASPECT, if tree.selected.aspect { "true" } else { "false" });
         row(body, "Aspect ratio", &aspect);
         note(body, "The version itself is picked in the game's panel; these are the menus eXo would ask about at launch.");
+        let filter = drop(&filter_options(), tree.selected.filter.as_deref().unwrap_or(""));
+        row(body, "Graphics filter", &filter);
+        note(body, "Smooths the pixel art, like ScummVM's Ctrl+Alt+number keys but kept for every launch. The global default is in Settings → General.");
+        let args = gtk::Entry::builder().text(tree.selected.args.as_deref().unwrap_or("")).placeholder_text("e.g. --music-volume=128 --no-aspect-ratio").css_classes(["field", "conf-entry"]).build();
+        row(body, "Extra options", &args);
+        note(body, "ScummVM command-line options added last, so they win over eXorchy's and eXo's. Quote values with spaces.");
         let initial_sound = tree.selected.sound.clone();
-        let f = Rc::new(SvmForm { tree, sub, sub_names, sound, sound_row, sounds: RefCell::new(Vec::new()), subtitles, subtitles_row, aspect });
+        let f = Rc::new(SvmForm { tree, sub, sub_names, sound, sound_row, sounds: RefCell::new(Vec::new()), subtitles, subtitles_row, aspect, filter, args });
         // The stored sound must survive the first sync, which reads the
         // (empty) current list.
         if let Some(v) = f.variant() {
@@ -195,26 +227,42 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
         );
         d
     });
-    let glshader = (!is_svm).then(|| {
-        let d = drop(&SHADER, s.glshader.as_deref().unwrap_or(""));
-        row(body, "CRT Shader", &d);
-        let n = note(body, "CRT shaders are a DOSBox Staging feature: they do not apply while this game runs under DOSBox-X. Switch the emulator above to DOSBox Staging for the CRT look.");
-        // What would run it with the choice currently in the dialog is what
-        // the note reflects - switching the engine updates it before saving.
-        let uses_x = glib::clone!(#[weak] d, #[weak] n, #[strong] engine, move || {
+    // Each emulator has its own filters: the row shows the list of the one
+    // that runs the game with the emulator currently picked in the dialog.
+    let win9x = engine.is_none();
+    let filter_engine = engine_info.as_ref().and_then(|e| e.filter_engine.clone());
+    let staging_opts = staging_options();
+    let dosx_opts = dosx_options(win9x);
+    let filters = (!is_svm && filter_engine.is_some()).then(|| {
+        let staging = drop(&staging_opts, s.glshader.as_deref().filter(|v| *v != "default").unwrap_or(""));
+        let dosx = drop(&dosx_opts, s.dosx_filter.as_deref().unwrap_or(""));
+        let bx = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        staging.set_hexpand(true);
+        dosx.set_hexpand(true);
+        bx.append(&staging);
+        bx.append(&dosx);
+        row(body, "Graphics filter", &bx);
+        let n = note(body, "");
+        let sync = glib::clone!(#[weak] staging, #[weak] dosx, #[weak] n, #[strong] engine, move || {
             let x = match engine.as_ref().map(|e| drop_value(e, engine_opts)) {
                 Some(v) if v == "dosbox-x" => true,
                 Some(v) if v == "staging" => false,
-                _ => exo_x,
+                Some(_) => exo_x,
+                None => filter_engine.as_deref() == Some("dosbox-x"),
             };
-            d.set_sensitive(!x);
-            n.set_visible(x);
+            staging.set_visible(!x);
+            dosx.set_visible(x);
+            n.set_label(match (x, win9x) {
+                (false, _) => "DOSBox Staging's shaders: the CRT ones imitate a monitor of the time, xBR and AdvMAME smooth the pixel art. The default for every game is in Settings → General.",
+                (true, false) => "DOSBox-X's shaders and scalers: CRT looks, scanlines, and smoothing (xBR, HQ2x). The default for every game is in Settings → General.",
+                (true, true) => "DOSBox-X's shaders and scalers, for this game only: CRT looks, scanlines, and smoothing (xBR, HQ2x).",
+            });
         });
-        uses_x();
+        sync();
         if let Some(e) = &engine {
-            e.connect_selected_notify(move |_| uses_x());
+            e.connect_selected_notify(move |_| sync());
         }
-        d
+        (staging, dosx)
     });
     let fullscreen = drop(&FULLSCREEN, s.fullscreen.as_deref().unwrap_or(""));
     row(body, "Fullscreen", &fullscreen);
@@ -267,14 +315,17 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
                 sound: string_value(&f.sound, &f.sounds.borrow()).filter(|_| f.sound_row.is_visible()),
                 subtitles: Some(drop_value(&f.subtitles, &ON_OFF) == "true"),
                 aspect: Some(drop_value(&f.aspect, &ASPECT) == "true"),
+                filter: Some(drop_value(&f.filter, &filter_options())),
+                args: Some(f.args.text().to_string()),
             };
             Box::pin(async move {
                 scummvm::set_scummvm_options(core.state(), id, options).await?;
-                games::set_game_settings(core.state(), id, None, None, fullscreen, None, None).await
+                games::set_game_settings(core.state(), id, games::GameSettings { fullscreen, ..Default::default() }).await
             })
         } else {
             let engine = engine.as_ref().map(|d| drop_value(d, engine_opts)).filter(|v| !v.is_empty());
-            let glshader = glshader.as_ref().map(|d| drop_value(d, &SHADER)).filter(|v| !v.is_empty());
+            let glshader = filters.as_ref().map(|(d, _)| drop_value(d, &staging_opts)).filter(|v| !v.is_empty());
+            let dosx_filter = filters.as_ref().map(|(_, d)| drop_value(d, &dosx_opts)).filter(|v| !v.is_empty());
             let cycles = cycles.as_ref().and_then(|(mode, value)| match drop_value(mode, &CYCLES).as_str() {
                 "" => None,
                 "fixed" => Some((value.value() as i64).to_string()),
@@ -284,7 +335,7 @@ fn build_form(dialog: &adw::Dialog, body: &gtk::Box, id: i64, svm: Option<ScummV
                 let b = tv.buffer();
                 b.text(&b.start_iter(), &b.end_iter(), false).to_string()
             }).filter(|v| !v.trim().is_empty());
-            Box::pin(async move { games::set_game_settings(core.state(), id, engine, glshader, fullscreen, cycles, custom).await })
+            Box::pin(async move { games::set_game_settings(core.state(), id, games::GameSettings { engine, glshader, dosx_filter, fullscreen, cycles, custom_conf: custom }).await })
         };
         let (dialog, error, save) = (dialog.clone(), error.clone(), save.clone());
         app::spawn(fut, move |res| {

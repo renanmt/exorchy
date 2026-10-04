@@ -927,3 +927,45 @@ window, which tiles.
 
 `splash.jpg` stays in the repository for the README. The old overlay's hard-coded `#000000`
 is gone with it.
+
+## 2026-10-04 - Graphics filters per emulator; ScummVM extra options
+
+A user asked how to keep HQ2x, which they had picked in Day of the Tentacle with ScummVM's
+Ctrl+Alt+number keys. Those keys change the running session only. eXo's inis scale by 8 with
+the plain scaler, which gives sharp, blocky pixels.
+- **Two layers.** Settings → General → "ScummVM graphics filter" stores `svm_filter` in
+  `config`. Game settings can override it with a filter or "Off" (`svm_filter` in
+  `game_config`: a `scummvm::FILTERS` id or `none`).
+- **Command line, not the ini.** All the games on one build share its ini, so a per-game
+  choice cannot live there. The filter is passed as `--scaler=<s> --scale-factor=<n>`.
+  ScummVM before 2.5 has no `--scaler` and exits on an unknown option, so those builds get
+  `--gfx-mode=hq2x`. The version tested is the binary that runs: on Linux the 2.3 snapshot
+  runs on the 2.5.0 pack, so only eXo's own Windows exe takes the old form. A system
+  ScummVM (version unknown) gets the current options.
+- **Only filters every build has.** HQ, AdvMAME, SaI, SuperSaI, SuperEagle, TV and DotMatrix,
+  at factor 2 (or 3 for HQ3x and AdvMAME3x). `pixel-perfect` stretching scales the result
+  to the window.
+- **Extra options for whatever else.** `svm_args` is free text, split like a shell would
+  (`shlex`, so quoted paths survive) and appended after everything else, so it overrides
+  eXorchy's and eXo's options. It is checked when saved: an unclosed quote is refused.
+  DOS games already have the custom DOSBox config for the same purpose.
+
+The same request applies to every emulator, so each one got its own filter list, global
+default and per-game override (Settings → General → Graphics filters; Game settings →
+Graphics filter). Each emulator's filters differ, so there is no shared list:
+- **DOSBox Staging** keeps its keys (`global_glshader`, per-game `glshader`), widened from
+  On/Off to the four `crt-auto*` modes plus the shader files Staging ships
+  (`dosbox::STAGING_SHADERS`). The old switch stored "default" for Off: `staging_shader`
+  reads that as `sharp`, and an unset key as `crt-auto`. Staging calls `glshader`
+  deprecated (the new name is `shader`), but older system builds only know `glshader`.
+- **DOSBox-X** (`dosx_filter`, `dosbox::DOSBOX_X_FILTERS`) offers its built-in GLSL shaders,
+  the CRT and xBR shader files its AppImage ships (DOSBox-X finds both by bare name;
+  checked with the pack), and its software scalers (`scaler/<name>`). eXo's DOSBox-X confs
+  use `output=openglnb` and `scaler=normal2x`. A shader therefore gets `output = opengl` and
+  `scaler = none`; a scaler gets `<name> forced`, or DOSBox-X skips it on larger modes. An
+  unknown shader is logged and ignored by DOSBox-X, so a system build without the files
+  still starts. A per-game `none` turns the global filter off.
+- **Win9x under DOSBox-X** takes the game's own filter only. The global one targets
+  DOS-era modes, and a 2x scaler on a Windows desktop is a different thing.
+- **86Box** gets none: it ships no shaders and its renderer lives in eXo's per-game cfg.
+- `set_game_settings` takes `GameSettings` instead of one argument per key.

@@ -13,6 +13,7 @@ textview.conf-editor, textview.conf-editor text {
 }
 .conf-scroller { border: var(--border) solid var(--line-3); border-radius: var(--radius); }
 .conf-scroller:focus-within { border-color: var(--accent); }
+entry.conf-entry { font-family: monospace; }
 
 /* ---- Playlist picker / management ---- */
 list.playlist-list { background: none; }

@@ -11,6 +11,37 @@ request that raises the version. The release workflow publishes that section
 and refuses to release a tag that has none.
 -->
 
+## [0.6.0] - 2026-10-04
+
+Graphics filters for DOSBox Staging, DOSBox-X and ScummVM, so games can look
+the way you remember them: a CRT monitor of the time, or smoothed pixel art.
+
+### Added
+- **Settings → General → Graphics filters**: a default look for each
+  emulator, applied to every game.
+  - **DOSBox Staging**: automatic CRT (matched to the game's video mode, to
+    the emulated machine, or an arcade monitor), Hyllian and VGA monitor
+    looks, xBR, AdvMAME and AdvInterp smoothing, bilinear and Catmull-Rom.
+  - **DOSBox-X**: CRT looks (Lottes, Geom, Easymode, Hyllian, Aperture and
+    more), scanlines, TV and RGB, xBR, and the HQ2x, HQ3x, xBRZ, 2xSaI and
+    SuperEagle scalers. Games that run under DOSBox-X had no filters before.
+  - **ScummVM**: HQ2x, HQ3x, AdvMAME, 2xSaI, SuperEagle, TV2x and DotMatrix.
+    Picking HQ2x with ScummVM's Ctrl+Alt keys only lasted until the game
+    closed; now it stays.
+- A **Graphics filter** row in each game's settings to give that game its
+  own look, or turn the default off for it. Windows 9x games that run under
+  DOSBox-X get the DOSBox-X list there.
+- **Extra options** for ScummVM games: any ScummVM command-line options, added
+  last so they win over eXorchy's and eXo's (for example
+  `--music-volume=128`).
+
+### Changed
+- The **Auto CRT shaders** switch is now the DOSBox Staging dropdown in
+  Graphics filters. Your choice carries over: on is "CRT (automatic)", off is
+  "Off (sharp pixels)".
+- Game settings call the DOSBox Staging row **Graphics filter** instead of
+  CRT Shader, and list every shader instead of On/Off.
+
 ## [0.5.0] - 2026-10-02
 
 A new look, modelled on eXorchy's concept art, and a round of fixes.

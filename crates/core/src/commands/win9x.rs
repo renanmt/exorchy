@@ -1040,6 +1040,11 @@ fn launch_dosbox_x(
         size,
         ne2000_override()
     );
+    // The game's own filter only: the global DOSBox-X one is for DOS-era
+    // modes, and a 2x scaler on a Windows desktop is a different thing.
+    if let Some(filter) = crate::launchers::dosbox::dosbox_x_filter_conf(per_game_config.get("dosx_filter").map(String::as_str), None) {
+        frag.push_str(&filter);
+    }
     if let Some(custom) = per_game_config.get("custom_conf") {
         let trimmed = custom.trim();
         if !trimmed.is_empty() {

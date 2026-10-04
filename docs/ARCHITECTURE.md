@@ -180,8 +180,12 @@ and launch dir granted) → command line `<emulator> -conf <patched> [-conf
 options.conf] [DOSBox-X: -nomenu, -conf printer_<id>.conf] -conf
 global_overrides_<id>.conf [-conf game_<id>.conf]` with cwd `<root>/eXo`. The
 printer fragment sends DOSBox-X's pages to PNG files in `<game dir>/!prints`
-(eXo's confs say `printoutput=printer`, Windows-only); CRT shaders are
-Staging's and are left out for DOSBox-X. `download_game` queues the
+(eXo's confs say `printoutput=printer`, Windows-only). The graphics filter is
+per emulator: Staging's `glshader` (global `global_glshader`, per game
+`glshader`, list `dosbox::STAGING_SHADERS`) goes in the global fragment;
+DOSBox-X's (`dosx_filter`, global and per game, list
+`dosbox::DOSBOX_X_FILTERS`, fragment `dosbox::dosbox_x_filter_conf`) in the
+per-game one. `download_game` queues the
 `dosbox-x` pack (owned by eXoWin9x in the manifest, `pack_collection`) with
 the first download of a game that needs it. The field knowledge encoded in these functions is
 covered by the unit tests copied from Exodium; keep them. Every emulator spawn
@@ -370,7 +374,7 @@ network choice).
 | `ui/reading/` | `reading::build(window)` → `library.set_reading_widget()`. The room is laid out like Browse: the shared sidebar (All Reading, Downloaded shortcut with its count, Types, Publications, Years, Languages, Favorites; values from `logic::facet_rows`), one chip per active filter, count / sort / grid-list on the right, the header's search (`reading::set_query`). `reading::open_issue(issue, page)` (the room, a dossier's articles) brings the tab forward and the reader (`reader.rs`) replaces the room's body until closed (× or Esc). The tab closes any open dossier. Game manuals open the same way (`pdf::open_document_viewer` → `LibraryPage::show_document`, a "document" page beside the tabs; the dossier steps aside and returns on close). In the room the status bar shows the room's counts and keys (`StatusBar::set_reading`, `set_reading_counts`). Full screen (the reader's button, F11) is `LibraryPage::set_document_fullscreen`: the window goes full screen and the banner, toolbar and status bar hide. Documents render in `ui/pdf.rs` (poppler), opening in "Fit page", a mode that follows viewport resizes (`Fit::Page/Width/Free`) |
 | `ui/media.rs` | `media::install(window, library)`: fills `detail.media_slot` (preview video, the Theme row that plays a game's theme in place). There is no bottom player |
 | `ui/playlists.rs` | `playlists::pick_for_game(parent, game)` from the ⋯ menu; create / rename / delete |
-| `ui/game_settings.rs` | `game_settings::open(parent, game)` from the ⋯ menu; shader, fullscreen, cycles, custom conf, ScummVM options |
+| `ui/game_settings.rs` | `game_settings::open(parent, game)` from the ⋯ menu; shader, fullscreen, cycles, custom conf, ScummVM options (variant menus, graphics filter, extra command-line options) |
 | `ui/onboarding.rs` | `onboarding::run(window)` after the library is up: seeding consent (online only), welcome modal once (`welcome_seen`) |
 | `ui/launch_notes.rs` | the one panel note per game (port of `launchNotes.ts`), rendered in the detail panel |
 
