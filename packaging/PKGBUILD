@@ -1,7 +1,7 @@
 # Maintainer: Renan Tonheiro <renan.tonheiro@gmail.com>
 # Build from a local checkout:  cd packaging && makepkg -si
 pkgname=exorchy
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="eXorchy: Omarchy-native launcher for the eXo collections (eXoDOS, eXoWin3x, eXoWin9x, eXoScummVM)"
 arch=('x86_64')
