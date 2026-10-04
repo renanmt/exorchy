@@ -7,7 +7,7 @@
 //! report `Launched`. A new kind is one module and one match arm.
 
 pub(crate) mod cue;
-pub(crate) mod dosbox;
+pub mod dosbox;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -32,7 +32,12 @@ pub(crate) struct LaunchContext<'a> {
     pub root: PathBuf,
     /// Global preferences at the moment of launch.
     pub fullscreen: bool,
-    pub crt_auto: bool,
+    /// DOSBox Staging's shader (`global_glshader`, see `dosbox::staging_shader`).
+    pub staging_shader: String,
+    /// The DOSBox-X filter (`dosx_filter`, an id from `dosbox::DOSBOX_X_FILTERS`).
+    pub dosx_filter: Option<String>,
+    /// The ScummVM graphics filter (`svm_filter`, an id from `scummvm::FILTERS`).
+    pub svm_filter: Option<String>,
     /// The game's `game_config` rows.
     pub per_game: &'a HashMap<String, String>,
 }
@@ -62,7 +67,7 @@ pub(crate) async fn prepare(kind: Launcher, ctx: &LaunchContext<'_>) -> Result<L
         .await
         .map(LaunchOutcome::Launched),
         Launcher::ScummVm => crate::commands::scummvm::launch_scummvm_game(
-            ctx.app, ctx.game.clone(), ctx.id, ctx.data_dir, ctx.fullscreen, ctx.per_game,
+            ctx.app, ctx.game.clone(), ctx.id, ctx.data_dir, ctx.fullscreen, ctx.svm_filter.as_deref(), ctx.per_game,
         )
         .await
         .map(LaunchOutcome::Launched),

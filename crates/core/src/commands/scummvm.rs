@@ -39,6 +39,55 @@ pub(crate) fn build_version(slug: &str) -> &'static str {
         .unwrap_or("unknown")
 }
 
+/// The graphics filters eXorchy offers: stored id, label, the `--scaler` /
+/// `--scale-factor` pair ScummVM 2.5+ takes, and the `--gfx-mode` name the
+/// older builds take instead. eXo's inis scale by 8 with the plain scaler
+/// (sharp pixels); these smooth at 2x or 3x and `pixel-perfect` stretches
+/// the result to the window.
+pub const FILTERS: &[(&str, &str, &str, u8, &str)] = &[
+    ("hq2x", "HQ2x", "hq", 2, "hq2x"),
+    ("hq3x", "HQ3x", "hq", 3, "hq3x"),
+    ("advmame2x", "AdvMAME2x", "advmame", 2, "advmame2x"),
+    ("advmame3x", "AdvMAME3x", "advmame", 3, "advmame3x"),
+    ("2xsai", "2xSaI", "sai", 2, "2xsai"),
+    ("super2xsai", "Super2xSaI", "supersai", 2, "super2xsai"),
+    ("supereagle", "SuperEagle", "supereagle", 2, "supereagle"),
+    ("tv2x", "TV2x", "tv", 2, "tv2x"),
+    ("dotmatrix", "DotMatrix", "dotmatrix", 2, "dotmatrix"),
+];
+
+/// The `svm_filter` value that turns a global filter off for one game.
+pub const FILTER_NONE: &str = "none";
+
+/// True for a ScummVM older than 2.5, which has no `--scaler`.
+fn before_scaler_options(version: &str) -> bool {
+    let mut parts = version.split(|c: char| !c.is_ascii_digit()).map(|p| p.parse::<u32>().unwrap_or(0));
+    let (major, minor) = (parts.next().unwrap_or(0), parts.next().unwrap_or(0));
+    (major, minor) < (2, 5)
+}
+
+/// The filter arguments for a launch: the game's `svm_filter` wins over the
+/// global one. `version` is the ScummVM that runs (eXo's build or its
+/// pack); a system ScummVM (unknown version) gets the current options. Only
+/// eXo's 2.3 snapshot on Windows needs `--gfx-mode`: its pack is 2.5.0.
+fn filter_args(per_game: Option<&str>, global: Option<&str>, version: Option<&str>) -> Vec<String> {
+    let id = per_game.filter(|v| !v.is_empty()).or(global);
+    let Some(&(_, _, scaler, factor, legacy)) = FILTERS.iter().find(|f| Some(f.0) == id) else {
+        return Vec::new();
+    };
+    if version.is_some_and(before_scaler_options) {
+        vec![format!("--gfx-mode={legacy}")]
+    } else {
+        vec![format!("--scaler={scaler}"), format!("--scale-factor={factor}")]
+    }
+}
+
+/// The game's own extra command-line options (`svm_args`), split like a
+/// shell would so a quoted path stays one argument.
+pub fn split_extra_args(text: &str) -> Result<Vec<String>, String> {
+    shlex::split(text).ok_or_else(|| "The extra options have an unclosed quote.".to_string())
+}
+
 /// One line of eXo's launch index.
 #[derive(Debug, Clone)]
 struct IndexEntry {
@@ -583,10 +632,11 @@ pub(crate) async fn launch_scummvm_game(
     id: i64,
     data_dir: &str,
     fullscreen: bool,
+    global_filter: Option<&str>,
     per_game_config: &HashMap<String, String>,
 ) -> Result<String, String> {
     let title = game.title.clone();
-    launch_inner(app, game, id, data_dir, fullscreen, per_game_config)
+    launch_inner(app, game, id, data_dir, fullscreen, global_filter, per_game_config)
         .await
         .inspect_err(|e| log::error!("launch_scummvm_game({}): {}", title, e))
 }
@@ -597,6 +647,7 @@ async fn launch_inner(
     id: i64,
     data_dir: &str,
     fullscreen: bool,
+    global_filter: Option<&str>,
     per_game_config: &HashMap<String, String>,
 ) -> Result<String, String> {
     let source = game.torrent_source.as_deref().unwrap_or("eXoScummVM");
@@ -670,6 +721,13 @@ async fn launch_inner(
         cmd.arg("--aspect-ratio");
     }
     cmd.arg("--stretch-mode=pixel-perfect");
+    // The version that runs: eXo's own build, or the pack standing in for it.
+    let running = match resolved.source {
+        EngineSource::Exo => Some(build_version(&entry.build)),
+        EngineSource::Pack => Some(pack_version(&entry.build)),
+        _ => None,
+    };
+    cmd.args(filter_args(per_game_config.get("svm_filter").map(String::as_str), global_filter, running));
     cmd.arg(format!("--config={}", ini.display()));
     cmd.args(&variant.extra_args);
     if let Some(p) = &variant.platform {
@@ -677,6 +735,10 @@ async fn launch_inner(
     }
     cmd.arg(format!("--savepath={}", savepath.display()));
     cmd.arg(format!("--path={}", variant.run_dir.display()));
+    // Last, so the user's options win over everything above.
+    if let Some(text) = per_game_config.get("svm_args") {
+        cmd.args(split_extra_args(text)?);
+    }
     cmd.arg(&launch_target);
     cmd.current_dir(&variant.run_dir);
     log::info!(
@@ -779,6 +841,10 @@ pub struct SvmSelection {
     pub sound: Option<String>,
     pub subtitles: bool,
     pub aspect: bool,
+    /// `svm_filter`: a `FILTERS` id, `FILTER_NONE`, or None for the global one.
+    pub filter: Option<String>,
+    /// `svm_args`, the extra command-line options as typed.
+    pub args: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -900,6 +966,8 @@ pub async fn scummvm_variants(
             sound,
             subtitles: cfg.get("svm_subtitles").map(String::as_str) == Some("true"),
             aspect: cfg.get("svm_aspect").map(String::as_str) != Some("false"),
+            filter: cfg.get("svm_filter").cloned(),
+            args: cfg.get("svm_args").cloned(),
         },
     }))
 }
@@ -918,6 +986,10 @@ pub struct SvmOptions {
     pub subtitles: Option<bool>,
     #[serde(default)]
     pub aspect: Option<bool>,
+    #[serde(default)]
+    pub filter: Option<String>,
+    #[serde(default)]
+    pub args: Option<String>,
 }
 
 pub async fn set_scummvm_options(
@@ -925,6 +997,9 @@ pub async fn set_scummvm_options(
     id: i64,
     options: SvmOptions,
 ) -> Result<(), String> {
+    if let Some(args) = &options.args {
+        split_extra_args(args)?;
+    }
     let conn = db_state.lock()?;
     let keys = [
         ("svm_variant", options.variant),
@@ -932,6 +1007,8 @@ pub async fn set_scummvm_options(
         ("svm_sound", options.sound),
         ("svm_subtitles", options.subtitles.filter(|&b| b).map(|_| "true".to_string())),
         ("svm_aspect", options.aspect.filter(|&b| !b).map(|_| "false".to_string())),
+        ("svm_filter", options.filter),
+        ("svm_args", options.args),
     ];
     for (key, value) in keys {
         match value.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
@@ -1086,5 +1163,28 @@ mod tests {
         assert_eq!(dos.subs[1].sounds, ["Sound Blaster", "Tandy"]);
         assert!(dos.subs[1].has_subtitles);
         assert_eq!(v[2].sounds, ["Sound Blaster", "Roland MT32"]);
+    }
+
+    /// The game's choice wins, "none" turns the global one off, and the
+    /// builds before 2.5 get the single `--gfx-mode` name instead.
+    #[test]
+    fn graphics_filter_follows_game_then_global_then_build() {
+        assert!(filter_args(None, None, Some("2.9.0")).is_empty());
+        assert_eq!(filter_args(None, Some("hq2x"), Some("2.9.0")), vec!["--scaler=hq", "--scale-factor=2"]);
+        assert_eq!(filter_args(Some("hq3x"), Some("hq2x"), Some("2026.1.0")), vec!["--scaler=hq", "--scale-factor=3"]);
+        assert!(filter_args(Some(FILTER_NONE), Some("hq2x"), Some("2.9.0")).is_empty());
+        assert_eq!(filter_args(Some(""), Some("tv2x"), None), vec!["--scaler=tv", "--scale-factor=2"]);
+        assert_eq!(filter_args(None, Some("hq2x"), Some(build_version("svn2.3_18903"))), vec!["--gfx-mode=hq2x"]);
+        assert_eq!(filter_args(None, Some("hq2x"), Some(build_version("svn2.8_9335"))), vec!["--scaler=hq", "--scale-factor=2"]);
+        assert_eq!(filter_args(None, Some("hq2x"), Some(pack_version("svn2.3_18903"))), vec!["--scaler=hq", "--scale-factor=2"]);
+    }
+
+    #[test]
+    fn extra_options_split_like_a_shell() {
+        assert_eq!(
+            split_extra_args("--no-aspect-ratio --extrapath=\"/my games/x\"").unwrap(),
+            vec!["--no-aspect-ratio", "--extrapath=/my games/x"]
+        );
+        assert!(split_extra_args("--extrapath=\"/open").is_err());
     }
 }

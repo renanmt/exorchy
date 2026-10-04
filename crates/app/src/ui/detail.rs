@@ -681,8 +681,8 @@ impl DetailPanel {
         if languages > 1 {
             items.push(("preferences-desktop-locale-symbolic", format!("{languages} language versions")));
         }
-        if dos_engine == Some("staging") {
-            items.push(("video-display-symbolic", "CRT shaders".into()));
+        if matches!(dos_engine, Some("staging" | "dosbox-x")) {
+            items.push(("video-display-symbolic", "CRT shaders and filters".into()));
         }
         for (icon, text) in items {
             let line = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).css_classes(["dossier-feature"]).build();

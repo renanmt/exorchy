@@ -808,7 +808,7 @@ dependencies = [
 
 [[package]]
 name = "exorchy"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "exorchy-core",
  "gstreamer",
@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "exorchy-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -847,6 +847,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "shlex",
  "tar",
  "tempfile",
  "thiserror 2.0.18",

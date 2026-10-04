@@ -465,6 +465,9 @@ pub struct GameEngineInfo {
     pub prints: bool,
     /// `engine` resolves on this system right now.
     pub engine_available: bool,
+    /// The emulator whose graphics filters apply ("staging" | "dosbox-x"):
+    /// `engine` for DOS games, DOSBox-X for the Win9x games it runs.
+    pub filter_engine: Option<String>,
 }
 
 pub async fn game_engine_info(db_state: State<'_, DbState>, id: i64) -> Result<GameEngineInfo, String> {
@@ -484,10 +487,19 @@ pub async fn game_engine_info(db_state: State<'_, DbState>, id: i64) -> Result<G
         exo_engine: None,
         prints: false,
         engine_available: false,
+        filter_engine: None,
     };
     let source = game.torrent_source.as_deref().unwrap_or("eXoDOS");
-    if collection_def(source).map(|c| c.launcher) != Some(Launcher::DosBox) {
-        return Ok(info);
+    match collection_def(source).map(|c| c.launcher) {
+        Some(Launcher::DosBox) => {}
+        Some(Launcher::Win9x) => {
+            let variant = game.dosbox_variant.as_deref().unwrap_or("x98");
+            if !variant.starts_with("86box") && variant != "pcbox" {
+                info.filter_engine = Some(launchers::dosbox::DosEngine::DosboxX.key().into());
+            }
+            return Ok(info);
+        }
+        _ => return Ok(info),
     }
     tokio::task::spawn_blocking(move || {
         let prints = game
@@ -502,6 +514,7 @@ pub async fn game_engine_info(db_state: State<'_, DbState>, id: i64) -> Result<G
         info.prints = prints;
         info.exo_engine = Some(exo.key().into());
         info.engine = Some(engine.key().into());
+        info.filter_engine = Some(engine.key().into());
         info.engine_available = match engine {
             launchers::dosbox::DosEngine::Staging => crate::emulators::resolve_dosbox_staging(&data_dir).is_some(),
             launchers::dosbox::DosEngine::DosboxX => crate::emulators::resolve_dosbox_x(&data_dir).is_some(),
@@ -628,11 +641,13 @@ pub async fn get_transfer_stats(torrent_state: State<'_, TorrentState>) -> Resul
 }
 
 /// Per-game settings the dialog edits; each key overrides the global one.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct GameSettings {
     /// `staging` forces DOSBox Staging for an ECE game; None = eXo's choice.
     pub engine: Option<String>,
     pub glshader: Option<String>,
+    /// DOSBox-X's filter (`dosbox::DOSBOX_X_FILTERS` id, or `dosbox::FILTER_NONE`).
+    pub dosx_filter: Option<String>,
     pub fullscreen: Option<String>,
     pub cycles: Option<String>,
     pub custom_conf: Option<String>,
@@ -644,29 +659,24 @@ pub async fn get_game_settings(state: State<'_, DbState>, id: i64) -> Result<Gam
     Ok(GameSettings {
         engine: cfg.get("engine").cloned(),
         glshader: cfg.get("glshader").cloned(),
+        dosx_filter: cfg.get("dosx_filter").cloned(),
         fullscreen: cfg.get("fullscreen").cloned(),
         cycles: cfg.get("cycles").cloned(),
         custom_conf: cfg.get("custom_conf").cloned(),
     })
 }
 
-pub async fn set_game_settings(
-    state: State<'_, DbState>,
-    id: i64,
-    engine: Option<String>,
-    glshader: Option<String>,
-    fullscreen: Option<String>,
-    cycles: Option<String>,
-    custom_conf: Option<String>,
-) -> Result<(), String> {
+/// Store the dialog's settings; a None (or empty) field deletes the key, so
+/// the game inherits the global value again.
+pub async fn set_game_settings(state: State<'_, DbState>, id: i64, settings: GameSettings) -> Result<(), String> {
     let conn = state.lock()?;
-    // For each key: Some(value) = set, None = delete (inherit global)
     let pairs: &[(&str, &Option<String>)] = &[
-        ("engine", &engine),
-        ("glshader", &glshader),
-        ("fullscreen", &fullscreen),
-        ("cycles", &cycles),
-        ("custom_conf", &custom_conf),
+        ("engine", &settings.engine),
+        ("glshader", &settings.glshader),
+        ("dosx_filter", &settings.dosx_filter),
+        ("fullscreen", &settings.fullscreen),
+        ("cycles", &settings.cycles),
+        ("custom_conf", &settings.custom_conf),
     ];
     for (key, val) in pairs {
         match val {
@@ -695,24 +705,32 @@ pub async fn launch_game(app: AppHandle, db_state: State<'_, DbState>, id: i64) 
     let _op_guard = op_lock.lock().await;
     // Read everything we need from the DB and drop the lock before the heavy
     // path resolution + process spawning below.
-    let (game, data_dir, crt_auto, fullscreen, per_game) = {
+    let (game, data_dir, staging_shader, fullscreen, dosx_filter, svm_filter, per_game) = {
         let conn = db_state.lock()?;
         let game = queries::fetch_game_by_id(&conn, id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Game with id {} not found", id))?;
         let data_dir = configured_data_dir(&conn)?;
-        let global_glshader = queries::get_config(&conn, "global_glshader")
-            .map_err(|e| e.to_string())?
-            .unwrap_or_else(|| "crt-auto".to_string());
+        let global_glshader = queries::get_config(&conn, "global_glshader").map_err(|e| e.to_string())?;
+        let dosx_filter = queries::get_config(&conn, "dosx_filter").map_err(|e| e.to_string())?;
         let default_fullscreen = queries::get_config(&conn, "default_fullscreen")
             .map_err(|e| e.to_string())?
             .unwrap_or_else(|| "window".to_string());
+        let svm_filter = queries::get_config(&conn, "svm_filter").map_err(|e| e.to_string())?;
         let per_game = queries::get_all_game_config(&conn, id).map_err(|e| e.to_string())?;
         // Record the launch timestamp for the "Recently played" shelf.
         if let Err(e) = queries::set_last_played(&conn, id) {
             log::warn!("Failed to update last_played for {}: {}", game.title, e);
         }
-        (game, data_dir, global_glshader == "crt-auto", default_fullscreen == "fullscreen", per_game)
+        (
+            game,
+            data_dir,
+            launchers::dosbox::staging_shader(global_glshader.as_deref()),
+            default_fullscreen == "fullscreen",
+            dosx_filter,
+            svm_filter,
+            per_game,
+        )
     };
 
     if !game.installed {
@@ -744,7 +762,9 @@ pub async fn launch_game(app: AppHandle, db_state: State<'_, DbState>, id: i64) 
         data_dir: &data_dir,
         root,
         fullscreen,
-        crt_auto,
+        staging_shader,
+        dosx_filter,
+        svm_filter,
         per_game: &per_game,
     };
     match launchers::prepare(kind, &ctx).await? {

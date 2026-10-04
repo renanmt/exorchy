@@ -122,9 +122,10 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
 
     // User preferences, applied LAST and written for both states: Staging
     // defaults glshader to crt-auto, so "off" has to be an explicit value.
-    // The shaders are Staging's; DOSBox-X gets the window setting only.
+    // The shaders are Staging's; DOSBox-X's filter goes in the per-game
+    // fragment below, which is written after this one.
     {
-        let glshader_val = if ctx.crt_auto { "crt-auto" } else { "sharp" };
+        let glshader_val = &ctx.staging_shader;
         let fullscreen_val = if ctx.fullscreen { "true" } else { "false" };
         let frag = match engine {
             DosEngine::Staging => format!("[sdl]\nfullscreen = {fullscreen_val}\n[render]\nglshader = {glshader_val}\n"),
@@ -153,6 +154,12 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
                 frag.push_str(&format!("[render]\nglshader = {}\n", gs));
             }
         }
+        if engine == DosEngine::DosboxX {
+            let per_game = ctx.per_game.get("dosx_filter").map(String::as_str);
+            if let Some(filter) = dosbox_x_filter_conf(per_game, ctx.dosx_filter.as_deref()) {
+                frag.push_str(&filter);
+            }
+        }
         if let Some(cy) = ctx.per_game.get("cycles") {
             frag.push_str(&format!("[cpu]\ncycles = {}\n", cy));
         }
@@ -175,6 +182,91 @@ pub(crate) async fn prepare(ctx: &LaunchContext<'_>) -> Result<PreparedLaunch, S
     }
 
     Ok(PreparedLaunch { cmd, binary: dosbox_bin })
+}
+
+/// DOSBox Staging's shaders as eXorchy offers them (`glshader`): the
+/// adaptive CRTs built into Staging, then the shader files its releases ship
+/// under `resources/shaders`. `crt-auto` is what a launch uses when nothing
+/// is chosen, as Staging itself does.
+pub const STAGING_SHADERS: &[(&str, &str)] = &[
+    ("crt-auto", "CRT (automatic)"),
+    ("crt-auto-machine", "CRT (per machine)"),
+    ("crt-auto-arcade", "CRT: arcade"),
+    ("crt-auto-arcade-sharp", "CRT: arcade, sharp"),
+    ("crt/crt-hyllian", "CRT: Hyllian"),
+    ("crt/vga-1080p", "CRT: VGA"),
+    ("crt/vga-1080p-fake-double-scan", "CRT: VGA, double scan"),
+    ("sharp", "Off (sharp pixels)"),
+    ("interpolation/nearest", "Nearest"),
+    ("interpolation/bilinear", "Bilinear"),
+    ("interpolation/catmull-rom", "Catmull-Rom"),
+    ("scaler/xbr-lv3", "xBR"),
+    ("scaler/xbr-lv2-noblend", "xBR, no blend"),
+    ("scaler/xbr-lv2-3d", "xBR 3D"),
+    ("scaler/advmame2x", "AdvMAME2x"),
+    ("scaler/advmame3x", "AdvMAME3x"),
+    ("scaler/advinterp2x", "AdvInterp2x"),
+    ("scaler/advinterp3x", "AdvInterp3x"),
+];
+
+/// The global `global_glshader` as a Staging shader. Unset is Staging's own
+/// default; "default" is what the old On/Off switch stored for Off.
+pub fn staging_shader(global: Option<&str>) -> String {
+    match global {
+        None | Some("") => "crt-auto",
+        Some("default") => "sharp",
+        Some(v) => v,
+    }
+    .to_string()
+}
+
+/// DOSBox-X's filters (`dosx_filter`): id, label. A bare id is a GLSL shader
+/// (built in, or one of the files the AppImage ships, both found by name);
+/// `scaler/<name>` is one of its software scalers.
+pub const DOSBOX_X_FILTERS: &[(&str, &str)] = &[
+    ("crt-lottes", "CRT: Lottes"),
+    ("crt-lottes-fast", "CRT: Lottes fast"),
+    ("crt-geom", "CRT: Geom"),
+    ("crt-easymode", "CRT: Easymode"),
+    ("crt-hyllian", "CRT: Hyllian"),
+    ("crt-aperture", "CRT: Aperture"),
+    ("crt-caligari", "CRT: Caligari"),
+    ("crt-pi", "CRT: Pi"),
+    ("zfast_crt", "CRT: zfast"),
+    ("scan2x", "Scanlines 2x"),
+    ("scan3x", "Scanlines 3x"),
+    ("tv2x", "TV2x"),
+    ("tv3x", "TV3x"),
+    ("rgb2x", "RGB2x"),
+    ("rgb3x", "RGB3x"),
+    ("xbr-lv3", "xBR"),
+    ("xbr-lv2-noblend", "xBR, no blend"),
+    ("advmame2x", "AdvMAME2x"),
+    ("advmame3x", "AdvMAME3x"),
+    ("advinterp2x", "AdvInterp2x"),
+    ("advinterp3x", "AdvInterp3x"),
+    ("scaler/hq2x", "HQ2x"),
+    ("scaler/hq3x", "HQ3x"),
+    ("scaler/xbrz", "xBRZ"),
+    ("scaler/2xsai", "2xSaI"),
+    ("scaler/super2xsai", "Super2xSaI"),
+    ("scaler/supereagle", "SuperEagle"),
+];
+
+/// The `dosx_filter` value that turns the global DOSBox-X filter off for one game.
+pub const FILTER_NONE: &str = "none";
+
+/// The conf fragment for the DOSBox-X filter in effect: the game's choice,
+/// else the global one; None leaves eXo's conf alone. Shaders need OpenGL
+/// output and the picture unscaled (eXo's confs ask for `normal2x`);
+/// software scalers are `forced`, or DOSBox-X skips them on larger modes.
+pub fn dosbox_x_filter_conf(per_game: Option<&str>, global: Option<&str>) -> Option<String> {
+    let id = per_game.filter(|v| !v.is_empty()).or(global)?;
+    DOSBOX_X_FILTERS.iter().find(|f| f.0 == id)?;
+    Some(match id.strip_prefix("scaler/") {
+        Some(scaler) => format!("[sdl]\noutput = opengl\n[render]\nglshader = none\nscaler = {scaler} forced\n"),
+        None => format!("[sdl]\noutput = opengl\n[render]\nscaler = none\nglshader = {id}\n"),
+    })
 }
 
 pub const DOSBOX_X_MISSING_MESSAGE: &str = "This game runs under DOSBox-X, which is not installed yet. \
@@ -1208,6 +1300,31 @@ fn autoexec_has_launch_cmd(conf: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+
+    /// Unset is Staging's own default, and the old switch's "default" was Off.
+    #[test]
+    fn staging_shader_reads_old_and_new_values() {
+        use super::staging_shader;
+        assert_eq!(staging_shader(None), "crt-auto");
+        assert_eq!(staging_shader(Some("")), "crt-auto");
+        assert_eq!(staging_shader(Some("default")), "sharp");
+        assert_eq!(staging_shader(Some("crt-auto")), "crt-auto");
+        assert_eq!(staging_shader(Some("scaler/xbr-lv3")), "scaler/xbr-lv3");
+    }
+
+    /// Shaders need OpenGL and no scaler; scalers are forced; the game's
+    /// choice wins and "none" turns the global one off.
+    #[test]
+    fn dosbox_x_filter_fragment() {
+        use super::{dosbox_x_filter_conf, FILTER_NONE};
+        assert_eq!(dosbox_x_filter_conf(None, None), None);
+        let crt = dosbox_x_filter_conf(None, Some("crt-lottes")).unwrap();
+        assert!(crt.contains("output = opengl") && crt.contains("scaler = none") && crt.contains("glshader = crt-lottes"));
+        let hq = dosbox_x_filter_conf(Some("scaler/hq2x"), Some("crt-lottes")).unwrap();
+        assert!(hq.contains("scaler = hq2x forced") && hq.contains("glshader = none"));
+        assert_eq!(dosbox_x_filter_conf(Some(FILTER_NONE), Some("crt-lottes")), None);
+        assert_eq!(dosbox_x_filter_conf(None, Some("not-a-filter")), None);
+    }
 
     /// The emulator's view of a mounted host directory is case-insensitive,
     /// so the probe's must be too. Only Linux can fail this - which is where
